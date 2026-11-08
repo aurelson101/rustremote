@@ -197,3 +197,10 @@ Publication du projet complet sur le dépôt privé `aurelson101/rustremote` dem
 README avec captures réelles, licence personnalisée d’usage professionnel et de
 redistribution gratuite interdisant la revente, NOTICE et métadonnées préparés.
 Les droits des composants tiers restent inchangés ; il ne s’agit pas d’une licence OSI.
+
+Publication du projet complet effectuée sur `main` du dépôt privé
+`aurelson101/rustremote` : premier commit complet
+`604a029040ec5fa9d6d6d9aeb0300bd33cd2abe1` ; 86 fichiers, captures et licence incluses.
+Arbre source local/distant identique, contrôles de liens README et métadonnées Cargo
+réussis ; aucun binaire ni secret publié. P3-02 reste PARTIAL : cette publication des
+sources ne constitue pas une nouvelle AppImage ni une qualification des limites restantes.

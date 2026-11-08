@@ -39,7 +39,7 @@ Créer **RustRemote**, application de bureau Linux centrée sur des sessions SSH
 ## 5. Tâches à faire (ordre prioritaire)
 
 - [x] **P0-01** Vérifier l'environnement Ubuntu et les prérequis Rust/GTK ; consigner versions/commandes.
-- [x] **P0-02** Initialiser Git et le Cargo workspace minimal, avec licence à décider et `README` cohérent.
+- [x] **P0-02** Initialiser Git et le Cargo workspace minimal, avec licence choisie et `README` cohérent.
 - [x] **P0-03** Créer une fenêtre GTK4/Relm4 native avec arborescence de sessions, onglets et panneau SFTP fictif ; lancer et vérifier.
 - [x] **P0-04** Définir les structs `SessionProfile`, `SessionKind`, `SessionState` et modèles de stockage sans secrets ; tests.
 - [x] **P1-01** Authentification SSH agent + contrôle d'empreinte d'hôte + ouverture PTY ; tests.
@@ -106,7 +106,14 @@ Créer **RustRemote**, application de bureau Linux centrée sur des sessions SSH
   `aurelson101/rustremote` (initialement vide). Licence explicitement choisie : usage
   professionnel autorisé, revente interdite ; licence personnalisée dans LICENSE,
   tiers séparés dans NOTICE, métadonnées Cargo et packaging ajustés. README réécrit
-  avec deux captures réelles de laboratoire dans docs/screenshots. Publication en cours.
+  avec deux captures réelles de laboratoire dans docs/screenshots. Projet complet publié
+  sur `main` : `604a029040ec5fa9d6d6d9aeb0300bd33cd2abe1`, visibilité privée conservée.
+- Publication GitHub : 86 fichiers de projet, sans dist/target/.tools ni secret détecté,
+  via le connecteur GitHub (CLI non authentifiée). Arbre Git distant identique à
+  l’index local ; historique local synchronisé aux objets Git vérifiés par SHA,
+  branche main et origin configurés. Aucun force-push ni changement de visibilité.
+  Licence personnalisée d’usage professionnel, revente interdite ; README et captures
+  réelles publiés. `cargo check --workspace` après métadonnées/licence : PASS.
 - Incomplets : CLIPRDR réel texte/fichiers/dossiers RDP (Shadow 3.32 non compatible),
   AD/Windows/périphériques physiques, KDE et tests prolongés, progression/reprise et
   bastions SFTP ; tunnels autonomes/macros/Multi-Exec désactivés. Pas d’équivalence

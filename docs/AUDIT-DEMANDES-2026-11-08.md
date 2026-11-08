@@ -84,3 +84,11 @@ licences ; LICENSE/NOTICE sont prévus dans le prochain packaging.
 Autres rejeux réussis : actions de dossiers par souris, quatre bascules Affichage,
 Coffre distinct des Paramètres ; fermeture FreeRDP à la sortie de RustRemote.
 Résultats structurés : `validation/2026-11-08.json`.
+
+Publication complète réalisée sur `main` (dépôt privé conservé), premier commit de code
+`604a029040ec5fa9d6d6d9aeb0300bd33cd2abe1`. Les 86 fichiers de l’arbre distant
+correspondent à l’index local, captures incluses. Les répertoires de build, caches et
+AppImages restent exclus. Scan ciblé avant publication : aucun en-tête de clé privée,
+jeton connu ou fichier d’identifiants détecté ; ce contrôle n’est pas un audit exhaustif.
+Les liens relatifs du README, le fichier de licence Cargo, le script de packaging et
+`cargo check --workspace` ont été vérifiés après préparation de la publication.
