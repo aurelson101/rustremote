@@ -234,6 +234,9 @@ pub fn build(app: &Application, offline: bool, demo: bool, enforced_offline: boo
         "simulation",
         "sftp",
         "diagnostics",
+        "tunnels",
+        "macros",
+        "multi-exec",
     ] {
         let action = gtk::gio::SimpleAction::new(name, None);
         let controller = profiles.clone();
@@ -252,9 +255,12 @@ pub fn build(app: &Application, offline: bool, demo: bool, enforced_offline: boo
             "simulation" => controller.simulation_lab(),
             "sftp" => controller.sftp_current(),
             "diagnostics" => controller.diagnostics(),
+            "tunnels" => controller.tunnels(),
+            "macros" => controller.commands(false),
+            "multi-exec" => controller.commands(true),
             "tools" => controller.information("Outils", "Accès disponibles : profils SSH et RDP configurables.
 
-VNC dispose d’un tunnel SSH optionnel ; série utilise picocom. SFTP natif est accessible depuis le terminal SSH. Ping et Traceroute sont configurables dans Paramètres. Les tunnels généraux, macros et Multi-Exec restent à implémenter et leurs boutons sont désactivés.
+VNC dispose d’un tunnel SSH optionnel ; série utilise picocom. SFTP natif est accessible depuis le terminal SSH. Ping et Traceroute sont configurables dans Paramètres. Tunnels directs, macros prédéfinies et Multi-Exec sont accessibles par leurs boutons ; une confirmation des cibles est obligatoire.
 
 Les accès actuels utilisent les clients système OpenSSH / FreeRDP 3 ; aucune connexion ne part sans confirmation de sa cible."),
             _ => controller.information("À propos de RustRemote", &format!("RustRemote {} · Linux / Rust / GTK4 / VTE
@@ -302,6 +308,9 @@ SSH et série dans les onglets ; navigateur SFTP natif. RDP/VNC restent externes
             ],
             "Outils" => &[
                 ("Ping / Traceroute…", "app.diagnostics"),
+                ("Tunnels SSH…", "app.tunnels"),
+                ("Macros SSH…", "app.macros"),
+                ("Multi-Exec SSH…", "app.multi-exec"),
                 ("Laboratoire SFTP / presse-papiers…", "app.simulation"),
                 ("Outils disponibles…", "app.tools"),
                 ("Paramètres et protection…", "app.settings"),
@@ -414,6 +423,9 @@ SSH et série dans les onglets ; navigateur SFTP natif. RDP/VNC restent externes
             "Coffre" => Some("app.vault"),
             "Paramètres" => Some("app.settings"),
             "SFTP" => Some("app.sftp"),
+            "Port Forward" | "Tunnels" => Some("app.tunnels"),
+            "Macros" => Some("app.macros"),
+            "Multi-Exec" => Some("app.multi-exec"),
             _ => None,
         };
         if let Some(action) = action {

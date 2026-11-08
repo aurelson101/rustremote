@@ -1,8 +1,8 @@
 # Contrôle des demandes avant nouvelle AppImage — 2026-11-08
 
-**Décision : publication différée. Toutes les demandes ne sont pas terminées.**
-L’AppImage 0.4.1 existante est conservée ; elle ne contient pas les changements
-non publiés décrits ici. Aucun essai ne contacte ia.aurelson.com ou un serveur réel.
+**Relevé initial conservé ; voir la [validation 0.5.0](VALIDATION-0.5.0.md) pour les résultats plus récents.**
+Les limites Windows/matériel, moteurs intégrés et file persistante restent ouvertes.
+Aucun essai ne contacte ia.aurelson.com ou un serveur réel.
 
 ## Couverture des demandes
 
@@ -16,22 +16,22 @@ non publiés décrits ici. Aucun essai ne contacte ia.aurelson.com ou un serveur
 | Domaine AD/realm SSH et RDP | Champs et validation présents ; UPN ou DOMAINE\\utilisateur SSH, domaine RDP séparé. Tests de construction ; authentification RDP locale avec domaine réussie. AD/LDAP réel non testé. |
 | Mot de passe RDP dans le profil | Connexion depuis l’interface au bureau RDP isolé réussie, secret transmis par pipe, déconnexion suivie. |
 | Copier/coller texte SSH bidirectionnel | Parcours réel réussi avec consentement multiligne ; clic droit souris Copier/Coller vérifié avec échanges SSH réels. |
-| Texte/fichiers/dossiers bidirectionnels RDP, sélection multiple | Options distinctes opt-in présentes et testées dans les arguments ; **transferts réels non validés** : FreeRDP Shadow 3.32 ne fournit pas CLIPRDR. Une simulation de copie ne prouve pas le canal RDP. |
+| Texte/fichiers/dossiers bidirectionnels RDP, sélection multiple | 10 cas réels CLIPRDR réussis sous GNOME Remote Desktop/FreeRDP en namespaces isolés : texte et un/plusieurs fichiers/dossiers dans chaque sens. Windows réel non testé. |
 | RDP autosize, smart sizing, son, imprimantes, double écran | Options présentes et relues ; son/impression/multimoniteur physiques non validés. RDP reste une fenêtre FreeRDP externe. |
 | SFTP éditable et transférable | Réussi : listing, texte UTF-8, enregistrement avec contrôle de conflit, création de dossiers, envoi/téléchargement récursif, annulation, refus d’écrasement et de liens. |
-| Commandes SFTP inspirées des usages FileZilla | Renommage sans écrasement, permissions Unix, suppression confirmée bornée testés ; téléchargement mixte fichier+dossier à sélection multiple testé ; sélecteurs locaux ajoutés mais pas encore rejoués. Pas de file de transferts persistante, progression détaillée ou reprise. |
-| SFTP par bastion/configuration OpenSSH | **Non disponible** : connexion libssh2 directe distincte du terminal. La fenêtre le signale. |
+| Commandes SFTP inspirées des usages FileZilla | Renommage, permissions, suppression confirmée, multisélection et sélecteurs GTK réels testés. Progression, annulation et reprise de fichiers ajoutées ; pas de file persistante ni reprise récursive. |
+| SFTP par bastion/configuration OpenSSH | HostName et ProxyJump ajoutés, empreinte stricte et bastion clé/agent ; ProxyCommand personnalisé refusé. Voir validation 0.5.0. |
 | Coffre distinct des paramètres | Corrigé ; fenêtre propre aux identifiants, référence par profil, lecture depuis un coffre de laboratoire après redémarrage réussie. Aucun secret dans le JSON/export. |
-| Menu Affichage | Panneaux Sessions/SFTP, barres d’outils/état, plein écran, zoom et fermeture de l’onglet ajoutés ; quatre bascules et zoom testés ; plein écran non validé par le dernier essai Wayland. |
+| Menu Affichage | Panneaux, barres, zoom et fermeture d’onglet testés ; plein écran Wayland confirmé par compositeur puis restauration sur AppImage 0.5.0. |
 | Import/export de profils et exemple Serveur IA | Parcours GTK réussi avec simulation IA sans réseau, refus de doublon ; tests Rust : références de coffre exclues des exports et neutralisées à l’import. |
 | Ping et traceroute | Outils configurables présents ; simulations et désactivation par paramètres testées. Aucun diagnostic vers infrastructure réelle. |
 | VNC avec tunnel SSH | Configuration et lanceur existants ; laboratoire local de la 0.4.1 documenté. Moteur VNC intégré absent. |
 | Série/switch | Terminal picocom et laboratoire PTY réussis ; adaptateur et switch physiques non testés. |
-| Tunnels autonomes, port forwarding, macros, Multi-Exec | **Non implémentés** ; boutons désactivés avec indication « À venir ». |
-| GNOME/Wayland/KDE, RAM/CPU, absence de fuite/blocage | Mesures ciblées seulement : parcours X11, cycles de fenêtres et compteurs ; dernier démarrage Wayland automatisé en échec, KDE non testé ; aucune garantie d’absence absolue de fuite ni certification KDE/Wayland complète. |
-| AppImage nouvelle version | **Non créée à cette étape**, car couverture encore partielle. Préparer une version de test en conservant explicitement ces limites après les validations manquantes. |
+| Tunnels autonomes, port forwarding, macros, Multi-Exec | Implémentés en 0.5.0 : trois modes de tunnel loopback, macros et Multi-Exec avec confirmation sur sessions authentifiées. Voir validation 0.5.0. |
+| GNOME/Wayland/KDE, RAM/CPU, absence de fuite/blocage | Parcours Wayland GNOME réussi, dont plein écran. Mesures courtes mémoire/CPU documentées ; KDE et endurance non qualifiés, aucune garantie absolue d’absence de fuite. |
+| AppImage nouvelle version | 0.5.0 construite ; version, SHA256, authentification SSH/SFTP du profil, RDP et démarrage Wayland testés sur artefact. Voir validation 0.5.0. |
 
-## Vérifications de cet incrément
+## Vérifications historiques avant 0.5.0
 
 - `cargo fmt --all -- --check`, `cargo check --workspace`,
   `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace` :

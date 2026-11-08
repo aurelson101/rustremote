@@ -8,6 +8,7 @@ lancement de connexions RDP, VNC et série.
 RustRemote est un projet indépendant, inspiré des usages des outils de gestion de
 sessions. Il ne contient pas de code propriétaire de MobaXterm ou de FileZilla.
 
+[Validation 0.5.0](docs/VALIDATION-0.5.0.md) ·
 [État des demandes](docs/AUDIT-DEMANDES-2026-11-08.md) ·
 [Feuille de route](docs/ROADMAP.md) · [Sécurité](docs/SECURITY.md) · [Licence](LICENSE)
 
@@ -34,7 +35,9 @@ servent à vérifier les transferts, les collisions et le refus des liens symbol
   copier/coller contrôlé, y compris au clic droit.
 - **SFTP** : connexion native ssh2/libssh2, listing, édition UTF-8, création de dossiers,
   renommage, permissions Unix, suppression confirmée, transferts récursifs et sélection
-  multiple ; protection contre l'écrasement et détection des conflits d'édition.
+  multiple ; progression réelle, annulation et reprise de fichiers après vérification
+  du préfixe ; protection contre l’écrasement et détection des conflits d’édition.
+  Alias HostName et ProxyJump pris en charge avec bastion déjà approuvé et clé/agent.
 - **Profils** : dossiers Linux/Windows, favoris, recherche, édition, menus contextuels,
   import/export JSON RustRemote ; chiffrement age facultatif au premier lancement.
 - **Identifiants** : mot de passe dans le formulaire de chaque profil SSH/RDP ;
@@ -47,28 +50,32 @@ servent à vérifier les transferts, les collisions et le refus des liens symbol
   intégré pour les équipements série.
 - **Interface et outils** : thème sombre, icônes embarquées, panneaux et barres
   masquables, plein écran, paramètres persistants, Ping/Traceroute avec simulation.
+- **Automatisation SSH** : tunnels local/distant/SOCKS avec écoute loopback, macros
+  prédéfinies et Multi-Exec sur 1 à 8 sessions authentifiées, après prévisualisation.
 
 ## Limites actuelles
 
 Le projet n'est pas une réimplémentation complète de MobaXterm ou de FileZilla.
-RDP/VNC utilisent des fenêtres externes ; tunnels autonomes, macros et Multi-Exec
-restent désactivés. Le SFTP ouvre un transport distinct et n'applique pas les alias,
-ProxyJump ou options OpenSSH ; progression détaillée et reprise sont à développer.
+RDP/VNC utilisent des fenêtres externes ; X11 forwarding, file de transferts
+persistante et reprise des dossiers restent à développer. Le SFTP ouvre un transport
+distinct ; il accepte HostName/ProxyJump, pas les ProxyCommand personnalisés ni toutes
+les options OpenSSH. Le bastion exige clé/agent et empreinte préalablement validée.
 
 Les transferts SFTP sont bornés à **16 Mio, 128 entrées, 8 niveaux et 30 secondes** ;
-l'éditeur accepte du texte UTF-8 jusqu'à 1 Mio. Un envoi interrompu peut laisser une
-cible partielle ; les destinations existantes sont refusées par les transferts.
-La suppression distante est définitive, confirmée et non atomique.
+l’éditeur accepte du texte UTF-8 jusqu’à 1 Mio. Un envoi interrompu peut laisser une
+cible partielle. La reprise de fichiers vérifie tout le préfixe avant de continuer.
+Les téléchargements interrompus conservent un fichier `.nom.rustremote-part` sans
+publier la destination finale. La suppression distante est définitive et confirmée.
 
-Les options RDP de presse-papiers sont configurées, mais **la copie réelle de texte,
-fichiers et dossiers via CLIPRDR n'est pas validée** par le laboratoire Shadow actuel.
+La copie réelle de texte, fichiers et dossiers dans les deux sens via **CLIPRDR**
+a été vérifiée entre FreeRDP et GNOME Remote Desktop dans un laboratoire isolé.
 Windows/AD réels, son, imprimantes, double écran, matériel série et KDE restent à
-qualifier. Le dernier rejeu automatisé Wayland de cet incrément a échoué pendant
-le parcours de démarrage ; le fonctionnement X11 ne vaut pas validation Wayland.
+qualifier. Le parcours Wayland natif a réussi sous GNOME ; cela ne certifie pas
+l’ensemble des environnements Linux ni l’absence de fuite sur une longue durée.
 
-Le dépôt contient un incrément **non publié après la 0.4.1**. L'ancienne AppImage
-0.4.1 ne contient pas les derniers ajouts ; aucune nouvelle image n'est annoncée
-comme complète. Voir [l'audit avant AppImage](docs/AUDIT-DEMANDES-2026-11-08.md).
+La version **0.5.0 est un aperçu de test**, disponible dans les
+[releases GitHub](https://github.com/aurelson101/rustremote/releases/tag/v0.5.0).
+Voir les résultats et limites de la [validation](docs/VALIDATION-0.5.0.md).
 
 ## Compiler et lancer
 
@@ -109,6 +116,7 @@ cargo test --workspace
 python3 scripts/smoke-profiles.py target/debug/rustremote
 python3 scripts/test-ssh-sftp-local.py --gui target/debug/rustremote
 python3 scripts/test-rdp-local.py --app target/debug/rustremote
+python3 scripts/test-rdp-clipboard-local.py
 ```
 
 Les laboratoires nécessitent leurs outils supplémentaires (Paramiko, PyGObject,

@@ -23,6 +23,7 @@ logging.getLogger("paramiko").addHandler(logging.NullHandler())
 events = {"publickey_accepted": 0, "publickey_rejected": 0, "pty_requested": 0,
           "resize_requested": 0, "unsafe_path_rejected": 0, "shell_commands": 0}
 shell_workers=[]
+command_counter_lock=threading.Lock()
 
 
 def command(args, **kwargs):
@@ -44,6 +45,33 @@ with tempfile.TemporaryDirectory(prefix="rustremote-ssh-") as directory:
 
 
     class Server(paramiko.ServerInterface):
+        def __init__(self):
+            self.direct = {}
+
+        def check_channel_direct_tcpip_request(self, channel_id, origin, destination):
+            if destination not in (("127.0.0.1", echo_port),("127.0.0.1", port)):
+                return paramiko.OPEN_FAILED_ADMINISTRATIVELY_PROHIBITED
+            self.direct[channel_id] = destination
+            return paramiko.OPEN_SUCCEEDED
+
+        def check_port_forward_request(self, address, port):
+            if address != "127.0.0.1" or port < 1024:return False
+            listener=socket.socket()
+            try:listener.bind((address,port));listener.listen(4);listener.settimeout(.2)
+            except OSError:listener.close();return False
+            remote_listeners.append(listener)
+            def accept_forwarded():
+                try:
+                    while self.transport.is_active() and not stop.is_set():
+                        try:connection,origin=listener.accept()
+                        except socket.timeout:continue
+                        channel=self.transport.open_forwarded_tcpip_channel(origin,(address,port))
+                        thread=threading.Thread(target=bridge,args=(channel,connection));channel_workers.append(thread);thread.start()
+                except (OSError,EOFError,paramiko.SSHException):pass
+                finally:listener.close()
+            thread=threading.Thread(target=accept_forwarded);channel_workers.append(thread);thread.start()
+            return port
+
         def get_allowed_auths(self, username):
             return "publickey,password"
 
@@ -97,7 +125,11 @@ with tempfile.TemporaryDirectory(prefix="rustremote-ssh-") as directory:
                             line,pending=pending.split(b"\n",1)
                             command=line.decode(errors="replace").strip()
                             if not command: continue
-                            events["shell_commands"]+=1
+                            with command_counter_lock:
+                                events["shell_commands"]+=1
+                                counter=base/"shell-commands.count"
+                                counter.with_suffix(".tmp").write_text(str(events["shell_commands"]))
+                                counter.with_suffix(".tmp").replace(counter)
                             if command=="echo RUSTREMOTE_UTF8": reply="RÉPONSE_DISTANTE — été"
                             elif command=="pwd": reply="/laboratoire"
                             elif command=="exit": channel.send_exit_status(0);channel.close();return
@@ -116,6 +148,13 @@ with tempfile.TemporaryDirectory(prefix="rustremote-ssh-") as directory:
             return True
 
     class Handle(paramiko.SFTPHandle):
+        def read(self, offset, length):
+            if getattr(self, "slow", False):time.sleep(.15)
+            return super().read(offset, length)
+
+        def stat(self):
+            return paramiko.SFTPAttributes.from_stat(os.fstat(self.readfile.fileno()))
+
         def write(self, offset, content):
             if offset < 0 or offset + len(content) > 2 * 1024 * 1024:
                 return paramiko.SFTP_PERMISSION_DENIED
@@ -161,6 +200,7 @@ with tempfile.TemporaryDirectory(prefix="rustremote-ssh-") as directory:
                     return paramiko.SFTP_PERMISSION_DENIED
                 fd = os.open(self.path(name), flags | os.O_NOFOLLOW, 0o600)
                 handle = Handle(flags)
+                handle.slow = name.endswith("progress.txt")
                 stream = os.fdopen(fd, "r+b" if flags & os.O_RDWR else "wb" if flags & os.O_WRONLY else "rb")
                 handle.readfile = stream
                 handle.writefile = stream
@@ -216,6 +256,48 @@ with tempfile.TemporaryDirectory(prefix="rustremote-ssh-") as directory:
     known.write_text(f"[127.0.0.1]:{port} {host.get_name()} {host.get_base64()}\n")
     stop = threading.Event()
     transports = []
+    echo_listener = socket.socket();echo_listener.bind(("127.0.0.1",0));echo_listener.listen(4);echo_listener.settimeout(.2)
+    echo_port=echo_listener.getsockname()[1]
+    (base/"forward-echo-port").write_text(str(echo_port))
+    (base/"shell-commands.count").write_text("0")
+    def echo_server():
+        while not stop.is_set():
+            try:connection,_=echo_listener.accept()
+            except socket.timeout:continue
+            with connection:
+                connection.settimeout(5)
+                try:
+                    content=connection.recv(8192)
+                    if content:connection.sendall(content)
+                except OSError:pass
+    echo_worker=threading.Thread(target=echo_server);echo_worker.start()
+    channel_workers=[]
+    remote_listeners=[]
+    def bridge(channel,connection):
+        import select
+        try:
+            connection.settimeout(5)
+            deadline=time.monotonic()+60;count=0
+            while count<16*1024*1024 and time.monotonic()<deadline and not stop.is_set():
+                for source in select.select([connection,channel],[],[],.2)[0]:
+                    content=source.recv(min(4096,16*1024*1024-count))
+                    if not content:return
+                    count+=len(content);deadline=time.monotonic()+60
+                    (channel if source is connection else connection).sendall(content)
+        except (OSError,EOFError,paramiko.SSHException):pass
+        finally:channel.close();connection.close()
+    def relay(transport,server):
+        import select
+        while transport.is_active() and not stop.is_set():
+            channel=transport.accept(.2)
+            if channel is None:continue
+            destination=server.direct.pop(channel.get_id(),None)
+            if destination is None:continue
+            def copy(channel=channel,destination=destination):
+                try:connection=socket.create_connection(destination,timeout=5)
+                except OSError:channel.close();return
+                bridge(channel,connection)
+            t=threading.Thread(target=copy);channel_workers.append(t);t.start()
 
     def serve():
         while not stop.is_set():
@@ -228,7 +310,9 @@ with tempfile.TemporaryDirectory(prefix="rustremote-ssh-") as directory:
             transport.add_server_key(host)
             transport.set_subsystem_handler("sftp", paramiko.SFTPServer, Files)
             try:
-                transport.start_server(server=Server())
+                handler=Server();handler.transport=transport
+                transport.start_server(server=handler)
+                dispatcher=threading.Thread(target=relay,args=(transport,handler));channel_workers.append(dispatcher);dispatcher.start()
             except (paramiko.SSHException, EOFError, OSError):
                 transport.close()
 
@@ -303,7 +387,7 @@ with tempfile.TemporaryDirectory(prefix="rustremote-ssh-") as directory:
             primary={"name":"SSH intégré — laboratoire","host":"127.0.0.1","port":port,"username":"lab","favorite":False,"folder":"Linux","platform":"Linux","simulation":False,"options":{"protocol":"Ssh","identity_file":str(base/"identity"),"agent":False,"known_hosts_file":str(gui_known),"config_file":"/dev/null"}}
             agent_profile=dict(primary,name="SSH Agent — laboratoire",options=dict(primary["options"],identity_file=None,agent=True))
             (config/"profiles.json").write_text(json.dumps({"version":1,"folders":["Linux"],"profiles":[primary,agent_profile]}))
-            gui=subprocess.run(["dbus-run-session","--","python3",str(Path(__file__).with_name("smoke-connected.py")),str(image),str(config.parent)],env=gui_env,timeout=240)
+            gui=subprocess.run(["dbus-run-session","--","python3",str(Path(__file__).with_name("smoke-connected.py")),str(image),str(config.parent)],env=gui_env,timeout=600)
             assert gui.returncode==0,"Parcours SSH intégré échoué"
             summary["application_terminal_gui"]=True
         summary["success"] = True
@@ -313,11 +397,15 @@ with tempfile.TemporaryDirectory(prefix="rustremote-ssh-") as directory:
         if agent_process:
             agent_process.terminate();agent_process.wait(timeout=5)
         stop.set()
+        echo_worker.join(timeout=6);echo_listener.close()
         worker.join(timeout=6)
         listener.close()
         for transport in transports:
             transport.close()
             transport.join(timeout=3)
+        for listener in remote_listeners:listener.close()
+        for worker in channel_workers:
+            worker.join(timeout=6)
         for worker in shell_workers:
             worker.join(timeout=3)
         assert not worker.is_alive() and all(not t.is_alive() for t in transports)

@@ -29,6 +29,8 @@ struct Browser {
     editor: gtk::TextView,
     editing: RefCell<Option<(PathBuf, Vec<u8>)>>,
     status: gtk::Label,
+    progress: Arc<crate::sftp::Progress>,
+    progress_bar: gtk::ProgressBar,
 }
 impl Browser {
     fn invalidate_listing(&self) {
@@ -44,6 +46,33 @@ impl Browser {
             return;
         }
         self.cancel.store(false, Ordering::Relaxed);
+        self.progress.reset();
+        self.progress_bar.set_fraction(0.0);
+        self.progress_bar.set_text(Some("0 octets · 0 entrée(s)"));
+        self.progress_bar
+            .update_property(&[gtk::accessible::Property::Description(
+                "0 octets · 0 entrée(s)",
+            )]);
+        let weak = Rc::downgrade(self);
+        gtk::glib::timeout_add_local(std::time::Duration::from_millis(100), move || {
+            let Some(state) = weak.upgrade() else {
+                return gtk::glib::ControlFlow::Break;
+            };
+            if !state.busy.get() {
+                return gtk::glib::ControlFlow::Break;
+            }
+            let (bytes, entries) = state.progress.snapshot();
+            state
+                .progress_bar
+                .set_text(Some(&format!("{bytes} octets · {entries} entrée(s)")));
+            state
+                .progress_bar
+                .update_property(&[gtk::accessible::Property::Description(&format!(
+                    "{bytes} octets · {entries} entrée(s)"
+                ))]);
+            state.progress_bar.pulse();
+            gtk::glib::ControlFlow::Continue
+        });
         if matches!(&operation, Operation::List(_)) {
             self.invalidate_listing();
         }
@@ -54,6 +83,7 @@ impl Browser {
         let profile = self.profile.clone();
         let credential = self.credential.clone();
         let cancel = self.cancel.clone();
+        let progress = self.progress.clone();
         let state = Rc::downgrade(self);
         crate::dialogs::io(
             move || {
@@ -64,7 +94,7 @@ impl Browser {
                         credential.as_deref().map(|s| s.as_str()),
                     )?);
                 }
-                let mut budget = Budget::new(cancel);
+                let mut budget = Budget::new(cancel).track(progress);
                 let result = guard
                     .as_ref()
                     .ok_or("Session SFTP absente")?
@@ -81,6 +111,13 @@ impl Browser {
                     return;
                 };
                 state.busy.set(false);
+                let (bytes, entries) = state.progress.snapshot();
+                state
+                    .progress_bar
+                    .set_fraction(if result.is_ok() { 1.0 } else { 0.0 });
+                state
+                    .progress_bar
+                    .set_text(Some(&format!("{bytes} octets · {entries} entrée(s)")));
                 state.controls.set_sensitive(true);
                 match result{
                 Ok(Output::Entries(entries))=>{
@@ -276,7 +313,7 @@ impl Browser {
         let Some(parent) = self.path.root().and_downcast::<gtk::Window>() else {
             return;
         };
-        let chooser = gtk::FileChooserNative::new(
+        let chooser = gtk::FileChooserDialog::new(
             Some("Envoyer vers le dossier SFTP courant"),
             Some(&parent),
             if folders {
@@ -284,9 +321,15 @@ impl Browser {
             } else {
                 gtk::FileChooserAction::Open
             },
-            Some("Envoyer"),
-            Some("Annuler"),
+            &[
+                ("Annuler", gtk::ResponseType::Cancel),
+                ("Envoyer", gtk::ResponseType::Accept),
+            ],
         );
+        chooser.set_application(parent.application().as_ref());
+        chooser.set_modal(true);
+        chooser.set_destroy_with_parent(true);
+        chooser.set_default_size(800, 600);
         chooser.set_select_multiple(true);
         let weak = Rc::downgrade(self);
         chooser.connect_response(move |chooser, response| {
@@ -326,14 +369,78 @@ impl Browser {
             }
             chooser.destroy();
         });
-        chooser.show();
+        chooser.present();
+    }
+    fn resume_selected(self: &Rc<Self>, upload: bool) {
+        let entries = self.selected_entries();
+        if entries.len() != 1 || !entries[0].regular {
+            self.status
+                .set_text("Sélectionnez un seul fichier régulier pour la reprise");
+            return;
+        }
+        let local = PathBuf::from(self.local.text().as_str());
+        if !local.is_absolute() {
+            self.status
+                .set_text("Chemin local absolu requis pour la reprise");
+            return;
+        }
+        let remote = PathBuf::from(self.path.text().as_str()).join(&entries[0].name);
+        let Some(parent) = self.path.root().and_downcast::<gtk::Window>() else {
+            return;
+        };
+        let dialog = gtk::Window::builder()
+            .title("Confirmer la reprise SFTP")
+            .transient_for(&parent)
+            .modal(true)
+            .default_width(460)
+            .build();
+        let body = gtk::Box::new(gtk::Orientation::Vertical, 10);
+        body.add_css_class("dialog-content");
+        let text = gtk::Label::new(Some(&format!(
+            "Reprendre {} du fichier « {} » ? Le préfixe existant sera comparé ; seuls les octets manquants seront ajoutés. La destination peut rester partielle en cas d’interruption.",
+            if upload {
+                "l’envoi"
+            } else {
+                "le téléchargement"
+            },
+            entries[0].name
+        )));
+        text.set_wrap(true);
+        body.append(&text);
+        let operation = RefCell::new(Some(Operation::Resume {
+            upload,
+            local,
+            remote,
+        }));
+        let apply = gtk::Button::with_label("Confirmer la reprise du fichier SFTP");
+        let weak = Rc::downgrade(self);
+        let window = dialog.downgrade();
+        apply.connect_clicked(move |_| {
+            if let (Some(state), Some(op)) = (weak.upgrade(), operation.borrow_mut().take()) {
+                state.submit(op);
+            }
+            if let Some(w) = window.upgrade() {
+                w.close();
+            }
+        });
+        body.append(&apply);
+        let cancel = gtk::Button::with_label("Annuler la reprise SFTP");
+        let window = dialog.downgrade();
+        cancel.connect_clicked(move |_| {
+            if let Some(w) = window.upgrade() {
+                w.close();
+            }
+        });
+        body.append(&cancel);
+        dialog.set_child(Some(&body));
+        dialog.present();
     }
     fn stop(&self) {
         self.cancel.store(true, Ordering::Relaxed);
         if let Ok(mut guard) = self.connection.try_lock()
             && let Some(connection) = guard.take()
         {
-            connection.abort();
+            std::thread::spawn(move || connection.abort());
         }
         self.status
             .set_text("Déconnexion / annulation SFTP demandée");
@@ -378,7 +485,7 @@ pub fn open(
     let body = gtk::Box::new(gtk::Orientation::Vertical, 8);
     body.add_css_class("dialog-content");
     let info = gtk::Label::new(Some(&format!(
-        "SFTP direct · {}:{} · {}\nAgent, clé ou mot de passe du profil. Les alias, passerelles et commandes de ~/.ssh/config ne sont pas appliqués.",
+        "SFTP · {}:{} · {}\nAgent, clés et mot de passe du profil. HostName et ProxyJump pris en charge ; bastion par clé/agent, empreinte déjà validée. ProxyCommand personnalisé refusé.",
         profile.host, profile.port, profile.username
     )));
     info.set_wrap(true);
@@ -387,6 +494,10 @@ pub fn open(
     status.set_wrap(true);
     status.update_property(&[gtk::accessible::Property::Label("État SFTP réel")]);
     body.append(&status);
+    let progress_bar = gtk::ProgressBar::new();
+    progress_bar.set_show_text(true);
+    progress_bar.update_property(&[gtk::accessible::Property::Label("Progression SFTP")]);
+    body.append(&progress_bar);
     let controls = gtk::Box::new(gtk::Orientation::Vertical, 8);
     fn field(body: &gtk::Box, label: &str, value: &str) -> gtk::Entry {
         let entry = gtk::Entry::new();
@@ -436,6 +547,8 @@ pub fn open(
         editor,
         editing: RefCell::new(None),
         status,
+        progress: Arc::new(crate::sftp::Progress::default()),
+        progress_bar,
     });
     let weak = Rc::downgrade(&state);
     state.path.connect_changed(move |_| {
@@ -465,6 +578,18 @@ pub fn open(
     });
     controls.reorder_child_after(&connect, Some(&state.path));
     let action_box = gtk::Box::new(gtk::Orientation::Vertical, 6);
+    button(
+        &action_box,
+        "Reprendre l’envoi du fichier SFTP…",
+        &state,
+        |s| s.resume_selected(true),
+    );
+    button(
+        &action_box,
+        "Reprendre le téléchargement SFTP…",
+        &state,
+        |s| s.resume_selected(false),
+    );
     button(&action_box, "Dossier parent SFTP", &state, |s| {
         let path = PathBuf::from(s.path.text().as_str()).join("..");
         s.path.set_text(&path.to_string_lossy());

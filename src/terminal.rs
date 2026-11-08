@@ -18,6 +18,8 @@ struct SessionInner {
     pidfd: RefCell<Option<OwnedFd>>,
     sftp_windows: RefCell<Vec<gtk::glib::WeakRef<gtk::Window>>>,
     profile: SessionProfile,
+    forward: bool,
+    control: Option<tempfile::TempDir>,
     credential: RefCell<Option<std::sync::Arc<crate::credentials::Secret>>>,
     auth: RefCell<Option<crate::ssh_auth::Bridge>>,
 }
@@ -42,6 +44,7 @@ impl Session {
     }
     pub fn can_sftp(&self) -> bool {
         self.active()
+            && !self.0.forward
             && matches!(
                 self.0.profile.options,
                 crate::profiles::ProtocolOptions::Ssh { .. }
@@ -53,6 +56,32 @@ impl Session {
                 .and_then(|i| tabs.nth_page(Some(i)))
                 .is_some_and(|p| t.is_ancestor(&p))
         })
+    }
+    pub fn can_dispatch(&self) -> bool {
+        use std::os::unix::fs::FileTypeExt;
+        self.can_sftp()
+            && self.0.control.as_ref().is_some_and(|directory| {
+                std::fs::symlink_metadata(directory.path().join("control"))
+                    .is_ok_and(|m| m.file_type().is_socket())
+            })
+    }
+    pub fn is_tunnel(&self) -> bool {
+        self.0.forward
+    }
+    pub fn target(&self) -> String {
+        format!(
+            "{} — {}@{}:{}",
+            self.0.profile.name, self.0.profile.username, self.0.profile.host, self.0.profile.port
+        )
+    }
+    pub fn send_command(&self, value: &str) -> Result<(), String> {
+        crate::tools::command(value, 1)?;
+        if !self.can_dispatch() {
+            return Err("La session SSH n’est pas encore authentifiée ou n’est plus active".into());
+        }
+        let terminal = self.0.terminal.upgrade().ok_or("Terminal fermé")?;
+        terminal.feed_child(format!("{value}\r").as_bytes());
+        Ok(())
     }
     pub fn open_sftp(&self) {
         if !self.can_sftp() {
@@ -149,7 +178,69 @@ pub fn open(
     preferences: &crate::preferences::Preferences,
     credential: Option<std::sync::Arc<crate::credentials::Secret>>,
 ) -> Result<Session, String> {
+    open_internal(tabs, profile, status, preferences, credential, None)
+}
+pub fn open_tunnel(
+    tabs: &gtk::Notebook,
+    profile: &SessionProfile,
+    status: &gtk::Label,
+    preferences: &crate::preferences::Preferences,
+    credential: Option<std::sync::Arc<crate::credentials::Secret>>,
+    forward: &crate::tools::Forward,
+) -> Result<Session, String> {
+    open_internal(
+        tabs,
+        profile,
+        status,
+        preferences,
+        credential,
+        Some(forward),
+    )
+}
+fn open_internal(
+    tabs: &gtk::Notebook,
+    profile: &SessionProfile,
+    status: &gtk::Label,
+    preferences: &crate::preferences::Preferences,
+    credential: Option<std::sync::Arc<crate::credentials::Secret>>,
+    forward: Option<&crate::tools::Forward>,
+) -> Result<Session, String> {
     let (binary, mut args) = profile.command()?;
+    let control = if matches!(
+        profile.options,
+        crate::profiles::ProtocolOptions::Ssh { .. }
+    ) {
+        let directory = tempfile::Builder::new()
+            .prefix("rr-ssh-control-")
+            .tempdir()
+            .map_err(|_| "Contrôle d’authentification SSH indisponible")?;
+        args.splice(
+            0..0,
+            [
+                "-o".into(),
+                "ControlMaster=yes".into(),
+                "-o".into(),
+                "ControlPersist=no".into(),
+                "-o".into(),
+                format!("ControlPath={}", directory.path().join("control").display()),
+            ],
+        );
+        Some(directory)
+    } else {
+        None
+    };
+    if let Some(forward) = forward {
+        if !matches!(
+            profile.options,
+            crate::profiles::ProtocolOptions::Ssh { .. }
+        ) {
+            return Err("Un tunnel nécessite un profil SSH".into());
+        }
+        if let Some(i) = args.iter().position(|v| v == "-F") {
+            args.drain(i..i + 2);
+        }
+        args.splice(0..0, forward.arguments()?);
+    }
     if !matches!(
         profile.options,
         crate::profiles::ProtocolOptions::Ssh { .. }
@@ -204,6 +295,8 @@ pub fn open(
         pidfd: RefCell::new(None),
         sftp_windows: RefCell::new(Vec::new()),
         profile: profile.clone(),
+        forward: forward.is_some(),
+        control,
         credential: RefCell::new(credential),
         auth: RefCell::new(auth),
         cancelled: Cell::new(false),
@@ -336,10 +429,7 @@ pub fn open(
         }
     });
     tools.append(&paste);
-    if matches!(
-        profile.options,
-        crate::profiles::ProtocolOptions::Ssh { .. }
-    ) {
+    if session.can_sftp() {
         let sftp = gtk::Button::with_label("Ouvrir SFTP");
         terminal
             .bind_property("input-enabled", &sftp, "sensitive")
@@ -510,7 +600,7 @@ pub fn open(
                     child.disconnect();
                 } else {
                     if let Some(s) = s.upgrade() {
-                        s.set_text(if ssh {
+                        s.set_text(if child.0.forward { "Tunnel SSH lancé · écoute loopback demandée, déconnecter pour l’arrêter" } else if ssh {
                             "Terminal actif · authentification et empreinte dans le terminal"
                         } else {
                             "Liaison série active · port local, sans authentification SSH"

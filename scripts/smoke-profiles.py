@@ -15,6 +15,12 @@ import gi
 if os.environ.get("RUSTREMOTE_PRIVATE_TEST_RUNTIME") != "1":
     with tempfile.TemporaryDirectory(prefix="rustremote-gui-runtime-") as private_runtime:
         test_env = dict(os.environ, XDG_RUNTIME_DIR=private_runtime, RUSTREMOTE_PRIVATE_TEST_RUNTIME="1", GIO_USE_VFS="local")
+        for name, suffix in (("HOME", "home"), ("XDG_DATA_HOME", "data"), ("XDG_CACHE_HOME", "cache")):
+            directory = Path(private_runtime) / suffix
+            directory.mkdir(mode=0o700)
+            test_env[name] = str(directory)
+        if not test_env.get("XAUTHORITY") and (Path.home()/".Xauthority").is_file():
+            test_env["XAUTHORITY"] = str(Path.home()/".Xauthority")
         wayland = os.environ.get("WAYLAND_DISPLAY", "wayland-0")
         if not os.path.isabs(wayland):
             test_env["WAYLAND_DISPLAY"] = str(Path(os.environ.get("XDG_RUNTIME_DIR", f"/run/user/{os.getuid()}")) / wayland)
@@ -30,7 +36,7 @@ if os.environ.get("RUSTREMOTE_PRIVATE_TEST_RUNTIME") != "1":
         raise SystemExit(outcome.returncode)
 
 gi.require_version("Atspi", "2.0")
-from gi.repository import Atspi
+from gi.repository import Atspi, GLib
 Atspi.set_timeout(2000, 3000)
 
 
@@ -43,10 +49,16 @@ def walk(node):
 
 
 def app():
+    context = GLib.MainContext.default()
+    for _ in range(64):
+        if not context.pending():
+            break
+        context.iteration(False)
     desktop = Atspi.get_desktop(0)
     for i in range(desktop.get_child_count()):
         item = desktop.get_child_at_index(i)
         if item and item.get_name().lower() == "rustremote":
+            item.set_cache_mask(Atspi.Cache.NONE)
             return item
     return None
 
@@ -76,11 +88,29 @@ def absent(name):
 
 
 def click(name):
-    node = wait(name)
-    actionable = next((n for n in walk(node)
-                       if any(i.endswith("Action") for i in n.get_interfaces())
-                       and any(Atspi.Action.get_action_name(n.get_action_iface(), i) in ("click", "activate", "press", "toggle") for i in range(n.get_action_iface().get_n_actions()))), None)
-    assert actionable, "Élément sans action : " + name
+    deadline = time.monotonic() + 20
+    actionable = None
+    scrolled = False
+    while time.monotonic() < deadline:
+        root = app()
+        candidates = [n for n in walk(root) if n.get_name() == name
+                      and n.get_state_set().contains(Atspi.StateType.SENSITIVE)
+                      and any(i.endswith("Action") for i in n.get_interfaces())
+                      and any(Atspi.Action.get_action_name(n.get_action_iface(), i)
+                              in ("click", "activate", "press", "toggle")
+                              for i in range(n.get_action_iface().get_n_actions()))] if root else []
+        shown = [n for n in candidates if n.get_state_set().contains(Atspi.StateType.SHOWING)]
+        if shown:
+            actionable = shown[-1]
+            break
+        if candidates and not scrolled:
+            scrolled = True
+            try:
+                candidates[-1].get_component_iface().scroll_to(Atspi.ScrollType.ANYWHERE)
+            except GLib.Error:
+                pass
+        time.sleep(.1)
+    assert actionable, "Élément actif et visible absent : " + name
     action_iface = actionable.get_action_iface()
     index = next(i for i in range(action_iface.get_n_actions()) if Atspi.Action.get_action_name(action_iface, i) in ("click", "activate", "press", "toggle"))
     assert action_iface.do_action(index), name

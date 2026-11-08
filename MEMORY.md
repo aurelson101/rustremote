@@ -5,13 +5,13 @@
 
 ## 1. État de référence
 
-- **Mise à jour :** 2026-11-08 — incrément non publié après 0.4.1 ; audit avant nouvelle AppImage.
-- **Dernier agent :** Codex ; identifiants par profil, coffre OS, dossiers, Affichage et commandes SFTP ; laboratoires locaux uniquement.
+- **Mise à jour :** 2026-11-08 — version 0.5.0, validation et préparation de publication AppImage.
+- **Dernier agent :** Codex ; SFTP réel, progression/reprise, bastions, tunnels/Multi-Exec, Wayland et CLIPRDR ; laboratoires locaux uniquement.
 - **Phase :** P1 — terminal/SFTP natifs, MVP encore incomplet.
 - **État confirmé :** terminal SSH/série intégré VTE, SFTP natif ssh2/libssh2 ; RDP/VNC externes ; profils/import/export, dossiers et paramètres persistants.
 - **Code existant :** package Rust/GTK4, ui/dialogs/profiles/store/simulation/icons ; scripts AppImage, GTK et laboratoires réseau/PTY.
 - **Plateforme cible initiale :** Ubuntu Linux / GNOME. Debian ensuite.
-- **Dernière vérification réelle :** 29 tests Rust et contrôles Cargo réussis ; mot de passe SSH/SFTP + coffre privé après redémarrage, RDP depuis profil + fermeture suivie, menus/dossiers et paramètres testés sur binaire de développement. Voir docs/AUDIT-DEMANDES-2026-11-08.md. L’AppImage existante reste la 0.4.1 précédente.
+- **Dernière vérification réelle :** 34 tests Rust et contrôles Cargo réussis ; AppImage 0.5.0 construite. Voir `docs/VALIDATION-0.5.0.md` et les rapports JSON versionnés pour les parcours réels et limites.
 
 ## 2. Objectif immuable
 
@@ -379,23 +379,20 @@ Créer **RustRemote**, application de bureau Linux centrée sur des sessions SSH
 
 ### Limites actuelles
 
-Les profils persistants et lanceurs externes SSH/RDP sont disponibles. Aucun moteur
-SSH/PTY/RDP intégré, transfert SFTP, VNC ou coffre de mots de passe n'est implémenté.
-Les fonctionnalités absentes restent indiquées ou désactivées. Aucun serveur réel
-contacté : la connexion et l'authentification distante restent non testées. Test graphique
-sous X11/Xwayland uniquement, portabilité AppImage et Wayland natif non validés.
+Voir `docs/VALIDATION-0.5.0.md` : terminal SSH/série intégré et SFTP natif réels ;
+RDP/VNC externes. SFTP borné (16 Mio, 128 entrées, profondeur 8, 30 s), reprise de
+fichiers seulement, pas de file persistante. ProxyCommand personnalisé refusé.
+Windows/AD, matériel physique, KDE et endurance non qualifiés. SQLite, IronRDP,
+X11 forwarding et verrouillage automatique du coffre restent ouverts.
 
 ## 7. PROCHAINE ACTION EXACTE POUR LE NOUVEL AGENT
 
-**Lire l’audit du 2026-11-08 et ses derniers résultats.** Ne pas recommencer le SSH
-ni produire une AppImage sous le nom 0.4.1 existant. Diagnostiquer le dernier démarrage Wayland en échec
-puis qualifier un laboratoire CLIPRDR réel isolé
-(Shadow ne convient pas). P1-03 reste prioritaire : progression/reprise/bastions.
-Avant une nouvelle image de test : version nouvelle, helper askpass embarqué,
-Cargo fmt/check/clippy/test et rejeu sur l’artefact ; limites explicites maintenues.
-Connexions autorisées : laboratoires locaux uniquement ; ne pas contacter l’alias IA
-ni ia.aurelson.com. Aucun sudo, commit, push ou installation système effectués ici.
-
+Partir de la 0.5.0 et de `docs/VALIDATION-0.5.0.md`, ne pas réécrire les moteurs
+fonctionnels. Priorité SFTP suivante : file de transferts et limites configurables
+avec budgets sûrs ; ensuite stockage SQLite/ergonomie P1-04. Réseau autorisé :
+laboratoires locaux seulement ; aucun accès à ia.aurelson.com. La publication sur
+GitHub et le remplacement des anciennes AppImages sont autorisés par l’utilisateur ;
+conserver le dépôt privé et la licence autorisant l’usage professionnel sans revente.
 
 ## 8. Protocole de mise à jour (obligatoire)
 
@@ -407,3 +404,32 @@ ni ia.aurelson.com. Aucun sudo, commit, push ou installation système effectués
 5. En cas d'échec, écrire la cause et la commande de reproduction **sans données sensibles**.
 6. Réduire les anciens détails à une synthèse utile ; conserver les décisions et blocages, pas les logs volumineux.
 7. Ne jamais effacer le travail d'un autre agent ni inventer son historique. Faire un relais uniquement après sauvegarde cohérente des fichiers.
+
+## Relais 0.5.0 — 2026-11-08
+
+Codex : `sftp.rs`/`sftp_ui.rs` (progression, annulation, reprise vérifiée, sélecteurs
+GTK), `ssh_route.rs` (HostName/ProxyJump strict), `tools.rs`, `dialogs/automation.rs`,
+`terminal.rs`/`ui.rs` (tunnels, macros/Multi-Exec, contrôle privé après authentification),
+version Cargo et harnais SSH/Wayland/CLIPRDR. Aucune dépendance applicative ajoutée.
+
+Cargo fmt/check/Clippy -D warnings et tests réussis : 33 + 1 askpass. AppImage
+0.5.0 construite et contrôlée par version/FUSE et extraction sans FUSE/SHA256.
+SSH/SFTP de l’AppImage : vrais fichiers locaux/distants vérifiés, édition, conflit,
+permissions, dossiers, lots, reprise/annulation, clés/agent, bastion/alias et refus
+bastion inconnu réussis. Mot de passe/coffre après redémarrage et série PTY native
+réussis sur l’image ; RDP profil/domaine/certificat/pixels/arrêt et Wayland natif
+avec plein écran réussis. CLIPRDR GNOME/FreeRDP : texte et fichiers/dossiers dans
+les deux sens, 10 cas réels, chemins FUSE et octets comparés.
+
+Erreurs rencontrées : portail GTK FileChooser absent (dialogue GTK substitué),
+cache AT-SPI Wayland obsolète (pompage événements/actions visibles), relais bastion
+du laboratoire coupé après 5 s/8 Kio (budget adapté). Parcours combiné terminé en
+échec de harnais après les étapes SFTP réussies : mauvais repérage/choix GTK
+DropDown de tunnel ; conservé comme échec, rejeux ciblés séparés. Ne pas présenter
+le premier parcours combiné comme intégralement réussi. Voir validation 0.5.0.
+
+Rejeu ciblé des tunnels sur AppImage réussi après ouverture accessible du menu puis
+sélection clavier vérifiée : trois modes avec écho bidirectionnel et ports fermés
+à la déconnexion. Résultats dans `docs/validation/0.5.0.json`. Les tests du harnais
+peuvent être limités par RUSTREMOTE_TUNNELS_ONLY / RUSTREMOTE_SERIAL_ONLY /
+RUSTREMOTE_AUTOMATION_ONLY ; timeout global porté à 600 s pour le parcours enrichi.

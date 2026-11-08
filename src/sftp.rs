@@ -4,11 +4,10 @@ use ssh2::{CheckResult, KnownHostFileKind, OpenFlags, OpenType, RenameFlags};
 use std::{
     fs,
     io::{Read, Write},
-    net::{TcpStream, ToSocketAddrs},
     path::{Path, PathBuf},
     sync::{
         Arc,
-        atomic::{AtomicBool, Ordering},
+        atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering},
     },
     time::{Duration, Instant},
 };
@@ -18,7 +17,8 @@ const MAX_ENTRIES: usize = 128;
 pub struct Connection {
     _session: ssh2::Session,
     sftp: ssh2::Sftp,
-    tcp: TcpStream,
+    tcp: crate::ssh_route::Stream,
+    _proxy: Option<crate::ssh_route::Proxy>,
 }
 #[derive(Clone)]
 pub struct Entry {
@@ -46,6 +46,11 @@ pub enum Operation {
         mode: u32,
     },
     Delete(PathBuf),
+    Resume {
+        upload: bool,
+        local: PathBuf,
+        remote: PathBuf,
+    },
     Upload {
         local: PathBuf,
         remote: PathBuf,
@@ -60,11 +65,29 @@ pub enum Output {
     Text { path: PathBuf, bytes: Vec<u8> },
     Done(String),
 }
+#[derive(Default)]
+pub struct Progress {
+    bytes: AtomicU64,
+    entries: AtomicUsize,
+}
+impl Progress {
+    pub fn reset(&self) {
+        self.bytes.store(0, Ordering::Relaxed);
+        self.entries.store(0, Ordering::Relaxed);
+    }
+    pub fn snapshot(&self) -> (u64, usize) {
+        (
+            self.bytes.load(Ordering::Relaxed),
+            self.entries.load(Ordering::Relaxed),
+        )
+    }
+}
 pub struct Budget {
     bytes: u64,
     entries: usize,
     start: Instant,
     cancel: Arc<AtomicBool>,
+    progress: Option<Arc<Progress>>,
 }
 impl Budget {
     pub fn new(cancel: Arc<AtomicBool>) -> Self {
@@ -73,7 +96,12 @@ impl Budget {
             entries: 0,
             start: Instant::now(),
             cancel,
+            progress: None,
         }
+    }
+    pub fn track(mut self, progress: Arc<Progress>) -> Self {
+        self.progress = Some(progress);
+        self
     }
     fn check(&self) -> Result<(), String> {
         if self.cancel.load(Ordering::Relaxed) {
@@ -87,6 +115,9 @@ impl Budget {
     fn entry(&mut self, depth: usize) -> Result<(), String> {
         self.check()?;
         self.entries += 1;
+        if let Some(p) = &self.progress {
+            p.entries.store(self.entries, Ordering::Relaxed);
+        }
         if depth > 8 || self.entries > MAX_ENTRIES {
             Err("Transfert limité à 128 entrées et 8 niveaux".into())
         } else {
@@ -96,6 +127,9 @@ impl Budget {
     fn bytes(&mut self, count: usize) -> Result<(), String> {
         self.check()?;
         self.bytes += count as u64;
+        if let Some(p) = &self.progress {
+            p.bytes.store(self.bytes, Ordering::Relaxed);
+        }
         if self.bytes > MAX_BYTES {
             Err("Transfert limité à 16 Mio".into())
         } else {
@@ -126,6 +160,36 @@ fn path_ok(path: &Path) -> Result<(), String> {
         Ok(())
     }
 }
+fn partial_path(path: &Path) -> Result<PathBuf, String> {
+    let name = path
+        .file_name()
+        .and_then(|s| s.to_str())
+        .ok_or("Nom de destination invalide")?;
+    component(name)?;
+    let name = format!(".{name}.rustremote-part");
+    component(&name)?;
+    Ok(path.with_file_name(name))
+}
+fn publish(from: &Path, to: &Path) -> Result<(), String> {
+    use std::os::unix::ffi::OsStrExt;
+    let from = std::ffi::CString::new(from.as_os_str().as_bytes()).map_err(error)?;
+    let to = std::ffi::CString::new(to.as_os_str().as_bytes()).map_err(error)?;
+    let result = unsafe {
+        libc::renameat2(
+            libc::AT_FDCWD,
+            from.as_ptr(),
+            libc::AT_FDCWD,
+            to.as_ptr(),
+            libc::RENAME_NOREPLACE,
+        )
+    };
+    if result != 0 {
+        return Err(
+            "Destination existante ou publication atomique impossible ; aucun écrasement".into(),
+        );
+    }
+    Ok(())
+}
 fn error(_: impl std::fmt::Display) -> String {
     "Erreur SFTP : opération refusée, connexion interrompue ou permissions insuffisantes".into()
 }
@@ -136,6 +200,8 @@ impl Connection {
         if profile.simulation {
             return Err("Un profil de simulation ne contacte aucun serveur".into());
         }
+        let route = crate::ssh_route::Route::resolve(profile)?;
+        let profile = &route.profile;
         let ProtocolOptions::Ssh {
             identity_file,
             agent,
@@ -145,27 +211,9 @@ impl Connection {
         else {
             return Err("SFTP nécessite un profil SSH".into());
         };
-        let addresses = (profile.host.as_str(), profile.port)
-            .to_socket_addrs()
-            .map_err(|_| "Résolution du serveur impossible")?;
-        let deadline = Instant::now() + Duration::from_secs(15);
-        let mut socket = None;
-        for addr in addresses.take(4) {
-            let Some(left) = deadline.checked_duration_since(Instant::now()) else {
-                break;
-            };
-            if let Ok(tcp) = TcpStream::connect_timeout(&addr, left.min(Duration::from_secs(5))) {
-                socket = Some(tcp);
-                break;
-            }
-        }
-        let tcp = socket.ok_or("Connexion SFTP impossible (limite 15 secondes)")?;
-        tcp.set_read_timeout(Some(Duration::from_secs(5)))
-            .map_err(error)?;
-        tcp.set_write_timeout(Some(Duration::from_secs(5)))
-            .map_err(error)?;
+        let (tcp, proxy) = route.connect()?;
         let mut session = ssh2::Session::new().map_err(error)?;
-        session.set_timeout(5000);
+        session.set_timeout(if proxy.is_some() { 15000 } else { 5000 });
         session.set_tcp_stream(tcp.try_clone().map_err(error)?);
         session.method_pref(ssh2::MethodType::Kex,"curve25519-sha256,curve25519-sha256@libssh.org,ecdh-sha2-nistp256,ecdh-sha2-nistp384,diffie-hellman-group-exchange-sha256").map_err(error)?;
         session
@@ -174,7 +222,8 @@ impl Connection {
                 "ssh-ed25519,ecdsa-sha2-nistp256,ecdsa-sha2-nistp384,rsa-sha2-512,rsa-sha2-256",
             )
             .map_err(error)?;
-        session.handshake().map_err(error)?;
+        session.handshake().map_err(|_| "Connexion SSH SFTP refusée ; pour un bastion, chargez la clé dans l’agent et validez son empreinte dans le terminal")?;
+        session.set_timeout(5000);
         let mut known = session.known_hosts().map_err(error)?;
         let known_path = known_hosts_file
             .as_ref()
@@ -213,20 +262,21 @@ impl Connection {
         }
         let (key, _) = session.host_key().ok_or("Clé d’hôte absente")?;
         if !matches!(
-            known.check_port(&profile.host, profile.port, key),
+            known.check_port(&route.key_host, route.key_port, key),
             CheckResult::Match
         ) {
             return Err("SFTP refusé : clé d’hôte inconnue ou modifiée ; vérifiez l’empreinte dans le terminal SSH".into());
         }
         let keys: Result<(), String> = (|| {
-            if !session.authenticated()
-                && let Some(key) = identity_file
-            {
+            for key in &route.identities {
+                if session.authenticated() {
+                    break;
+                }
                 let metadata = fs::metadata(key).map_err(error)?;
                 if !metadata.is_file() || metadata.len() > 256 * 1024 {
                     return Err("Clé SSH : fichier régulier de 256 Kio maximum requis".into());
                 }
-                let _ = session.userauth_pubkey_file(&profile.username, None, Path::new(key), None);
+                let _ = session.userauth_pubkey_file(&profile.username, None, key, None);
             }
             if !session.authenticated() && *agent {
                 use base64::Engine;
@@ -291,10 +341,11 @@ impl Connection {
             _session: session,
             sftp,
             tcp,
+            _proxy: proxy,
         })
     }
     pub fn abort(&self) {
-        let _ = self.tcp.shutdown(std::net::Shutdown::Both);
+        self.tcp.shutdown();
     }
     fn entries(&self, path: &Path, budget: &Budget) -> Result<Vec<Entry>, String> {
         path_ok(path)?;
@@ -534,6 +585,26 @@ impl Connection {
                     "Suppression terminée : {removed} élément(s) · actualisez le listing"
                 )))
             }
+            Operation::Resume {
+                upload,
+                local,
+                remote,
+            } => {
+                let saved_partial = !upload && !local.try_exists().map_err(error)?;
+                let candidate = if saved_partial {
+                    partial_path(&local)?
+                } else {
+                    local.clone()
+                };
+                self.resume(upload, &candidate, &remote, budget)?;
+                if saved_partial {
+                    publish(&candidate, &local)?;
+                }
+                Ok(Output::Done(format!(
+                    "Reprise terminée : {} octets vérifiés/transférés",
+                    budget.bytes
+                )))
+            }
             Operation::Upload { local, remote } => {
                 if !local.is_absolute() {
                     return Err("Chemin local absolu requis".into());
@@ -558,28 +629,143 @@ impl Connection {
                     .tempdir_in(parent)
                     .map_err(error)?;
                 let payload = staging.path().join("payload");
-                self.download(&remote, &payload, 0, budget)?;
-                use std::os::unix::ffi::OsStrExt;
-                let from = std::ffi::CString::new(payload.as_os_str().as_bytes()).map_err(error)?;
-                let to = std::ffi::CString::new(local.as_os_str().as_bytes()).map_err(error)?;
-                let result = unsafe {
-                    libc::renameat2(
-                        libc::AT_FDCWD,
-                        from.as_ptr(),
-                        libc::AT_FDCWD,
-                        to.as_ptr(),
-                        libc::RENAME_NOREPLACE,
-                    )
-                };
-                if result != 0 {
-                    return Err("Destination existante ou publication atomique impossible ; aucun écrasement".into());
+                if let Err(message) = self.download(&remote, &payload, 0, budget) {
+                    if payload
+                        .symlink_metadata()
+                        .is_ok_and(|m| m.is_file() && m.len() > 0)
+                        && let Ok(partial) = partial_path(&local)
+                        && fs::File::open(&payload).and_then(|f| f.sync_all()).is_ok()
+                        && publish(&payload, &partial).is_ok()
+                    {
+                        return Err(format!(
+                            "{message} · copie partielle conservée ; sélectionnez le fichier et Reprendre le téléchargement vers la même destination"
+                        ));
+                    }
+                    return Err(message);
                 }
+                publish(&payload, &local)?;
                 Ok(Output::Done(format!(
                     "Téléchargement terminé : {} octets, {} entrée(s)",
                     budget.bytes, budget.entries
                 )))
             }
         }
+    }
+    fn resume(
+        &self,
+        upload: bool,
+        local: &Path,
+        remote: &Path,
+        budget: &mut Budget,
+    ) -> Result<(), String> {
+        use std::os::unix::fs::OpenOptionsExt;
+        if !local.is_absolute() {
+            return Err("Chemin local absolu requis pour la reprise".into());
+        }
+        path_ok(remote)?;
+        budget.entry(0)?;
+        let remote_stat = self.sftp.lstat(remote).map_err(error)?;
+        if !remote_stat.is_file() || !fs::symlink_metadata(local).map_err(error)?.is_file() {
+            return Err("Reprise réservée aux fichiers réguliers existants, sans lien".into());
+        }
+        let mut local_file = fs::OpenOptions::new()
+            .read(true)
+            .append(!upload)
+            .custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK)
+            .open(local)
+            .map_err(error)?;
+        local_file
+            .try_lock()
+            .map_err(|_| "Le fichier local est déjà utilisé")?;
+        let local_stat = local_file.metadata().map_err(error)?;
+        if !local_stat.is_file() {
+            return Err("Fichier local régulier requis".into());
+        }
+        let flags = if upload {
+            OpenFlags::READ | OpenFlags::WRITE | OpenFlags::APPEND
+        } else {
+            OpenFlags::READ
+        };
+        let mut remote_file = self
+            .sftp
+            .open_mode(remote, flags, 0o600, OpenType::File)
+            .map_err(error)?;
+        let remote_stat = remote_file.stat().map_err(error)?;
+        if !remote_stat.is_file() {
+            return Err("Fichier distant régulier requis".into());
+        }
+        let remote_size = remote_stat.size.ok_or("Taille distante inconnue")?;
+        let local_size = local_stat.len();
+        let (source_size, prefix) = if upload {
+            (local_size, remote_size)
+        } else {
+            (remote_size, local_size)
+        };
+        if source_size > MAX_BYTES || prefix > source_size {
+            return Err(
+                "Reprise refusée : limite 16 Mio ou destination plus longue que la source".into(),
+            );
+        }
+        let mut left = prefix;
+        let mut a = [0; 16384];
+        let mut b = [0; 16384];
+        while left > 0 {
+            budget.check()?;
+            let count = (left as usize).min(a.len());
+            local_file.read_exact(&mut a[..count]).map_err(error)?;
+            remote_file.read_exact(&mut b[..count]).map_err(error)?;
+            budget.bytes(count)?;
+            if a[..count] != b[..count] {
+                return Err(
+                    "Préfixe existant différent : reprise refusée, aucun octet ajouté".into(),
+                );
+            }
+            left -= count as u64;
+        }
+        let now = remote_file.stat().map_err(error)?;
+        if now.size != remote_stat.size
+            || now.mtime != remote_stat.mtime
+            || local_file.metadata().map_err(error)?.len() != local_size
+        {
+            return Err("Fichier modifié pendant la vérification : reprise refusée".into());
+        }
+        loop {
+            budget.check()?;
+            let count = if upload {
+                local_file.read(&mut a).map_err(error)?
+            } else {
+                remote_file.read(&mut a).map_err(error)?
+            };
+            if count == 0 {
+                break;
+            }
+            budget.bytes(count)?;
+            if upload {
+                remote_file.write_all(&a[..count]).map_err(error)?;
+            } else {
+                local_file.write_all(&a[..count]).map_err(error)?;
+            }
+        }
+        let after = remote_file.stat().map_err(error)?;
+        let local_after = local_file.metadata().map_err(error)?;
+        if budget.bytes > MAX_BYTES
+            || if upload {
+                after.size != Some(source_size)
+                    || local_after.len() != source_size
+                    || local_after.modified().ok() != local_stat.modified().ok()
+            } else {
+                local_after.len() != source_size
+                    || after.size != remote_stat.size
+                    || after.mtime != remote_stat.mtime
+            }
+        {
+            return Err("Reprise interrompue : taille ou source modifiée ; vérifiez la destination partielle".into());
+        }
+        if !upload {
+            local_file.sync_all().map_err(error)?;
+        }
+        remote_file.close().map_err(error)?;
+        Ok(())
     }
     fn upload(
         &self,
@@ -694,6 +880,27 @@ impl Connection {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn partial_publication_never_replaces_existing_files_and_progress_stops_on_cancel() {
+        let directory = tempfile::tempdir().unwrap();
+        let from = directory.path().join("from");
+        let to = directory.path().join("to");
+        fs::write(&from, b"partial").unwrap();
+        fs::write(&to, b"existing").unwrap();
+        assert!(publish(&from, &to).is_err());
+        assert_eq!(fs::read(&to).unwrap(), b"existing");
+        assert_eq!(fs::read(&from).unwrap(), b"partial");
+        assert!(partial_path(Path::new("/")).is_err());
+        let cancel = Arc::new(AtomicBool::new(false));
+        let progress = Arc::new(Progress::default());
+        let mut budget = Budget::new(cancel.clone()).track(progress.clone());
+        budget.entry(0).unwrap();
+        budget.bytes(123).unwrap();
+        assert_eq!(progress.snapshot(), (123, 1));
+        cancel.store(true, Ordering::Relaxed);
+        assert!(budget.bytes(1).is_err());
+        assert_eq!(progress.snapshot(), (123, 1));
+    }
     #[test]
     fn transfer_names_and_limits() {
         for name in ["..", "a/b", "a\\b", "x\n"] {

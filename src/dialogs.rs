@@ -1,4 +1,5 @@
 use crate::profiles::{ProtocolOptions, SessionProfile, SessionState, Workspace};
+mod automation;
 mod connections;
 mod credentials;
 mod diagnostics;

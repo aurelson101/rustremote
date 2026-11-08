@@ -10,13 +10,13 @@
 | P0-04 | Modèle | Critique | DONE | Types de profils sans secrets, sérialisation, tests unitaires. |
 | P1-01 | SSH | Critique | DONE | Connexion à laboratoire, vérification clé hôte, SSH Agent, gestion des refus ; tests. |
 | P1-02 | Terminal | Critique | DONE | PTY interactif, resize, ANSI, UTF-8, copie/collage, fermeture propre. |
-| P1-03 | SFTP | Haute | PARTIAL | Listing, download/upload, progression, traitement erreur et contrôle overwrite. |
+| P1-03 | SFTP | Haute | DONE | SFTP natif : listing, transferts réels, progression, erreurs et refus d’écrasement validés en 0.5.0 ; reprise de fichiers ajoutée. File persistante/limites configurables restent des évolutions. |
 | P1-04 | Ergonomie | Haute | PARTIAL | Favoris, stockage SQLite, édition de profils, recherches et raccourcis. |
 | P2-01 | RDP | Haute | PARTIAL | PoC IronRDP sécurisée avec labo Windows, certificat, UI basique. |
 | P2-02 | VNC | Moyenne | PARTIAL | Lanceur TigerVNC avec tunnel SSH ; moteur intégré/redimensionnement à livrer. |
 | P2-06 | Série | Moyenne | PARTIAL | Profil picocom et switch simulé ; liaison PTY testée, matériel physique non testé. |
-| P2-03 | Réseau | Moyenne | TODO | Tunnels/bastions/X11 avec tests et UI d'état. |
-| P2-04 | Outils | Moyenne | TODO | Macros et multi-exec avec prévisualisation et approbation. |
+| P2-03 | Réseau | Moyenne | PARTIAL | Tunnels local/distant/SOCKS et ProxyJump livrés ; X11 forwarding reste ouvert. |
+| P2-04 | Outils | Moyenne | DONE | Macros et Multi-Exec sur sessions SSH authentifiées avec prévisualisation, annulation et approbation testées en laboratoire. |
 | P2-05 | Coffre | Haute | PARTIAL | Mots de passe par profil dans Secret Service, cache temporaire et export sans références testés ; verrouillage automatique/politique du coffre à compléter. |
 | P3-01 | KVM | Exploration | TODO | Matériel/protocole VKC exact documenté, décision intégration/launcher. |
 | P3-02 | Distribution | Haute | PARTIAL | .deb/AppImage signables, CI, licences, SBOM, audit et test installation. |
@@ -204,3 +204,18 @@ Publication du projet complet effectuée sur `main` du dépôt privé
 Arbre source local/distant identique, contrôles de liens README et métadonnées Cargo
 réussis ; aucun binaire ni secret publié. P3-02 reste PARTIAL : cette publication des
 sources ne constitue pas une nouvelle AppImage ni une qualification des limites restantes.
+
+## Aperçu 0.5.0 — 2026-11-08
+
+Voir `VALIDATION-0.5.0.md`. P1-03 satisfait ses critères par le navigateur SFTP
+natif et ses transferts/édition réellement rejoués sur serveur local. Progression,
+annulation, reprise de fichiers, sélecteurs multiples et alias/bastion ajoutés.
+P2-04 livré avec commandes transitoires et cibles authentifiées ; P2-03 reste
+PARTIAL sans X11 forwarding. P1-04, P2-01/02/05/06 et P3-02 restent PARTIAL.
+
+34 tests Rust et contrôles Cargo réussis. AppImage 0.5.0 construite ; mots de passe
+SSH/SFTP en coffre après redémarrage, RDP depuis profil, Wayland/plein écran et
+série native testés sur artefact. CLIPRDR réel validé séparément sous GNOME Remote
+Desktop : texte/fichiers/dossiers dans les deux sens, 10 cas. Aucune qualification
+Windows/AD, KDE ou périphériques physiques. Les anciens résultats ci-dessus sont
+historiques ; la validation 0.5.0 prévaut pour l’état courant.

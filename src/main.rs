@@ -10,8 +10,10 @@ mod sftp;
 mod sftp_ui;
 mod simulation;
 mod ssh_auth;
+mod ssh_route;
 mod store;
 mod terminal;
+mod tools;
 mod ui;
 
 use gtk::prelude::*;

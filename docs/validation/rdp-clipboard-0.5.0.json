@@ -1,0 +1,24 @@
+{
+  "network_namespace": true,
+  "personal_desktop_accessed": false,
+  "target": "127.0.0.1",
+  "success": true,
+  "nla_certificate_pinned": true,
+  "server_window": {
+    "active": true,
+    "mapped": true,
+    "formats": ""
+  },
+  "text_client_to_server": true,
+  "text_server_to_client": true,
+  "file_cases": [
+    "client_to_server:one_file",
+    "client_to_server:multiple_files",
+    "client_to_server:one_folder",
+    "client_to_server:multiple_folders",
+    "server_to_client:one_file",
+    "server_to_client:multiple_files",
+    "server_to_client:one_folder",
+    "server_to_client:multiple_folders"
+  ]
+}

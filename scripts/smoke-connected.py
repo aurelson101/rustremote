@@ -102,7 +102,7 @@ with tempfile.TemporaryDirectory(prefix="rustremote-ssh-display-") as directory:
         rect=node.get_component_iface().get_extents(Atspi.CoordType.WINDOW)
         assert rect.width>0 and rect.height>0
         frame=node
-        while frame and frame.get_role()!=Atspi.Role.FRAME:frame=frame.get_parent()
+        while frame and frame.get_role() not in (Atspi.Role.FRAME,Atspi.Role.DIALOG):frame=frame.get_parent()
         assert frame,"Fenêtre privée de la cible absente"
         origin=frame.get_component_iface().get_extents(Atspi.CoordType.WINDOW)
         px=rect.x-origin.x+rect.width//2
@@ -120,6 +120,45 @@ with tempfile.TemporaryDirectory(prefix="rustremote-ssh-display-") as directory:
             x.XFlush(xd);time.sleep(.1)
             assert xt.XTestFakeButtonEvent(xd,button,0,0);x.XFlush(xd)
         finally:x.XCloseDisplay(xd)
+
+    def focus_window(title):
+        import ctypes as c
+        info=subprocess.check_output(["xwininfo","-name",title],text=True)
+        wid=int(re.search(r"Window id: (0x[0-9a-fA-F]+)",info).group(1),16)
+        x=c.CDLL("libX11.so.6")
+        x.XOpenDisplay.argtypes=[c.c_char_p];x.XOpenDisplay.restype=c.c_void_p
+        x.XSetInputFocus.argtypes=[c.c_void_p,c.c_ulong,c.c_int,c.c_ulong]
+        x.XFlush.argtypes=[c.c_void_p];x.XCloseDisplay.argtypes=[c.c_void_p]
+        display=x.XOpenDisplay(os.environ["DISPLAY"].encode());assert display
+        try:x.XSetInputFocus(display,wid,1,0);x.XFlush(display)
+        finally:x.XCloseDisplay(display)
+
+    def keypress(name, ctrl=False):
+        import ctypes as c
+        x=c.CDLL("libX11.so.6");xt=c.CDLL("libXtst.so.6")
+        x.XOpenDisplay.argtypes=[c.c_char_p];x.XOpenDisplay.restype=c.c_void_p
+        x.XStringToKeysym.argtypes=[c.c_char_p];x.XStringToKeysym.restype=c.c_ulong
+        x.XKeysymToKeycode.argtypes=[c.c_void_p,c.c_ulong];x.XKeysymToKeycode.restype=c.c_uint
+        x.XFlush.argtypes=[c.c_void_p];x.XCloseDisplay.argtypes=[c.c_void_p]
+        xt.XTestFakeKeyEvent.argtypes=[c.c_void_p,c.c_uint,c.c_int,c.c_ulong]
+        xd=x.XOpenDisplay(os.environ["DISPLAY"].encode());assert xd
+        try:
+            key=x.XKeysymToKeycode(xd,x.XStringToKeysym(name.encode()))
+            control=x.XKeysymToKeycode(xd,x.XStringToKeysym(b"Control_L"))
+            if ctrl:xt.XTestFakeKeyEvent(xd,control,1,0)
+            xt.XTestFakeKeyEvent(xd,key,1,0);xt.XTestFakeKeyEvent(xd,key,0,0)
+            if ctrl:xt.XTestFakeKeyEvent(xd,control,0,0)
+            x.XFlush(xd)
+        finally:x.XCloseDisplay(xd)
+        time.sleep(.3)
+
+    def chooser_location(path):
+        keypress("l",ctrl=True)
+        def entry():
+            root=app()
+            return next((n for n in walk(root) if n.get_state_set().contains(Atspi.StateType.FOCUSED) and any(i.endswith("EditableText") for i in n.get_interfaces())),None) if root else None
+        node=wait(entry,"Champ de chemin du sélecteur absent")
+        assert Atspi.EditableText.set_text_contents(node,str(path))
 
     def context_menu():
         root=app()
@@ -195,9 +234,74 @@ with tempfile.TemporaryDirectory(prefix="rustremote-ssh-display-") as directory:
         assert Atspi.Selection.select_child(node.get_parent(),node.get_index_in_parent())
         time.sleep(.2)
 
+    def test_choosers(data_root):
+        chooser_files=config.parent/"chooser-uploads";chooser_files.mkdir()
+        for file in ("chooser-un.txt","chooser-deux.txt"):(chooser_files/file).write_text(file+" — été")
+        click("Choisir les fichiers à envoyer…")
+        wait(lambda:find("Envoyer vers le dossier SFTP courant"),"Sélecteur local de fichiers absent")
+        chooser_location(chooser_files);keypress("Return")
+        node=wait(lambda:find("chooser-un.txt"),"Fichiers locaux du sélecteur absents")
+        pointer_click(node,1);keypress("a",ctrl=True);click("Envoyer")
+        wait(lambda:all((data_root/file).exists() for file in ("chooser-un.txt","chooser-deux.txt")),"Envoi multiple depuis le sélecteur échoué")
+        for file in ("chooser-un.txt","chooser-deux.txt"):assert (data_root/file).read_bytes()==(chooser_files/file).read_bytes()
+        chooser_folder=config.parent/"chooser-folder";chooser_folder.mkdir();(chooser_folder/"contenu.txt").write_text("Dossier choisi — été")
+        click("Choisir les dossiers à envoyer…")
+        wait(lambda:find("Envoyer vers le dossier SFTP courant"),"Sélecteur local de dossiers absent")
+        chooser_location(chooser_folder);click("Envoyer")
+        wait(lambda:(data_root/"chooser-folder/contenu.txt").exists(),"Envoi de dossier depuis le sélecteur échoué")
+        assert (data_root/"chooser-folder/contenu.txt").read_bytes()==(chooser_folder/"contenu.txt").read_bytes()
+        result["sftp_native_choosers_multiple_files_and_folder"]=True
+
     launch=[str(image)]
     if os.environ.get("RUSTREMOTE_GDB")=="1":launch=["gdb","--batch","-ex","run","-ex","thread apply all bt 10","--args",str(image)]
     serial_master,serial_slave=pty.openpty()
+    def test_tunnels():
+        # Trois modes OpenSSH réels, bornés à l’écho de la fixture loopback.
+        import socket
+        echo_port=int((config.parent/"forward-echo-port").read_text())
+        for mode in (0,1,2):
+            with socket.socket() as probe:
+                probe.bind(("127.0.0.1",0));listen_port=probe.getsockname()[1]
+            click("Tunnels");text("Port d’écoute du tunnel",str(listen_port));text("Port destination du tunnel",str(echo_port))
+            if mode:
+                focus_window("Tunnels SSH")
+                click("Local — poste vers serveur")
+                choice=("Local — poste vers serveur","Distant — serveur vers poste","SOCKS — proxy local")[mode]
+                keypress("Home")
+                for _ in range(mode):keypress("Down")
+                keypress("Return")
+                wait(lambda:any(n.get_role()==Atspi.Role.COMBO_BOX and n.get_name()==choice for n in walk(app())),"Type de tunnel non sélectionné")
+            click("Vérifier le tunnel SSH");click("Autoriser et ouvrir le tunnel")
+            def tunnel_echo():
+                try:
+                    with socket.create_connection(("127.0.0.1",listen_port),timeout=1) as stream:
+                        if mode==2:
+                            stream.sendall(b"\x05\x01\x00")
+                            greeting=b""
+                            while len(greeting)<2:
+                                block=stream.recv(2-len(greeting))
+                                if not block:return False
+                                greeting+=block
+                            assert greeting==b"\x05\x00",greeting.hex()
+                            stream.sendall(b"\x05\x01\x00\x01"+socket.inet_aton("127.0.0.1")+echo_port.to_bytes(2,"big"))
+                            reply=b""
+                            while len(reply)<10:
+                                block=stream.recv(10-len(reply))
+                                if not block:return False
+                                reply+=block
+                            assert reply[:2]==b"\x05\x00"
+                        stream.sendall(b"RustRemote tunnel fixture")
+                        return stream.recv(128)==b"RustRemote tunnel fixture"
+                except OSError:return False
+            wait(tunnel_echo,"Tunnel SSH sans écho bidirectionnel, mode "+str(mode))
+            click("Déconnecter le terminal")
+            def closed_tunnel():
+                with socket.socket() as stream:
+                    stream.settimeout(.2)
+                    return stream.connect_ex(("127.0.0.1",listen_port))!=0
+            wait(closed_tunnel,"Port du tunnel encore actif après déconnexion")
+            result["ssh_forward_mode_"+str(mode)+"_echo_and_disconnect"]=True
+
     workspace=json.loads((config/"rustremote/profiles.json").read_text())
     serial_name="Switch série — laboratoire"
     workspace["profiles"].append({"name":serial_name,"host":"","port":22,"username":"","favorite":False,"folder":"Linux","platform":"Unknown","simulation":False,"options":{"protocol":"Serial","device":os.ttyname(serial_slave),"baud":115200,"data_bits":8,"parity":"n","stop_bits":1,"flow":"n"}})
@@ -261,162 +365,264 @@ with tempfile.TemporaryDirectory(prefix="rustremote-ssh-display-") as directory:
             click("Autoriser et connecter")
             wait(lambda:"SSH intégré — laboratoire été" in contents(),"Bannière du terminal SSH absente")
             result["authenticated_terminal_utf8_ansi"]=True
-            paste("echo RUSTREMOTE_UTF8\npwd\n", right_click=True)
-            wait(lambda:find("Confirmer le collage multiligne"),"Confirmation multiligne absente")
-            assert "RÉPONSE_DISTANTE" not in contents(),"Commandes envoyées sans consentement"
-            click("Confirmer le collage dans cette session")
-            wait(lambda:"RÉPONSE_DISTANTE — été" in contents() and "/laboratoire" in contents(),"Réponses aux commandes absentes")
-            result["commands_and_multiline_consent"]=True
-            for name in ("zoom-in","zoom-out","zoom-reset"):
-                subprocess.run(["gapplication","action","com.rustremote.Preview",name],check=True,timeout=5)
-            wait(lambda:find("Zoom du terminal : 100 %"),"Zoom du terminal non réinitialisé")
-            result["display_terminal_zoom"]=True
-            reply=subprocess.check_output(["gdbus","call","--session","--dest","org.freedesktop.DBus","--object-path","/org/freedesktop/DBus","--method","org.freedesktop.DBus.GetConnectionUnixProcessID","com.rustremote.Preview"],text=True,timeout=5)
-            pid=re.search(r"uint32 (\d+)",reply).group(1)
-            # Redimensionnement X11 de cette seule fenêtre, sur l'affichage privé.
-            import ctypes as c
-            tree=subprocess.check_output(["xwininfo","-root","-tree"],text=True)
-            window_id=None
-            for line in tree.splitlines():
-                if not any(title in line for title in ['"RustRemote"','"RustRemote — Aperçu"']):continue
-                candidate=re.search(r"0x[0-9a-f]+",line).group()
-                prop=subprocess.check_output(["xprop","-id",candidate,"_NET_WM_PID"],text=True)
-                if re.search(r"= "+pid+r"\s*$",prop):window_id=int(candidate,16);break
-            assert window_id is not None
-            geometry=config.parent/"geometry.json"
-            changes=json.loads(geometry.read_text())["changes"] if geometry.exists() else 0
-            x=c.CDLL("libX11.so.6");x.XOpenDisplay.argtypes=[c.c_char_p];x.XOpenDisplay.restype=c.c_void_p;x.XResizeWindow.argtypes=[c.c_void_p,c.c_ulong,c.c_uint,c.c_uint];x.XSync.argtypes=[c.c_void_p,c.c_int];x.XCloseDisplay.argtypes=[c.c_void_p]
-            xd=x.XOpenDisplay(os.environ["DISPLAY"].encode());assert xd
-            x.XResizeWindow(xd,window_id,1500,900);x.XSync(xd,0);x.XCloseDisplay(xd)
-            wait(lambda:geometry.exists() and json.loads(geometry.read_text())["changes"]>changes,"Redimensionnement PTY depuis GTK non reçu par le serveur")
-            result["pty_resize_from_native_window"]=True
-            subprocess.run([sys.executable,str(Path(__file__).with_name("capture-preview.py")),"--pid",pid,"--output","dist/ssh-integrated.png"],check=True,timeout=10)
-            click("Tout sélectionner");context_menu();click("Copier")
-            result["terminal_right_click_copy_paste"]=True
-            assert find("Sélection copiée dans le presse-papiers"), "Copie non effectuée : "+str([n.get_name() for n in walk(app()) if "lection" in n.get_name()][:8])
-            copied=subprocess.check_output(["xclip","-selection","clipboard","-out"],timeout=5).decode()
-            assert "RÉPONSE_DISTANTE — été" in copied,repr(copied[:1000])
-            result["clipboard_bidirectional"]=True
-            click("Ouvrir le navigateur SFTP de l’onglet SSH")
-            wait(lambda:find("SFTP — "+profile["name"]),"Navigateur SFTP absent")
-            click("Connecter / Actualiser SFTP")
-            wait(lambda:"Listing SFTP authentifié" in field("État SFTP réel"),"Connexion SFTP native échouée")
-            remote("texte.txt")
-            text("Chemin distant SFTP","Linux")
-            click("Ouvrir la sélection SFTP")
-            wait(lambda:find("Sélectionnez un fichier ou dossier distant"),"Ancienne sélection SFTP encore utilisable après changement de chemin")
-            assert field("Éditeur SFTP réel")==""
-            stale_download=config.parent/"must-not-download"
-            text("Chemin local absolu pour transfert",str(stale_download))
-            click("Télécharger la sélection SFTP")
-            wait(lambda:find("Sélectionnez un ou plusieurs éléments distants"),"Ancienne sélection encore téléchargeable")
-            assert not stale_download.exists()
-            text("Chemin distant SFTP",".");click("Connecter / Actualiser SFTP")
-            remote("texte.txt");click("Ouvrir la sélection SFTP")
-            result["sftp_path_change_invalidates_selection"]=True
-            wait(lambda:"Édition distante — test" in field("Éditeur SFTP réel"),"Lecture SFTP native échouée")
-            data_root=config.parent/"server-data"
-            text("Éditeur SFTP réel","MODIFIÉ DEPUIS RUSTREMOTE — été\n")
-            click("Enregistrer le fichier distant")
-            wait(lambda:(data_root/"texte.txt").read_text()=="MODIFIÉ DEPUIS RUSTREMOTE — été\n","Enregistrement SFTP natif échoué")
-            text("Nom distant pour création ou envoi","ui-created")
-            click("Créer le dossier distant")
-            wait(lambda:(data_root/"ui-created").is_dir(),"Création du dossier SFTP échouée")
-            source=config.parent/"gui-upload.txt";source.write_text("Fichier envoyé par le navigateur natif — été\n")
-            text("Chemin local absolu pour transfert",str(source));text("Nom distant pour création ou envoi","ui-upload.txt")
-            click("Envoyer le fichier ou dossier local")
-            wait(lambda:(data_root/"ui-upload.txt").exists() and (data_root/"ui-upload.txt").read_bytes()==source.read_bytes(),"Envoi SFTP natif échoué")
-            click("Connecter / Actualiser SFTP")
-            wait(lambda:next((n for n in walk(app()) if n.get_name().startswith("ui-upload.txt ·")),None),"Listing SFTP non actualisé")
-            remote("Linux")
-            destination=config.parent/"gui-download"
-            text("Chemin local absolu pour transfert",str(destination));click("Télécharger la sélection SFTP")
-            wait(lambda:(destination/"dossier/enfant.txt").exists(),"Téléchargement récursif SFTP échoué")
-            assert (destination/"dossier/enfant.txt").read_bytes()==(data_root/"Linux/dossier/enfant.txt").read_bytes()
-            click("Télécharger la sélection SFTP")
-            wait(lambda:"aucun écrasement" in field("État SFTP réel"),"Écrasement local non refusé")
-            assert (destination/"dossier/enfant.txt").read_bytes()==(data_root/"Linux/dossier/enfant.txt").read_bytes()
-            local_folder=config.parent/"gui-folder";(local_folder/"sub").mkdir(parents=True);(local_folder/"sub/note.txt").write_text("Dossier UTF-8 — été\n")
-            text("Chemin local absolu pour transfert",str(local_folder));text("Nom distant pour création ou envoi","ui-folder")
-            click("Envoyer le fichier ou dossier local")
-            wait(lambda:(data_root/"ui-folder/sub/note.txt").exists(),"Envoi récursif SFTP échoué")
-            assert (data_root/"ui-folder/sub/note.txt").read_bytes()==(local_folder/"sub/note.txt").read_bytes()
-            result["sftp_native_editor_mkdir_bidirectional_transfers_no_clobber"]=True
-            click("Connecter / Actualiser SFTP");remote("ui-upload.txt")
-            click("Renommer la sélection SFTP");text("Nouveau nom SFTP","ui-renamed.txt");click("Appliquer la modification SFTP")
-            wait(lambda:(data_root/"ui-renamed.txt").exists() and not (data_root/"ui-upload.txt").exists(),"Renommage SFTP échoué")
-            click("Connecter / Actualiser SFTP");remote("ui-renamed.txt")
-            click("Permissions de la sélection SFTP");text("Permissions octales SFTP","640");click("Appliquer la modification SFTP")
-            wait(lambda:(data_root/"ui-renamed.txt").stat().st_mode&0o777==0o640,"Permissions SFTP échouées")
-            click("Renommer la sélection SFTP");text("Nouveau nom SFTP","texte.txt");click("Appliquer la modification SFTP")
-            wait(lambda:"aucun écrasement" in field("État SFTP réel"),"Collision renommage non refusée")
-            click("Connecter / Actualiser SFTP");remote("ui-folder")
-            click("Supprimer la sélection SFTP…");click("Annuler la suppression SFTP")
-            assert (data_root/"ui-folder/sub/note.txt").exists()
-            click("Supprimer la sélection SFTP…");click("Supprimer définitivement la sélection SFTP")
-            wait(lambda:not (data_root/"ui-folder").exists(),"Suppression récursive SFTP échouée")
-            result["sftp_rename_collision_permissions_delete_cancel_and_recursive"]=True
-            click("Connecter / Actualiser SFTP");remote("ui-renamed.txt")
-            node=next(n for n in walk(app()) if n.get_role()==Atspi.Role.LABEL and n.get_name().startswith("Linux ·"))
-            while node.get_role()!=Atspi.Role.LIST_ITEM:node=node.get_parent()
-            assert Atspi.Selection.select_child(node.get_parent(),node.get_index_in_parent())
-            target=config.parent/"multi-download";target.mkdir()
-            text("Chemin local absolu pour transfert",str(target));click("Télécharger la sélection SFTP")
-            wait(lambda:(target/"Linux/dossier/enfant.txt").exists() and (target/"ui-renamed.txt").exists(),"Téléchargement multiple SFTP échoué")
-            assert (target/"ui-renamed.txt").read_bytes()==(data_root/"ui-renamed.txt").read_bytes()
-            assert (target/"Linux/dossier/enfant.txt").read_bytes()==(data_root/"Linux/dossier/enfant.txt").read_bytes()
-            result["sftp_multiple_selection_files_and_folder"]=True
+            if os.environ.get("RUSTREMOTE_TUNNELS_ONLY")=="1":
+                test_tunnels()
+                result["success"]=True
+                raise SystemExit(0)
+            if os.environ.get("RUSTREMOTE_CHOOSERS_ONLY")=="1":
+                click("SFTP");click("Connecter / Actualiser SFTP")
+                wait(lambda:"Listing SFTP authentifié" in field("État SFTP réel"),"SFTP initial du sélecteur absent")
+                test_choosers(config.parent/"server-data")
+                result["success"]=True
+                raise SystemExit(0)
+
+            if os.environ.get("RUSTREMOTE_AUTOMATION_ONLY")=="1":
+                import paramiko
+                original=known.read_text();wrong=paramiko.ECDSAKey.generate()
+                copy_reads=True
+                click("Actions "+profile["name"]);click("Déconnecter")
+            else:
+                paste("echo RUSTREMOTE_UTF8\npwd\n", right_click=True)
+                wait(lambda:find("Confirmer le collage multiligne"),"Confirmation multiligne absente")
+                assert "RÉPONSE_DISTANTE" not in contents(),"Commandes envoyées sans consentement"
+                click("Confirmer le collage dans cette session")
+                wait(lambda:"RÉPONSE_DISTANTE — été" in contents() and "/laboratoire" in contents(),"Réponses aux commandes absentes")
+                result["commands_and_multiline_consent"]=True
+                for name in ("zoom-in","zoom-out","zoom-reset"):
+                    subprocess.run(["gapplication","action","com.rustremote.Preview",name],check=True,timeout=5)
+                wait(lambda:find("Zoom du terminal : 100 %"),"Zoom du terminal non réinitialisé")
+                result["display_terminal_zoom"]=True
+                reply=subprocess.check_output(["gdbus","call","--session","--dest","org.freedesktop.DBus","--object-path","/org/freedesktop/DBus","--method","org.freedesktop.DBus.GetConnectionUnixProcessID","com.rustremote.Preview"],text=True,timeout=5)
+                pid=re.search(r"uint32 (\d+)",reply).group(1)
+                # Redimensionnement X11 de cette seule fenêtre, sur l'affichage privé.
+                import ctypes as c
+                tree=subprocess.check_output(["xwininfo","-root","-tree"],text=True)
+                window_id=None
+                for line in tree.splitlines():
+                    if not any(title in line for title in ['"RustRemote"','"RustRemote — Aperçu"']):continue
+                    candidate=re.search(r"0x[0-9a-f]+",line).group()
+                    prop=subprocess.check_output(["xprop","-id",candidate,"_NET_WM_PID"],text=True)
+                    if re.search(r"= "+pid+r"\s*$",prop):window_id=int(candidate,16);break
+                assert window_id is not None
+                geometry=config.parent/"geometry.json"
+                changes=json.loads(geometry.read_text())["changes"] if geometry.exists() else 0
+                x=c.CDLL("libX11.so.6");x.XOpenDisplay.argtypes=[c.c_char_p];x.XOpenDisplay.restype=c.c_void_p;x.XResizeWindow.argtypes=[c.c_void_p,c.c_ulong,c.c_uint,c.c_uint];x.XSync.argtypes=[c.c_void_p,c.c_int];x.XCloseDisplay.argtypes=[c.c_void_p]
+                xd=x.XOpenDisplay(os.environ["DISPLAY"].encode());assert xd
+                x.XResizeWindow(xd,window_id,1500,900);x.XSync(xd,0);x.XCloseDisplay(xd)
+                wait(lambda:geometry.exists() and json.loads(geometry.read_text())["changes"]>changes,"Redimensionnement PTY depuis GTK non reçu par le serveur")
+                result["pty_resize_from_native_window"]=True
+                subprocess.run([sys.executable,str(Path(__file__).with_name("capture-preview.py")),"--pid",pid,"--output","dist/ssh-integrated.png"],check=True,timeout=10)
+                click("Tout sélectionner");context_menu();click("Copier")
+                result["terminal_right_click_copy_paste"]=True
+                assert find("Sélection copiée dans le presse-papiers"), "Copie non effectuée : "+str([n.get_name() for n in walk(app()) if "lection" in n.get_name()][:8])
+                copied=subprocess.check_output(["xclip","-selection","clipboard","-out"],timeout=5).decode()
+                assert "RÉPONSE_DISTANTE — été" in copied,repr(copied[:1000])
+                result["clipboard_bidirectional"]=True
+                click("Ouvrir le navigateur SFTP de l’onglet SSH")
+                wait(lambda:find("SFTP — "+profile["name"]),"Navigateur SFTP absent")
+                click("Connecter / Actualiser SFTP")
+                wait(lambda:"Listing SFTP authentifié" in field("État SFTP réel"),"Connexion SFTP native échouée")
+                remote("texte.txt")
+                text("Chemin distant SFTP","Linux")
+                click("Ouvrir la sélection SFTP")
+                wait(lambda:find("Sélectionnez un fichier ou dossier distant"),"Ancienne sélection SFTP encore utilisable après changement de chemin")
+                assert field("Éditeur SFTP réel")==""
+                stale_download=config.parent/"must-not-download"
+                text("Chemin local absolu pour transfert",str(stale_download))
+                click("Télécharger la sélection SFTP")
+                wait(lambda:find("Sélectionnez un ou plusieurs éléments distants"),"Ancienne sélection encore téléchargeable")
+                assert not stale_download.exists()
+                text("Chemin distant SFTP",".");click("Connecter / Actualiser SFTP")
+                remote("texte.txt");click("Ouvrir la sélection SFTP")
+                result["sftp_path_change_invalidates_selection"]=True
+                wait(lambda:"Édition distante — test" in field("Éditeur SFTP réel"),"Lecture SFTP native échouée")
+                data_root=config.parent/"server-data"
+                text("Éditeur SFTP réel","MODIFIÉ DEPUIS RUSTREMOTE — été\n")
+                click("Enregistrer le fichier distant")
+                wait(lambda:(data_root/"texte.txt").read_text()=="MODIFIÉ DEPUIS RUSTREMOTE — été\n","Enregistrement SFTP natif échoué")
+                text("Nom distant pour création ou envoi","ui-created")
+                click("Créer le dossier distant")
+                wait(lambda:(data_root/"ui-created").is_dir(),"Création du dossier SFTP échouée")
+                source=config.parent/"gui-upload.txt";source.write_text("Fichier envoyé par le navigateur natif — été\n")
+                text("Chemin local absolu pour transfert",str(source));text("Nom distant pour création ou envoi","ui-upload.txt")
+                click("Envoyer le fichier ou dossier local")
+                wait(lambda:(data_root/"ui-upload.txt").exists() and (data_root/"ui-upload.txt").read_bytes()==source.read_bytes(),"Envoi SFTP natif échoué")
+                click("Connecter / Actualiser SFTP")
+                wait(lambda:next((n for n in walk(app()) if n.get_name().startswith("ui-upload.txt ·")),None),"Listing SFTP non actualisé")
+                remote("Linux")
+                destination=config.parent/"gui-download"
+                text("Chemin local absolu pour transfert",str(destination));click("Télécharger la sélection SFTP")
+                wait(lambda:(destination/"dossier/enfant.txt").exists(),"Téléchargement récursif SFTP échoué")
+                assert (destination/"dossier/enfant.txt").read_bytes()==(data_root/"Linux/dossier/enfant.txt").read_bytes()
+                click("Télécharger la sélection SFTP")
+                wait(lambda:"aucun écrasement" in field("État SFTP réel"),"Écrasement local non refusé")
+                assert (destination/"dossier/enfant.txt").read_bytes()==(data_root/"Linux/dossier/enfant.txt").read_bytes()
+                local_folder=config.parent/"gui-folder";(local_folder/"sub").mkdir(parents=True);(local_folder/"sub/note.txt").write_text("Dossier UTF-8 — été\n")
+                text("Chemin local absolu pour transfert",str(local_folder));text("Nom distant pour création ou envoi","ui-folder")
+                click("Envoyer le fichier ou dossier local")
+                wait(lambda:(data_root/"ui-folder/sub/note.txt").exists(),"Envoi récursif SFTP échoué")
+                assert (data_root/"ui-folder/sub/note.txt").read_bytes()==(local_folder/"sub/note.txt").read_bytes()
+                result["sftp_native_editor_mkdir_bidirectional_transfers_no_clobber"]=True
+                click("Connecter / Actualiser SFTP");remote("ui-upload.txt")
+                click("Renommer la sélection SFTP");text("Nouveau nom SFTP","ui-renamed.txt");click("Appliquer la modification SFTP")
+                wait(lambda:(data_root/"ui-renamed.txt").exists() and not (data_root/"ui-upload.txt").exists(),"Renommage SFTP échoué")
+                click("Connecter / Actualiser SFTP");remote("ui-renamed.txt")
+                click("Permissions de la sélection SFTP");text("Permissions octales SFTP","640");click("Appliquer la modification SFTP")
+                wait(lambda:(data_root/"ui-renamed.txt").stat().st_mode&0o777==0o640,"Permissions SFTP échouées")
+                click("Renommer la sélection SFTP");text("Nouveau nom SFTP","texte.txt");click("Appliquer la modification SFTP")
+                wait(lambda:"aucun écrasement" in field("État SFTP réel"),"Collision renommage non refusée")
+                click("Connecter / Actualiser SFTP");remote("ui-folder")
+                click("Supprimer la sélection SFTP…");click("Annuler la suppression SFTP")
+                assert (data_root/"ui-folder/sub/note.txt").exists()
+                click("Supprimer la sélection SFTP…");click("Supprimer définitivement la sélection SFTP")
+                wait(lambda:not (data_root/"ui-folder").exists(),"Suppression récursive SFTP échouée")
+                result["sftp_rename_collision_permissions_delete_cancel_and_recursive"]=True
+                click("Connecter / Actualiser SFTP");remote("ui-renamed.txt")
+                node=next(n for n in walk(app()) if n.get_role()==Atspi.Role.LABEL and n.get_name().startswith("Linux ·"))
+                while node.get_role()!=Atspi.Role.LIST_ITEM:node=node.get_parent()
+                assert Atspi.Selection.select_child(node.get_parent(),node.get_index_in_parent())
+                target=config.parent/"multi-download";target.mkdir()
+                text("Chemin local absolu pour transfert",str(target));click("Télécharger la sélection SFTP")
+                wait(lambda:(target/"Linux/dossier/enfant.txt").exists() and (target/"ui-renamed.txt").exists(),"Téléchargement multiple SFTP échoué")
+                assert (target/"ui-renamed.txt").read_bytes()==(data_root/"ui-renamed.txt").read_bytes()
+                assert (target/"Linux/dossier/enfant.txt").read_bytes()==(data_root/"Linux/dossier/enfant.txt").read_bytes()
+                result["sftp_multiple_selection_files_and_folder"]=True
+                test_choosers(data_root)
+
+                # Reprise explicite dans les deux sens, préfixes différents refusés.
+                remote("ui-renamed.txt")
+                resumed=config.parent/"resumed.txt"
+                original=(data_root/"ui-renamed.txt").read_bytes()
+                resumed.write_bytes(original[:7])
+                text("Chemin local absolu pour transfert",str(resumed))
+                click("Reprendre le téléchargement SFTP…");click("Confirmer la reprise du fichier SFTP")
+                wait(lambda:resumed.read_bytes()==original,"Reprise téléchargement échouée")
+                upload_source=config.parent/"resume-upload.txt";upload_source.write_bytes(original+" — suite de test".encode())
+                text("Chemin local absolu pour transfert",str(upload_source))
+                click("Reprendre l’envoi du fichier SFTP…");click("Confirmer la reprise du fichier SFTP")
+                wait(lambda:(data_root/"ui-renamed.txt").read_bytes()==upload_source.read_bytes(),"Reprise envoi échouée")
+                resumed.write_bytes(b"PREFIXE DIFFERENT")
+                text("Chemin local absolu pour transfert",str(resumed))
+                click("Reprendre le téléchargement SFTP…");click("Confirmer la reprise du fichier SFTP")
+                wait(lambda:any("Préfixe existant différent" in n.get_name() for n in walk(app())),"Préfixe incohérent non refusé")
+                assert resumed.read_bytes()==b"PREFIXE DIFFERENT"
+                result["sftp_resume_both_directions_prefix_mismatch_rejected"]=True
+                (data_root/"progress.txt").write_bytes(b"RustRemote fixture\n"*50000)
+                click("Connecter / Actualiser SFTP");remote("progress.txt")
+                continued=config.parent/"progress-download.txt"
+                text("Chemin local absolu pour transfert",str(continued));click("Télécharger la sélection SFTP")
+                def progressed():
+                    node=find("Progression SFTP")
+                    description=node.get_description() if node else ""
+                    return bool(re.match(r"[1-9][0-9]* octets",description))
+                wait(progressed,"Progression réelle des octets SFTP absente")
+                click("Déconnecter / Annuler SFTP")
+                partial=continued.with_name("."+continued.name+".rustremote-part")
+                wait(lambda:partial.exists(),"Copie partielle non conservée après annulation")
+                assert not continued.exists() and 0<partial.stat().st_size<(data_root/"progress.txt").stat().st_size
+                click("Reprendre le téléchargement SFTP…");click("Confirmer la reprise du fichier SFTP")
+                wait(lambda:continued.exists(),"Publication atomique après reprise échouée")
+                assert continued.read_bytes()==(data_root/"progress.txt").read_bytes() and not partial.exists()
+                result["sftp_live_progress_cancel_preserve_partial_resume"]=True
 
 
-            text("Éditeur SFTP réel","Tentative après modification concurrente\n")
-            (data_root/"texte.txt").write_text("Modification concurrente à conserver\n")
-            click("Enregistrer le fichier distant")
-            wait(lambda:"Le fichier distant a changé" in field("État SFTP réel"),"Conflit d’édition SFTP non détecté")
-            assert (data_root/"texte.txt").read_text()=="Modification concurrente à conserver\n"
-            result["sftp_concurrent_edit_preserved"]=True
-            remote("escape");click("Ouvrir la sélection SFTP")
-            wait(lambda:"Liens et fichiers spéciaux refusés" in field("État SFTP réel"),"Lien SFTP non refusé")
-            result["sftp_symlink_not_opened"]=True
-            subprocess.run([sys.executable,str(Path(__file__).with_name("capture-preview.py")),"--pid",pid,"--title","SFTP — "+profile["name"],"--output","dist/sftp-integrated.png"],check=True,timeout=10)
-            click("Fermer le navigateur SFTP")
-            reply=subprocess.check_output(["gdbus","call","--session","--dest","org.freedesktop.DBus","--object-path","/org/freedesktop/DBus","--method","org.freedesktop.DBus.GetConnectionUnixProcessID","com.rustremote.Preview"],text=True,timeout=5)
-            pid=re.search(r"uint32 (\d+)",reply).group(1)
-            subprocess.run([sys.executable,str(Path(__file__).with_name("capture-preview.py")),"--pid",pid,"--output","dist/ssh-integrated.png"],check=True,timeout=10)
-            paste_button=find("Coller dans le terminal…")
-            sftp_button=find("Ouvrir SFTP")
-            disconnect_button=find("Déconnecter le terminal")
-            click("Actions "+profile["name"]);click("Déconnecter")
-            def paste_disabled():
-                paste_button.clear_cache()
-                return not paste_button.get_state_set().contains(Atspi.StateType.SENSITIVE)
-            wait(paste_disabled,"Collage encore actif après déconnexion")
-            for control in (sftp_button,disconnect_button):
-                control.clear_cache()
-                assert not control.get_state_set().contains(Atspi.StateType.SENSITIVE)
-            result["inactive_terminal_controls_disabled"]=True
-            result["paste_disabled_after_disconnect"]=True
-            wait(lambda:any("session terminée" in n.get_name() for n in walk(app())),"Session SSH non terminée après déconnexion")
-            print("OK : terminal et SFTP clé, opérations, protections, déconnexion",flush=True)
-            result["context_disconnect"]=True
-            copy_reads=True
-            # Refus réel d'une clé d'hôte changée depuis ce même profil dans l'UI.
-            original=known.read_text()
-            import paramiko
-            wrong=paramiko.ECDSAKey.generate()
-            known.write_text(f"[127.0.0.1]:{profile['port']} {wrong.get_name()} {wrong.get_base64()}\n")
-            click("Actions "+profile["name"]);click("Se connecter");click("Autoriser et connecter")
-            wait(lambda:"REMOTE HOST IDENTIFICATION HAS CHANGED" in contents(),"Changement d'hôte non signalé par le terminal")
-            print("OK : clé d’hôte modifiée refusée dans le terminal",flush=True)
-            result["changed_host_key_rejected_in_app"]=True
-            known.write_text(original)
+
+                text("Éditeur SFTP réel","Tentative après modification concurrente\n")
+                (data_root/"texte.txt").write_text("Modification concurrente à conserver\n")
+                click("Enregistrer le fichier distant")
+                wait(lambda:"Le fichier distant a changé" in field("État SFTP réel"),"Conflit d’édition SFTP non détecté")
+                assert (data_root/"texte.txt").read_text()=="Modification concurrente à conserver\n"
+                result["sftp_concurrent_edit_preserved"]=True
+                remote("escape");click("Ouvrir la sélection SFTP")
+                wait(lambda:"Liens et fichiers spéciaux refusés" in field("État SFTP réel"),"Lien SFTP non refusé")
+                result["sftp_symlink_not_opened"]=True
+                subprocess.run([sys.executable,str(Path(__file__).with_name("capture-preview.py")),"--pid",pid,"--title","SFTP — "+profile["name"],"--output","dist/sftp-integrated.png"],check=True,timeout=10)
+                click("Fermer le navigateur SFTP")
+                reply=subprocess.check_output(["gdbus","call","--session","--dest","org.freedesktop.DBus","--object-path","/org/freedesktop/DBus","--method","org.freedesktop.DBus.GetConnectionUnixProcessID","com.rustremote.Preview"],text=True,timeout=5)
+                pid=re.search(r"uint32 (\d+)",reply).group(1)
+                subprocess.run([sys.executable,str(Path(__file__).with_name("capture-preview.py")),"--pid",pid,"--output","dist/ssh-integrated.png"],check=True,timeout=10)
+                paste_button=find("Coller dans le terminal…")
+                sftp_button=find("Ouvrir SFTP")
+                disconnect_button=find("Déconnecter le terminal")
+                click("Actions "+profile["name"]);click("Déconnecter")
+                def paste_disabled():
+                    paste_button.clear_cache()
+                    return not paste_button.get_state_set().contains(Atspi.StateType.SENSITIVE)
+                wait(paste_disabled,"Collage encore actif après déconnexion")
+                for control in (sftp_button,disconnect_button):
+                    control.clear_cache()
+                    assert not control.get_state_set().contains(Atspi.StateType.SENSITIVE)
+                result["inactive_terminal_controls_disabled"]=True
+                result["paste_disabled_after_disconnect"]=True
+                wait(lambda:any("session terminée" in n.get_name() for n in walk(app())),"Session SSH non terminée après déconnexion")
+                print("OK : terminal et SFTP clé, opérations, protections, déconnexion",flush=True)
+                result["context_disconnect"]=True
+                copy_reads=True
+                # Refus réel d'une clé d'hôte changée depuis ce même profil dans l'UI.
+                original=known.read_text()
+                import paramiko
+                wrong=paramiko.ECDSAKey.generate()
+                known.write_text(f"[127.0.0.1]:{profile['port']} {wrong.get_name()} {wrong.get_base64()}\n")
+                click("Actions "+profile["name"]);click("Se connecter");click("Autoriser et connecter")
+                wait(lambda:"REMOTE HOST IDENTIFICATION HAS CHANGED" in contents(),"Changement d'hôte non signalé par le terminal")
+                print("OK : clé d’hôte modifiée refusée dans le terminal",flush=True)
+                result["changed_host_key_rejected_in_app"]=True
+                known.write_text(original)
             agent_name="SSH Agent — laboratoire"
             click("Actions "+agent_name);click("Se connecter");click("Autoriser et connecter")
             wait(lambda:"SSH intégré — laboratoire été" in contents(agent_name),"Authentification SSH Agent intégrée échouée")
             click("SFTP");click("Connecter / Actualiser SFTP")
             wait(lambda:"Listing SFTP authentifié" in field("État SFTP réel"),"SFTP via SSH Agent échoué")
             click("Fermer le navigateur SFTP")
+            # Alias et ProxyJump : terminal puis navigateur libssh2 via le bastion local.
+            config_file=config.parent/"bastion.conf"
+            config_text=(f'Host serveur-proxy-lab.invalid\n HostName 127.0.0.1\n ProxyJump bastion-lab\n'
+                         f'Host bastion-lab\n HostName 127.0.0.1\n Port {profile["port"]}\n User lab\n'
+                         f' IdentityFile "{profile["options"]["identity_file"]}"\n IdentitiesOnly yes\n UserKnownHostsFile "{known}"\n')
+            config_file.write_text(config_text)
+            proxy_name="SSH via bastion — laboratoire"
+            click("SSH");text("Nom du profil",proxy_name);text("Hôte / adresse IP","serveur-proxy-lab.invalid")
+            text("Port",str(profile["port"]));text("Utilisateur","lab");text("Clé SSH",profile["options"]["identity_file"])
+            text("Fichier known_hosts SSH",str(known));text("Configuration OpenSSH",str(config_file));click("Enregistrer le profil")
+            wait(lambda:find("Actions "+proxy_name),"Profil de bastion non enregistré")
+            click("Actions "+proxy_name);click("Se connecter");click("Autoriser et connecter")
+            wait(lambda:"SSH intégré — laboratoire été" in contents(proxy_name),"Terminal via bastion échoué")
+            click("SFTP");click("Connecter / Actualiser SFTP")
+            wait(lambda:"Listing SFTP authentifié" in field("État SFTP réel"),"SFTP via ProxyJump échoué")
+            click("Fermer le navigateur SFTP")
+            unknown=config.parent/"unknown-bastion-hosts";unknown.write_text("")
+            config_file.write_text(config_text.replace(str(known),str(unknown)))
+            click("SFTP");click("Connecter / Actualiser SFTP")
+            wait(lambda:any("Connexion SSH SFTP refusée" in n.get_name() for n in walk(app())),"Empreinte de bastion inconnue non refusée")
+            click("Fermer le navigateur SFTP");config_file.write_text(config_text)
+            click("Actions "+proxy_name);click("Déconnecter")
+            click("Actions "+agent_name);click("Se connecter")
+            result["ssh_sftp_alias_proxyjump_and_unknown_bastion_rejected"]=True
             print("OK : authentification agent SSH et SFTP",flush=True)
             result["ssh_and_sftp_agent_in_application"]=True
+            # Multi-Exec : deux sessions locales, prévisualisation et annulation sans envoi.
+            click("Actions "+profile["name"]);click("Se connecter");click("Autoriser et connecter")
+            wait(lambda:"SSH intégré — laboratoire été" in contents(),"Deuxième session pour Multi-Exec absente")
+            click("Multi-Exec")
+            text("Commande SSH à vérifier","echo RUSTREMOTE_UTF8")
+            click(profile["name"]+" — lab@127.0.0.1:"+str(profile["port"]))
+            click(agent_name+" — lab@127.0.0.1:"+str(profile["port"]))
+            commands=config.parent/"shell-commands.count";before=int(commands.read_text())
+            click("Vérifier les cibles et la commande");click("Annuler les commandes SSH")
+            assert int(commands.read_text())==before
+            click("Vérifier les cibles et la commande");click("Exécuter sur 2 session(s) SSH")
+            wait(lambda:int(commands.read_text())==before+2,"Multi-Exec non reçu par les deux sessions")
+            click("Fermer les outils de commandes")
+            result["multi_exec_local_two_targets_preview_cancel_and_send"]=True
+            click("Macros");click("Macro : système")
+            assert field("Commande SSH à vérifier")=="uname -a"
+            click("Fermer les outils de commandes")
+            result["macro_catalogue_populates_command"]=True
+            test_tunnels()
+            click("Actions "+profile["name"]);click("Déconnecter")
+            # Revenir à l’agent pour les contrôles stricts known_hosts ci-dessous.
+            click("Actions "+agent_name);click("Se connecter")
+
             known.write_text(f"[127.0.0.1]:{profile['port']} {wrong.get_name()} {wrong.get_base64()}\n")
             click("SFTP");click("Connecter / Actualiser SFTP")
             wait(lambda:"SFTP refusé : clé d’hôte inconnue ou modifiée" in field("État SFTP réel"),"Le navigateur SFTP n’a pas refusé la mauvaise clé d’hôte")
