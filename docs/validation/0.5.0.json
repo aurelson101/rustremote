@@ -118,5 +118,13 @@
     "serial_commands": [],
     "serial_replies": [],
     "application_exit_before_cleanup": null
+  },
+  "publication": {
+    "url": "https://github.com/aurelson101/rustremote/releases/tag/v0.5.0",
+    "private_repository": true,
+    "application_commit": "4e64054bcd2119ddea5be7a458c5be50939987b7",
+    "download_matches_local_sha256": true,
+    "old_local_images_and_checksums_removed": 10,
+    "old_github_assets_found": 0
   }
 }

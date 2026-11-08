@@ -219,3 +219,8 @@ série native testés sur artefact. CLIPRDR réel validé séparément sous GNOM
 Desktop : texte/fichiers/dossiers dans les deux sens, 10 cas. Aucune qualification
 Windows/AD, KDE ou périphériques physiques. Les anciens résultats ci-dessus sont
 historiques ; la validation 0.5.0 prévaut pour l’état courant.
+
+Publication 0.5.0 effectuée sur GitHub privé, AppImage et SHA256 téléversés puis
+retéléchargés et comparés. Anciennes AppImages locales 0.1.0–0.4.1 retirées après
+validation ; aucune ancienne pièce jointe GitHub n’existait. P3-02 reste PARTIAL
+(portabilité, signature, CI/.deb et installation multi-distribution non qualifiées).

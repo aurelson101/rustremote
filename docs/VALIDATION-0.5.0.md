@@ -100,3 +100,12 @@ Non qualifiés : Windows/AD/LDAP réels, audio/imprimantes/multimoniteur physiqu
 switch série physique, KDE, autres distributions. IronRDP/VNC intégrés, SQLite,
 verrouillage automatique du coffre, X11 forwarding, CI/.deb et signature restent
 ouverts dans la roadmap. Publication en préversion, dépôt privé conservé.
+
+## Publication vérifiée
+
+[Préversion v0.5.0](https://github.com/aurelson101/rustremote/releases/tag/v0.5.0)
+publiée sur le dépôt privé, commit applicatif
+`4e64054bcd2119ddea5be7a458c5be50939987b7`. AppImage et SHA256 retéléchargés depuis
+GitHub et comparés aux originaux : identiques. Les cinq anciennes images locales
+0.1.0 à 0.4.1 et leurs cinq checksums ont été retirés après cette vérification.
+Aucune ancienne AppImage/release GitHub n’existait ; aucun outil de build supprimé.

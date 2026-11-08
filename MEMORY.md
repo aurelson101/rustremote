@@ -5,7 +5,7 @@
 
 ## 1. État de référence
 
-- **Mise à jour :** 2026-11-08 — version 0.5.0, validation et préparation de publication AppImage.
+- **Mise à jour :** 2026-11-08 — version 0.5.0, AppImage publiée sur GitHub privé et téléchargement vérifié.
 - **Dernier agent :** Codex ; SFTP réel, progression/reprise, bastions, tunnels/Multi-Exec, Wayland et CLIPRDR ; laboratoires locaux uniquement.
 - **Phase :** P1 — terminal/SFTP natifs, MVP encore incomplet.
 - **État confirmé :** terminal SSH/série intégré VTE, SFTP natif ssh2/libssh2 ; RDP/VNC externes ; profils/import/export, dossiers et paramètres persistants.
@@ -433,3 +433,15 @@ sélection clavier vérifiée : trois modes avec écho bidirectionnel et ports f
 à la déconnexion. Résultats dans `docs/validation/0.5.0.json`. Les tests du harnais
 peuvent être limités par RUSTREMOTE_TUNNELS_ONLY / RUSTREMOTE_SERIAL_ONLY /
 RUSTREMOTE_AUTOMATION_ONLY ; timeout global porté à 600 s pour le parcours enrichi.
+
+Publication finale : sources poussées, commit applicatif
+`4e64054bcd2119ddea5be7a458c5be50939987b7`, préversion GitHub `v0.5.0` publiée avec
+AppImage + SHA256 : https://github.com/aurelson101/rustremote/releases/tag/v0.5.0 .
+Le fichier retéléchargé de GitHub est identique (SHA256 `03151f5520f30a29f9d52b8d120ebe291ddbee0d69337108feb9609acef80570`).
+Anciennes images locales 0.1.0 à 0.4.1 et leurs checksums supprimés après vérification
+de la nouvelle ; aucune ancienne release/AppImage GitHub n’existait. Outil de build
+`.tools/appimagetool` conservé. Dépôt toujours privé. Création de release initialement
+refusée avec SHA court, corrigée en utilisant le SHA complet ; aucun token exposé.
+Le dernier harnais avec focus explicite du dialogue a également passé les trois
+modes de tunnel sur l’AppImage. Les changements après le commit applicatif sont
+uniquement les traces de publication/validation dans la documentation.
