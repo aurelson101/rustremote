@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=RustRemote
+Comment=Prototype de client de sessions distantes
+Exec=rustremote
+Icon=rustremote
+Terminal=false
+Categories=Network;RemoteAccess;
+
+StartupWMClass=rustremote

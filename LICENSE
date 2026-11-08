@@ -1,0 +1,76 @@
+RustRemote — Licence d'utilisation et de redistribution gratuite
+Version 1.0 — 8 novembre 2026
+Identifiant : LicenseRef-RustRemote-No-Resale-1.0
+
+Copyright (c) 2026 aurelson101 et les contributeurs de RustRemote.
+
+1. Périmètre
+
+Cette licence s'applique au code et aux éléments originaux de RustRemote dont
+les titulaires des droits proposent la distribution sous cette licence.
+Les composants tiers conservent leurs propres licences : voir NOTICE.
+
+2. Utilisation autorisée
+
+Vous pouvez utiliser, étudier, copier et modifier RustRemote gratuitement,
+pour vos besoins personnels, associatifs ou professionnels, y compris au sein
+d'une entreprise et pour réaliser des prestations professionnelles rémunérées.
+Cette autorisation ne dépend pas du chiffre d'affaires de l'utilisateur.
+
+3. Redistribution gratuite
+
+Vous pouvez redistribuer gratuitement le logiciel, sous forme de sources ou
+de binaires, avec ou sans modifications, à condition de conserver cette licence,
+les mentions de droits d'auteur et les notices des composants tiers.
+Les versions modifiées doivent être identifiées comme telles et ne doivent pas
+être présentées comme une version officielle sans l'accord des titulaires.
+Les destinataires reçoivent directement les mêmes autorisations sur les éléments
+couverts par cette licence. Aucun prix ne peut être exigé pour obtenir la copie
+ou le droit d'utiliser ces éléments.
+
+4. Revente interdite
+
+Sans accord écrit distinct des titulaires concernés, vous ne pouvez pas vendre,
+louer, accorder une sous-licence payante ou redistribuer contre paiement une copie
+de RustRemote ou d'une version modifiée des éléments couverts par cette licence.
+Cette interdiction s'applique également lorsque la copie est vendue comme un
+élément d'une offre groupée. Les frais réels d'un support matériel ou de transmission,
+sans marge, sont admis s'ils sont clairement indiqués séparément.
+
+L'installation, l'intégration, la formation, le support et les autres prestations
+professionnelles distinctes peuvent être facturés : la copie de RustRemote et le
+droit de l'utiliser doivent rester gratuits et cette distinction doit être claire.
+La simple utilisation du logiciel pour fournir une prestation payante est autorisée.
+
+5. Attribution et droits réservés
+
+Cette licence n'accorde aucun droit sur les marques, logos ou noms de tiers,
+ni le droit de prétendre à leur approbation. Les droits qui ne sont pas accordés
+expressément restent réservés. Pour une autre forme de distribution commerciale,
+contactez les titulaires via https://github.com/aurelson101/rustremote.
+
+6. Composants tiers
+
+Les restrictions de cette licence ne modifient pas les droits accordés par les
+licences des composants tiers. Leurs autorisations, obligations et mentions restent
+applicables, notamment les droits de remplacer ou modifier une bibliothèque et de
+déboguer ces modifications lorsqu'ils sont garantis par sa licence.
+
+7. Absence de garantie
+
+Le logiciel est fourni en l'état, sans garantie contractuelle de fonctionnement,
+de sécurité, d'adéquation à un usage particulier ou d'absence d'erreur.
+Dans les limites autorisées par le droit applicable, les titulaires et contributeurs
+ne sont pas responsables des dommages résultant de l'utilisation du logiciel.
+Cette clause ne limite pas les droits impératifs auxquels il ne peut être dérogé.
+
+8. Respect de la licence
+
+En cas de violation, les autorisations accordées au contrevenant prennent fin.
+Elles sont rétablies si la violation est corrigée dans les trente jours suivant
+la première notification écrite de cette violation. Les destinataires qui respectent
+la licence conservent leurs propres autorisations.
+
+Il s'agit d'une licence personnalisée de logiciel à code source disponible,
+autorisant l'usage professionnel mais interdisant la revente ; elle n'est pas
+une licence open source approuvée par l'Open Source Initiative.

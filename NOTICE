@@ -1,0 +1,26 @@
+RustRemote — notices de distribution
+
+Le code et les ressources originaux de RustRemote sont proposés selon LICENSE :
+usage personnel et professionnel autorisé, redistribution gratuite, revente interdite.
+Cette licence ne remplace pas les licences des composants tiers.
+
+RustRemote est un projet indépendant. Aucun code propriétaire de MobaXterm ou de
+FileZilla n'est inclus ; ces noms ne désignent pas une affiliation ou une approbation.
+
+Les dépendances Rust sont verrouillées dans Cargo.lock. GTK, GLib et VTE, ainsi que
+les autres bibliothèques système, restent soumis à leurs licences respectives,
+notamment LGPL lorsqu'elle s'applique. OpenSSH, FreeRDP, TigerVNC et picocom sont
+des programmes système distincts ; ils ne sont pas relicenciés par RustRemote.
+
+Lors d'une construction AppImage, scripts/build-appimage.sh rassemble les notices
+et un inventaire dans usr/share/licenses à l'intérieur de l'image. Les compléments
+éventuellement absents des archives Cargo figurent dans packaging/third-party avec
+leur provenance. Les bibliothèques dynamiques sont dans usr/lib ; les sources de
+RustRemote et le script de construction permettent de reconstruire et remplacer
+ces bibliothèques conformément à leurs licences. Les sources et droits des composants
+restent disponibles auprès des projets et distributions indiqués dans leurs notices.
+
+Les captures de docs/screenshots montrent uniquement des profils et des données de
+laboratoire locaux. Elles ne présentent aucun accès à une infrastructure utilisateur.
+assets/maquette-rustremote.png est une référence conceptuelle, pas une capture de
+fonctionnalités livrées ; les captures du README montrent le logiciel exécuté.

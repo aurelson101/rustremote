@@ -1,0 +1,28 @@
+digraph RustRemote {
+ graph [rankdir=TB, fontname="DejaVu Sans", bgcolor="white", pad=0.28, nodesep=0.30, ranksep=0.45, splines=ortho, label="RustRemote — architecture cible (non implémentée)", labelloc=t, fontsize=20, fontcolor="#15314c"];
+ node [shape=box, style="rounded,filled", fontname="DejaVu Sans", fontsize=12, color="#b8c8db", penwidth=1.3, fillcolor="#eef4fa", margin="0.18,0.11"];
+ edge [color="#6080a0", arrowsize=0.65, penwidth=1.3];
+ ui [label="Interface native GTK4 + Relm4\nPanneaux • Onglets • Terminal • SFTP", fillcolor="#dae9fd"];
+ core [label="Core Rust + Tokio\nSessions • Événements • Tâches async", fillcolor="#dceaf0"];
+ domain [label="Modèles métier\nProfils • États • Transferts"];
+ store [label="SQLite\nSans secrets", shape=cylinder];
+ secrets [label="Secret Service / SSH Agent\nknown_hosts", fillcolor="#e4f4e7"];
+ protocols [label="ProtocolAdapter\nInterfaces modulaires", fillcolor="#e3e9ff"];
+ ssh [label="SSH / PTY\nRussh"];
+ sftp [label="SFTP\nSur canal SSH"];
+ rdp [label="RDP\nIronRDP (PoC)"];
+ vnc [label="VNC\nMoteur à évaluer"];
+ kvm [label="VKC / KVM\nÀ qualifier", fillcolor="#f9ecd8"];
+ os [label="Ubuntu / Debian\nGNOME • Wayland • X11", fillcolor="#f0f0f0"];
+ ui -> core;
+ core -> domain;
+ core -> store;
+ core -> secrets;
+ core -> protocols;
+ protocols -> {ssh rdp vnc kvm};
+ ssh -> sftp;
+ ui -> os [style=dashed];
+ secrets -> os [style=dashed];
+ {rank=same; domain store secrets protocols};
+ {rank=same; ssh rdp vnc kvm};
+}

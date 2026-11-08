@@ -1,0 +1,177 @@
+{
+  "date": "2026-11-08",
+  "artifact": "target/debug/rustremote",
+  "appimage_created": false,
+  "cargo": {
+    "fmt": true,
+    "check": true,
+    "clippy_warnings_denied": true,
+    "tests_application": 28,
+    "tests_helper": 1
+  },
+  "wayland_latest": {
+    "success": false,
+    "stage": "plaintext_startup",
+    "reason": "Protection des profils toujours ouvert ; plein écran non atteint"
+  },
+  "native": [
+    {
+      "target": "127.0.0.1",
+      "personal_desktop_accessed": false,
+      "authenticated_terminal_utf8_ansi": true,
+      "commands_and_multiline_consent": true,
+      "display_terminal_zoom": true,
+      "pty_resize_from_native_window": true,
+      "terminal_right_click_copy_paste": true,
+      "clipboard_bidirectional": true,
+      "sftp_path_change_invalidates_selection": true,
+      "sftp_native_editor_mkdir_bidirectional_transfers_no_clobber": true,
+      "sftp_rename_collision_permissions_delete_cancel_and_recursive": true,
+      "sftp_multiple_selection_files_and_folder": true,
+      "sftp_concurrent_edit_preserved": true,
+      "sftp_symlink_not_opened": true,
+      "inactive_terminal_controls_disabled": true,
+      "paste_disabled_after_disconnect": true,
+      "context_disconnect": true,
+      "changed_host_key_rejected_in_app": true,
+      "ssh_and_sftp_agent_in_application": true,
+      "sftp_changed_host_key_rejected_in_app": true,
+      "serial_security_status_correct": true,
+      "serial_switch_in_native_terminal": true,
+      "success": true,
+      "serial_received_bytes": 29,
+      "serial_commands": [
+        "show version",
+        "show interfaces"
+      ],
+      "serial_replies": [
+        "version",
+        "interfaces"
+      ],
+      "application_exit_before_cleanup": null
+    },
+    {
+      "target": "127.0.0.1",
+      "system_account_or_shell_used": false,
+      "openssh_utf8_exec": true,
+      "wrong_identity_rejected": true,
+      "changed_host_key_rejected": true,
+      "opensftp_bidirectional_files_folders": true,
+      "ssh_pty_and_resize": true,
+      "sftp_edit_readback": true,
+      "traversal_and_symlink_rejected": true,
+      "application_terminal_gui": true,
+      "success": true,
+      "services_stopped": true,
+      "events": {
+        "publickey_accepted": 17,
+        "publickey_rejected": 1,
+        "pty_requested": 3,
+        "resize_requested": 4,
+        "unsafe_path_rejected": 2,
+        "shell_commands": 2
+      }
+    }
+  ],
+  "credentials": [
+    {
+      "target": "127.0.0.1",
+      "personal_desktop_accessed": false,
+      "ssh_sftp_profile_password_temporary": true,
+      "profile_password_keyring_restart_no_json_secret": true,
+      "vault_separate_from_settings": true,
+      "serial_test": "Non exécuté : parcours SSH/SFTP ciblé",
+      "success": true,
+      "serial_received_bytes": 0,
+      "serial_commands": [],
+      "serial_replies": [],
+      "application_exit_before_cleanup": null
+    },
+    {
+      "target": "127.0.0.1",
+      "system_account_or_shell_used": false,
+      "openssh_utf8_exec": true,
+      "wrong_identity_rejected": true,
+      "changed_host_key_rejected": true,
+      "opensftp_bidirectional_files_folders": true,
+      "ssh_pty_and_resize": true,
+      "sftp_edit_readback": true,
+      "traversal_and_symlink_rejected": true,
+      "application_terminal_gui": true,
+      "success": true,
+      "services_stopped": true,
+      "events": {
+        "publickey_accepted": 5,
+        "publickey_rejected": 1,
+        "pty_requested": 3,
+        "resize_requested": 1,
+        "unsafe_path_rejected": 2,
+        "shell_commands": 0,
+        "password_accepted": 3
+      }
+    }
+  ],
+  "menus": [
+    {
+      "target": "127.0.0.1",
+      "personal_desktop_accessed": false,
+      "session_folder_create_rename_delete_via_context": true,
+      "display_menu_toggles_and_vault_distinct_settings": true,
+      "serial_test": "Non exécuté : parcours SSH/SFTP ciblé",
+      "success": true,
+      "serial_received_bytes": 0,
+      "serial_commands": [],
+      "serial_replies": [],
+      "application_exit_before_cleanup": null
+    },
+    {
+      "target": "127.0.0.1",
+      "system_account_or_shell_used": false,
+      "openssh_utf8_exec": true,
+      "wrong_identity_rejected": true,
+      "changed_host_key_rejected": true,
+      "opensftp_bidirectional_files_folders": true,
+      "ssh_pty_and_resize": true,
+      "sftp_edit_readback": true,
+      "traversal_and_symlink_rejected": true,
+      "application_terminal_gui": true,
+      "success": true,
+      "services_stopped": true,
+      "events": {
+        "publickey_accepted": 5,
+        "publickey_rejected": 1,
+        "pty_requested": 1,
+        "resize_requested": 1,
+        "unsafe_path_rejected": 2,
+        "shell_commands": 0
+      }
+    }
+  ],
+  "rdp": [
+    {
+      "target": "127.0.0.1",
+      "personal_desktop_accessed": false,
+      "native_app_in_virtual_desktop": true,
+      "bind_verified": true,
+      "wrong_certificate_rejected": true,
+      "negative_failure_causes_verified": true,
+      "wrong_password_rejected": true,
+      "nla_authenticated": true,
+      "certificate_pinned": true,
+      "remote_pixels_verified": true,
+      "profile_domain_password_stdin_connection_disconnect": true,
+      "tracked_client_closed_on_application_exit": true,
+      "clipboard_real": "non vérifié : le backend Shadow 3.32 ne gère pas CLIPRDR",
+      "audio_printers_dual_screen": "options testables par configuration ; périphériques réels non validés",
+      "log_error_counts": {
+        "shadow.log": 23,
+        "client.log": 2,
+        "bad-pin.log": 23,
+        "bad-password.log": 4,
+        "native-app.log": 0
+      },
+      "success": true,
+      "services_stopped": true
+    }
+  ]
+}

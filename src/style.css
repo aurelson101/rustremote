@@ -1,0 +1,51 @@
+window { background: #171d27; color: #e1e7ef; font-size: 13px; }
+headerbar.titlebar { min-height: 36px; padding: 0 10px; background: #202835; border-bottom: 1px solid #344052; box-shadow: none; }
+.menubar { background: #202835; padding: 3px 10px; border-bottom: 1px solid #2e394b; }
+.menu-button > button { padding: 4px 10px; min-height: 23px; border: 0; border-radius: 6px; background: transparent; box-shadow: none; }
+.menu-button > button:hover, .menu-button > button:checked { background: #32445f; }
+.menu-button arrow { min-width: 0; min-height: 0; opacity: 0; margin: 0; padding: 0; }
+button.menu-item { background: transparent; border: 0; box-shadow: none; border-radius: 6px; padding: 8px 12px; }
+button.menu-item:hover { background: #32445f; }
+.toolbar { background: #202835; padding: 9px 10px; border-bottom: 1px solid #354155; }
+button.tool { background: transparent; border: 1px solid transparent; box-shadow: none; padding: 7px 13px; min-width: 48px; border-radius: 8px; color: #e4eaf1; }
+button.tool:hover { background: #30425b; border-color: #4d6c98; }
+button.tool:disabled { opacity: 0.42; }
+.blue { color: #83bdf4; } .gold { color: #e8bc72; } .silver { color: #b4c3d5; }
+.panel { margin: 5px; background: #202835; border: 1px solid #354257; border-radius: 9px; }
+.panel-title { min-height: 35px; padding: 0 11px; background: #263140; border-radius: 9px 9px 0 0; border-bottom: 1px solid #354257; }
+.heading { font-weight: 600; }
+.session-search { margin: 7px; min-height: 28px; }
+entry, passwordentry { background: #121925; border: 1px solid #3b4b62; border-radius: 7px; }
+entry:focus-within, passwordentry:focus-within { border-color: #79aeea; }
+.favorite { padding: 9px 12px; color: #e7c584; }
+.session-group { margin: 5px 7px; }
+.session-group > title { padding: 5px 0; font-weight: 600; }
+button.session-row { background: transparent; border: 0; border-radius: 6px; box-shadow: none; padding: 6px 6px; min-height: 26px; }
+button.session-row:hover { background: #2e3f58; }
+button.session-row:disabled { opacity: 0.5; }
+.profile-manage { margin: 5px 8px; border-radius: 7px; }
+notebook { background: #101722; }
+notebook > header { padding: 6px 4px 0; background: #19212d; border-bottom: 1px solid #354257; }
+notebook > header tabs > tab { background: #202b3b; padding: 7px 11px; margin: 0 4px 0 0; border: 1px solid #37465d; border-bottom: 0; border-radius: 8px 8px 0 0; min-height: 25px; box-shadow: none; }
+notebook > header tabs > tab:checked { background: #2b4668; border-color: #739bca; box-shadow: inset 0 2px #8eb7e5; }
+button.tab-close { padding: 0; min-width: 18px; min-height: 18px; background: transparent; border: 0; box-shadow: none; border-radius: 5px; }
+button.tab-close:hover { background: alpha(#c0d9f7, 0.15); }
+.terminal, .terminal text { background: #0d141e; color: #d9e4f0; font-family: monospace; font-size: 13px; }
+.welcome { padding: 22px; background: #111a26; }
+.pathbar { padding: 8px 7px; }
+.pathbar button { min-height: 23px; min-width: 21px; padding: 2px; background: transparent; border: 0; box-shadow: none; }
+.pathbar entry { min-height: 27px; }
+.file-list { margin: 0 9px; }
+.column-title { padding: 8px 5px; background: #293648; border-bottom: 1px solid #3a4a62; font-weight: 500; }
+.file-cell { padding: 7px 4px; }
+.preview-note { color: #9baec5; font-size: 11px; padding: 10px; }
+.transfers { background: #1a2330; border-top: 1px solid #3b4c64; }
+.transfers > header tabs > tab { padding: 5px 8px; }
+paned > separator { min-width: 4px; background: #141c27; }
+.statusbar { min-height: 30px; padding: 3px 12px; background: #202b3b; border-top: 1px solid #3a4961; font-size: 12px; }
+.dialog-content { padding: 22px; }
+.dialog-content button { border-radius: 7px; padding: 8px 12px; }
+.dialog-content button:checked { background: #2d527e; border-color: #7ea9df; color: white; }
+.dialog-content entry, .dialog-content passwordentry { min-height: 34px; }
+.dialog-content .error { color: #ffa69f; }
+button.suggested-action { background: #3a70b7; color: white; border-color: #79a4de; }

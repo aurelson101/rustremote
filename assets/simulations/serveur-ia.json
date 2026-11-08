@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "folders": ["Linux"],
+  "profiles": [{
+    "name": "Serveur IA — simulation",
+    "host": "ia.aurelson.com",
+    "port": 22,
+    "username": "simulation",
+    "favorite": true,
+    "folder": "Linux",
+    "platform": "Linux",
+    "simulation": true,
+    "options": {"protocol": "Ssh", "identity_file": null, "agent": false}
+  }]
+}
