@@ -62,6 +62,15 @@ impl Controller {
         let body = gtk::Box::new(gtk::Orientation::Vertical, 12);
         body.add_css_class("dialog-content");
         let preferences = self.0.preferences.borrow().clone();
+        body.append(&gtk::Label::new(Some(
+            "Langue de l’interface (redémarrage nécessaire)",
+        )));
+        let language = crate::i18n::dropdown(&["English", "Français"]);
+        language.set_selected(u32::from(preferences.language == "fr"));
+        language.update_property(&[gtk::accessible::Property::Label(&crate::i18n::text(
+            "Interface language",
+        ))]);
+        body.append(&language);
         let note = gtk::Label::new(Some(
             "Réglages appliqués aux terminaux ouverts et aux nouvelles sessions. Les paramètres de démonstration restent temporaires.",
         ));
@@ -75,7 +84,7 @@ impl Controller {
             row.append(&label);
             let field = gtk::SpinButton::with_range(min, max, 1.0);
             field.set_value(value);
-            field.update_property(&[gtk::accessible::Property::Label(name)]);
+            field.update_property(&[gtk::accessible::Property::Label(&crate::i18n::text(name))]);
             row.append(&field);
             body.append(&row);
             field
@@ -119,6 +128,7 @@ impl Controller {
             font.update();
             history.update();
             let preferences = Preferences {
+                language: if language.selected() == 1 { "fr" } else { "en" }.into(),
                 font_size: font.value_as_int() as u8,
                 scrollback: history.value_as_int() as u32,
                 black_terminal: black.is_active(),
@@ -188,7 +198,7 @@ impl Controller {
         });
         body.append(&close);
         window.set_child(Some(&body));
-        window.present();
+        crate::i18n::present(&window);
     }
     pub fn exit_demo(&self, after: impl Fn() + 'static) {
         if self.0.demo_root.borrow().is_none() {
@@ -255,6 +265,6 @@ impl Controller {
         });
         body.append(&cancel);
         window.set_child(Some(&body));
-        window.present();
+        crate::i18n::present(&window);
     }
 }

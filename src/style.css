@@ -49,3 +49,14 @@ paned > separator { min-width: 4px; background: #141c27; }
 .dialog-content entry, .dialog-content passwordentry { min-height: 34px; }
 .dialog-content .error { color: #ffa69f; }
 button.suggested-action { background: #3a70b7; color: white; border-color: #79a4de; }
+/* Stable application controls across Adwaita, Breeze, Xfce and Mint themes. */
+button { background-image: none; }
+.dialog-content button { background: #263447; color: #e1e7ef; border: 1px solid #40526c; }
+.dialog-content button:hover { background: #334c6e; }
+.dialog-content button.suggested-action { background: #356db0; }
+.dialog-content { padding: 16px; }
+.sftp-pane { background: #121b27; border: 1px solid #354257; border-radius: 8px; padding: 10px; }
+.sftp-pane list { background: #121b27; color: #e1e7ef; }
+.sftp-pane row { padding: 6px; border-radius: 4px; }
+.sftp-pane row:selected { background: #2d527e; color: white; }
+.sftp-pane > label { font-weight: bold; padding: 4px; }

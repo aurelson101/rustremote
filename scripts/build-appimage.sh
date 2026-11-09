@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
-# Prototype construit pour Ubuntu 26.04 x86_64, pas encore une publication portable.
+# Native worker; default builds use a pinned older Linux userspace.
 set -euo pipefail
 cd "$(dirname "$(readlink -f "$0")")/.."
+if [[ ${RUSTREMOTE_PORTABLE_WORKER:-0} != 1 && ${RUSTREMOTE_NATIVE_BUILD:-0} != 1 ]]; then
+    exec python3 scripts/build-portable-appimage.py
+fi
 # Repli non privilégié : en-têtes APT extraits localement, bibliothèques système inchangées.
 native_dev="$PWD/.tools/native-dev/root"
 if ! pkg-config --exists openssl libssh2 && [[ -d "$native_dev/usr/lib/x86_64-linux-gnu/pkgconfig" ]]; then
@@ -46,6 +49,7 @@ cp packaging/rustremote.desktop packaging/rustremote.png "$appdir/"
 cp packaging/rustremote.png "$appdir/.DirIcon"
 python3 - "$appdir" <<'PY'
 import json
+import os
 from pathlib import Path
 import re
 import shutil
@@ -53,12 +57,41 @@ import subprocess
 import sys
 
 appdir = Path(sys.argv[1])
-output = subprocess.check_output(['ldd', 'target/release/rustremote'], text=True)
+clean_env = dict(os.environ)
+for name in ('LD_PRELOAD', 'LD_LIBRARY_PATH'):
+    clean_env.pop(name, None)
+loader_dir = Path(subprocess.check_output(['pkg-config', '--variable=gdk_pixbuf_moduledir', 'gdk-pixbuf-2.0'], text=True).strip())
+svg_loader = loader_dir / 'libpixbufloader-svg.so'
+if not svg_loader.is_file():
+    raise SystemExit('SVG loader missing: install librsvg2-common')
+modules = appdir / 'usr/lib/gdk-pixbuf-loaders'
+modules.mkdir()
+shutil.copy2(svg_loader, modules / svg_loader.name)
+query = subprocess.check_output(['pkg-config', '--variable=gdk_pixbuf_query_loaders', 'gdk-pixbuf-2.0'], text=True).strip()
+cache = subprocess.check_output([query, str(svg_loader)], env=clean_env, text=True)
+cache = cache.replace(str(svg_loader), '$ORIGIN/gdk-pixbuf-loaders/' + svg_loader.name)
+(modules / 'loaders.cache').write_text(cache)
+(appdir / 'usr/lib/gio/modules').mkdir(parents=True)
+gtk_libdir = Path(subprocess.check_output(['pkg-config', '--variable=libdir', 'gtk4'], text=True).strip())
+gtk_version = subprocess.check_output(['pkg-config', '--variable=gtk_binary_version', 'gtk4'], text=True).strip()
+im_sources = list((gtk_libdir / 'gtk-4.0' / gtk_version / 'immodules').glob('*.so'))
+im_target = appdir / 'usr/lib/gtk-4.0' / gtk_version / 'immodules'
+im_target.mkdir(parents=True)
+for module in im_sources: shutil.copy2(module, im_target / module.name)
+query_modules = subprocess.check_output(['pkg-config', '--variable=gio_querymodules', 'gio-2.0'], text=True).strip()
+subprocess.run([query_modules, str(im_target)], env=clean_env, check=True)
+output = '\n'.join(subprocess.check_output(['ldd', str(binary)], env=clean_env, text=True)
+                   for binary in [Path('target/release/rustremote'), svg_loader, *im_sources])
 if 'not found' in output:
     raise SystemExit('Dépendance système introuvable : ' + output)
 # Conserver glibc et le chargeur du système cible ; inclure les autres liens ELF.
 excluded = {'libc.so.6', 'libm.so.6', 'libdl.so.2', 'libpthread.so.0',
-            'librt.so.1', 'libresolv.so.2'}
+            'librt.so.1', 'libresolv.so.2',
+            # Match the host graphics driver and its C++/Wayland ABI.
+            'libEGL.so.1', 'libGL.so.1', 'libGLX.so.0', 'libGLdispatch.so.0',
+            'libOpenGL.so.0', 'libdrm.so.2', 'libgbm.so.1', 'libglapi.so.0',
+            'libstdc++.so.6', 'libgcc_s.so.1',
+            'libwayland-client.so.0', 'libwayland-cursor.so.0', 'libwayland-egl.so.1'}
 manifest = []
 for name, path in re.findall(r'^\s*(\S+) => (/\S+)', output, re.M):
     if name in excluded:
@@ -76,6 +109,24 @@ for name, path in re.findall(r'^\s*(\S+) => (/\S+)', output, re.M):
     if not copyright_file.is_file():
         raise SystemExit('Copyright introuvable : ' + str(copyright_file))
     shutil.copy2(copyright_file, appdir / 'usr/share/licenses' / (package + '.copyright'))
+for module in [svg_loader, *im_sources]:
+    owner = subprocess.check_output(['dpkg-query', '-S', str(module)], text=True).split(': ')[0].split(':')[0]
+    shutil.copy2(Path('/usr/share/doc') / owner / 'copyright', appdir / 'usr/share/licenses' / (owner + '.copyright'))
+    manifest.append('GTK/SVG module: ' + owner)
+versions = []
+for binary in [* (appdir / 'usr/bin').iterdir(), * (appdir / 'usr/lib').iterdir(), modules / svg_loader.name, *im_target.glob('*.so')]:
+    if not binary.is_file(): continue
+    with binary.open('rb') as stream:
+        if stream.read(4) != b'\x7fELF': continue
+    version_info = subprocess.check_output(['readelf', '--version-info', str(binary)], env=clean_env, text=True)
+    versions += [tuple(map(int, v.split('.'))) for v in re.findall(r'Name: GLIBC_([0-9.]+)', version_info)]
+minimum = max(versions)
+if os.environ.get('RUSTREMOTE_PORTABLE_WORKER') == '1' and minimum > (2, 36):
+    raise SystemExit('Portable build requires a newer glibc than the selected baseline')
+abi = {'architecture': 'x86_64', 'minimum_glibc': '.'.join(map(str, minimum)),
+       'gtk': subprocess.check_output(['pkg-config', '--modversion', 'gtk4'], text=True).strip(),
+       'vte': subprocess.check_output(['pkg-config', '--modversion', 'vte-2.91-gtk4'], text=True).strip()}
+(appdir / 'usr/share/licenses/ABI.json').write_text(json.dumps(abi, indent=2) + '\n')
 metadata = json.loads(subprocess.check_output(['cargo', 'metadata', '--locked', '--format-version=1', '--filter-platform=x86_64-unknown-linux-gnu']))
 for package in metadata['packages']:
     manifest.append(f"{package['name']} {package['version']}: {package.get('license') or package.get('license_file') or 'licence non renseignée'}")
@@ -98,6 +149,9 @@ cat > "$appdir/AppRun" <<'APPRUN'
 set -eu
 appdir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 export LD_LIBRARY_PATH="$appdir/usr/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+export GDK_PIXBUF_MODULE_FILE="$appdir/usr/lib/gdk-pixbuf-loaders/loaders.cache"
+export GIO_MODULE_DIR="$appdir/usr/lib/gio/modules"
+export GTK_PATH="$appdir/usr/lib/gtk-4.0"
 exec "$appdir/usr/bin/rustremote" "$@"
 APPRUN
 chmod +x "$appdir/AppRun"
@@ -108,3 +162,4 @@ ARCH=x86_64 VERSION="${version}-preview" APPIMAGE_EXTRACT_AND_RUN=1 "$tool" \
 # Remplacement atomique : les anciennes instances montées gardent leur image intacte.
 mv -f -- "$temporary_output" "$PWD/dist/$output"
 (cd dist && sha256sum "$output" > "$output.sha256")
+cp "$appdir/usr/share/licenses/ABI.json" "dist/RustRemote-${version}-ABI.json"

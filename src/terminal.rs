@@ -95,7 +95,7 @@ impl Session {
             .filter_map(|w| w.upgrade())
             .find(|w| w.is_visible())
         {
-            window.present();
+            crate::i18n::present(&window);
             return;
         }
         if let Some(t) = self.0.terminal.upgrade()
@@ -325,8 +325,7 @@ fn open_internal(
         }
     });
     let actions = gtk::gio::SimpleActionGroup::new();
-    let menu = gtk::gio::Menu::new();
-    for (name, title) in [
+    for (name, _title) in [
         ("copy", "Copier"),
         ("paste", "Coller"),
         ("select-all", "Tout sélectionner"),
@@ -354,11 +353,9 @@ fn open_internal(
                 .build();
         }
         actions.add_action(&action);
-        menu.append(Some(title), Some(&format!("terminal.{name}")));
     }
     terminal.insert_action_group("terminal", Some(&actions));
     page.insert_action_group("terminal", Some(&actions));
-    terminal.set_context_menu_model(Some(&menu));
     let context_click = gtk::GestureClick::new();
     context_click.set_button(3);
     context_click.set_propagation_phase(gtk::PropagationPhase::Capture);
@@ -400,7 +397,8 @@ fn open_internal(
             popup.set_child(Some(&body));
             popup.set_parent(&target);
             popup.set_pointing_to(Some(&gtk::gdk::Rectangle::new(x as i32, y as i32, 1, 1)));
-            popup.connect_closed(|p| p.unparent());
+            popup.connect_closed(crate::dialogs::defer_unparent);
+            crate::i18n::translate(popup.upcast_ref());
             popup.popup();
         }
     });
@@ -530,6 +528,8 @@ fn open_internal(
             s.set_text(&message);
         }
     });
+    crate::i18n::translate(page.upcast_ref());
+    crate::i18n::translate(header.upcast_ref());
     let index = tabs.append_page(&page, Some(&header));
     tabs.set_tab_reorderable(&page, true);
     tabs.set_current_page(Some(index));
@@ -542,6 +542,9 @@ fn open_internal(
             ![
                 "LD_LIBRARY_PATH",
                 "LD_PRELOAD",
+                "GDK_PIXBUF_MODULE_FILE",
+                "GIO_MODULE_DIR",
+                "GTK_PATH",
                 "SSH_ASKPASS",
                 "SSH_ASKPASS_REQUIRE",
                 "VNC_VIA_CMD",
@@ -682,7 +685,7 @@ fn paste_from(terminal: &vte::Terminal, status: &gtk::Label, clipboard: gtk::gdk
             let warning=gtk::Label::new(Some("Ce texte contient des retours à la ligne qui peuvent exécuter des commandes. Coller uniquement si vous avez vérifié son contenu."));warning.set_wrap(true);body.append(&warning);
             let preview=gtk::TextView::builder().editable(false).cursor_visible(false).monospace(true).wrap_mode(gtk::WrapMode::WordChar).accepts_tab(false).build();
             preview.buffer().set_text(&text);
-            preview.update_property(&[gtk::accessible::Property::Label("Texte du collage à confirmer")]);
+            preview.update_property(&[gtk::accessible::Property::Label(&crate::i18n::text("Texte du collage à confirmer"))]);
             body.append(&gtk::ScrolledWindow::builder().child(&preview).min_content_height(100).max_content_height(160).propagate_natural_height(true).build());
             let confirm=gtk::Button::with_label("Confirmer le collage dans cette session");let terminal=t.downgrade();let d=dialog.downgrade();
             confirm.connect_clicked(move |_|{if let Some(t)=terminal.upgrade() && t.is_input_enabled(){t.paste_text(&text);}

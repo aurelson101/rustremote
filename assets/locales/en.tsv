@@ -1,0 +1,411 @@
+Fichier	File
+Sessions	Sessions
+Outils	Tools
+Affichage	View
+Aide	Help
+Accueil	Home
+Nouvelle session	New session
+Nouveau profil…	New profile…
+Gestionnaire de profils…	Session manager…
+Nouveau dossier…	New folder…
+Importer des profils…	Import profiles…
+Exporter des profils…	Export profiles…
+Verrouiller les profils…	Lock profiles…
+Quitter	Quit
+Configurer SSH…	Configure SSH…
+Configurer RDP…	Configure RDP…
+Configurer VNC…	Configure VNC…
+Configurer série / switch…	Configure serial / switch…
+Profils enregistrés…	Saved profiles…
+Ping / Traceroute…	Ping / Traceroute…
+Tunnels SSH…	SSH tunnels…
+Macros SSH…	SSH macros…
+Multi-Exec SSH…	SSH Multi-Exec…
+Laboratoire SFTP / presse-papiers…	SFTP / clipboard lab…
+Outils disponibles…	Available tools…
+Paramètres et protection…	Settings and protection…
+Panneau Sessions	Sessions panel
+Panneau SFTP	SFTP panel
+Barre d’outils	Toolbar
+Barre d’état	Status bar
+Plein écran — F11	Full screen — F11
+Agrandir le terminal	Zoom in terminal
+Réduire le terminal	Zoom out terminal
+Zoom 100 %	Reset zoom
+Fermer l’onglet courant	Close current tab
+Ouvrir un onglet de démonstration	Open demo tab
+À propos…	About…
+Coffre	Vault
+Paramètres	Settings
+Série	Serial
+Mes profils	My profiles
+★ Mes profils	★ My profiles
+Gérer les profils…	Manage profiles…
+Rechercher une session	Search sessions
+Nouveau dossier de connexions	New session folder
+Aucun profil enregistré	No saved profiles
+Profils non chiffrés	Unencrypted profiles
+Profils chiffrés · déverrouillés	Encrypted profiles · unlocked
+Se connecter	Connect
+Modifier	Edit
+Déconnecter	Disconnect
+Déplacer…	Move…
+Déplacer	Move
+Annuler	Cancel
+Fermer	Close
+Créer le dossier	Create folder
+Créer un dossier de sessions	Create session folder
+Nom du dossier	Folder name
+Nouveau sous-dossier	New subfolder
+Nouvelle connexion SSH dans ce dossier	New SSH session in this folder
+Nouvelle connexion RDP dans ce dossier	New RDP session in this folder
+Déplacer ce dossier…	Move this folder…
+Renommer ce dossier	Rename this folder
+Supprimer ce dossier vide	Delete this empty folder
+Déplacer dans un dossier	Move to folder
+Dossier destination	Destination folder
+Sans dossier	Unassigned
+Nouveau nom du dossier	New folder name
+Renommer le dossier	Rename folder
+Confirmer la suppression du dossier vide	Confirm deleting empty folder
+Configuration de connexion	Connection settings
+Nom du profil	Profile name
+Hôte / adresse IP	Host / IP address
+Port	Port
+Utilisateur	Username
+Domaine / realm	Domain / realm
+Domaine	Domain
+Mot de passe	Password
+Clé SSH	SSH key
+Fichier known_hosts SSH	SSH known_hosts file
+Configuration OpenSSH	OpenSSH configuration
+Dossier de sessions	Session folder
+Nouveau dossier du profil	New session folder
+Enregistrer le profil	Save profile
+Annuler la configuration	Cancel configuration
+Favori	Favorite
+Ajouter aux favoris	Add to favorites
+Simulation locale — aucune connexion réseau	Local simulation — no network connection
+Ouvrir les profils	Open profiles
+Déverrouiller / ouvrir	Unlock / open
+Chiffrer les profils	Encrypt profiles
+Phrase secrète	Passphrase
+Confirmation de la phrase secrète	Confirm passphrase
+Continuer sans chiffrement	Continue without encryption
+Importer des profils RustRemote	Import RustRemote profiles
+Fichier à importer	Import file
+Prévisualiser l’import	Preview import
+Confirmer l’import	Confirm import
+Exporter des profils RustRemote	Export RustRemote profiles
+Fichier d’export	Export file
+Créer l’export JSON	Create JSON export
+Annuler l’export	Cancel export
+J’accepte l’export de métadonnées non chiffrées	I accept exporting unencrypted metadata
+Paramètres et sécurité	Settings and security
+Enregistrer les paramètres	Save settings
+Taille de police du terminal	Terminal font size
+Historique du terminal (lignes)	Terminal scrollback (lines)
+Fond noir du terminal	Black terminal background
+Activer l’outil Ping	Enable Ping
+Activer l’outil Traceroute	Enable Traceroute
+Quitter la démonstration	Leave demo mode
+Copier la sélection	Copy selection
+Tout sélectionner	Select all
+Coller dans le terminal…	Paste into terminal…
+Ouvrir SFTP	Open SFTP
+Déconnecter le terminal	Disconnect terminal
+Copier	Copy
+Coller	Paste
+Confirmer le collage multiligne	Confirm multiline paste
+Confirmer le collage dans cette session	Confirm paste into this session
+Annuler le collage	Cancel paste
+Confirmer la connexion	Confirm connection
+Autoriser et connecter	Allow and connect
+Annuler la connexion	Cancel connection
+Site local	Local site
+Site distant	Remote site
+Dossier local	Local folder
+Fichiers locaux	Local files
+Fichiers distants	Remote files
+Envoyer →	Upload →
+← Télécharger	← Download
+Nouveau dossier distant…	New remote folder…
+Nouveau dossier distant	New remote folder
+Dossier parent local	Local parent folder
+Dossier parent distant	Remote parent folder
+Actualiser le dossier local	Refresh local folder
+Chemin distant SFTP	Remote SFTP path
+Connecter / Actualiser SFTP	Connect / Refresh SFTP
+Aucune connexion SFTP ouverte	No SFTP connection open
+Listing SFTP authentifié chargé · liens non transférables	Authenticated SFTP listing loaded · links cannot be transferred
+Éditeur distant	Remote editor
+Commandes avancées	Advanced commands
+Nom distant pour création ou envoi	Remote name for creation or upload
+Chemin local absolu pour transfert	Local absolute transfer path
+Déconnecter / Annuler SFTP	Disconnect / Cancel SFTP
+Fermer le navigateur SFTP	Close SFTP browser
+Actualiser SFTP	Refresh SFTP
+Renommer la sélection SFTP	Rename selected remote item
+Permissions de la sélection SFTP	Remote item permissions
+Supprimer la sélection SFTP…	Delete selected remote items…
+Choisir les fichiers à envoyer…	Choose files to upload…
+Choisir les dossiers à envoyer…	Choose folders to upload…
+Ouvrir la sélection SFTP	Open selected remote item
+Créer le dossier distant	Create remote folder
+Envoyer le fichier ou dossier local	Upload local file or folder
+Télécharger la sélection SFTP	Download selected remote items
+Enregistrer le fichier distant	Save remote file
+Reprendre l’envoi SFTP	Resume SFTP upload
+Reprendre le téléchargement SFTP	Resume SFTP download
+Annuler la reprise SFTP	Cancel SFTP resume
+Reprendre le transfert SFTP	Resume SFTP transfer
+Permissions Unix	Unix permissions
+Confirmer la suppression SFTP	Confirm SFTP deletion
+Annuler la suppression SFTP	Cancel SFTP deletion
+Envoyer vers le dossier SFTP courant	Upload to current SFTP folder
+Envoyer	Upload
+Texte distant chargé ou enregistré · UTF-8, maximum 1 Mio	Remote text loaded or saved · UTF-8, maximum 1 MiB
+Sélectionnez un ou plusieurs éléments distants	Select one or more remote items
+Sélectionnez de 1 à 128 fichiers ou dossiers locaux	Select 1 to 128 local files or folders
+Tunnels SSH	SSH tunnels
+Profil SSH du tunnel	Tunnel SSH profile
+Type de tunnel SSH	SSH tunnel type
+Local — poste vers serveur	Local — client to server
+Distant — serveur vers poste	Remote — server to client
+SOCKS — proxy local	SOCKS — local proxy
+Port d’écoute du tunnel	Tunnel listening port
+Hôte destination du tunnel	Tunnel destination host
+Port destination du tunnel	Tunnel destination port
+Vérifier le tunnel SSH	Review SSH tunnel
+Autoriser et ouvrir le tunnel	Allow and open tunnel
+Confirmer le tunnel SSH	Confirm SSH tunnel
+Annuler le tunnel	Cancel tunnel
+Fermer les tunnels	Close tunnels
+Commande SSH à vérifier	SSH command to review
+Macro : système	Macro: system
+Macro : espace disque	Macro: disk space
+Macro : interfaces réseau	Macro: network interfaces
+Vérifier les cibles et la commande	Review targets and command
+Annuler les commandes SSH	Cancel SSH commands
+Fermer les outils de commandes	Close command tools
+Confirmer les commandes SSH	Confirm SSH commands
+Outils réseau — Ping / Traceroute	Network tools — Ping / Traceroute
+Cible du diagnostic	Diagnostic target
+Ping (4 requêtes)	Ping (4 requests)
+Traceroute (12 sauts max)	Traceroute (12 hops max)
+Simulation locale — aucun paquet réseau	Local simulation — no network packets
+Exécuter le diagnostic sur cette cible	Run diagnostic on this target
+Fermer le diagnostic	Close diagnostic
+Résultat du diagnostic	Diagnostic result
+Coffre des identifiants	Credential vault
+Fermer le coffre	Close vault
+À propos de RustRemote	About RustRemote
+Tout déplier	Expand all folders
+Tout replier	Collapse all folders
+Rétablir la disposition	Reset layout
+Rechercher une session…	Find a session…
+Informations système…	System information…
+Ouvrir un terminal local	Open local terminal
+Langue de l’interface (redémarrage nécessaire)	Interface language (restart required)
+Dossier introuvable	Folder not found
+Dossier parent introuvable	Parent folder not found
+Dossier destination introuvable	Destination folder not found
+Ce dossier existe déjà	This folder already exists
+Un dossier ne peut pas être déplacé dans lui-même	A folder cannot be moved into itself
+Le dossier contient des connexions ou sous-dossiers	The folder contains sessions or subfolders
+Adapter l’image (smart sizing)	Fit image (smart sizing)
+Affichage RDP	RDP display
+Audio RDP	RDP audio
+Automatique (résolution dynamique)	Automatic (dynamic resolution)
+Bits de données	Data bits
+Bits d’arrêt	Stop bits
+Chemin absolu de la clé privée (facultatif)	Private key absolute path (optional)
+Chiffrer les profils (recommandé)	Encrypt profiles (recommended)
+Chiffré avec age / scrypt (déverrouillé pour cette session)	Encrypted with age / scrypt (unlocked for this session)
+Choisir une clé SSH existante	Choose an existing SSH key
+Client RDP lancé · connexion en cours avec contrôle NLA et certificat	RDP client started · connecting with NLA and certificate checks
+Client externe lancé · état de connexion non suivi	External client started · connection status not tracked
+Client manquant	Missing client
+Confirmer la phrase secrète	Confirm passphrase
+Connexion bloquée hors ligne	Connection blocked offline
+Connexion refusée	Connection refused
+Contrôle de flux (n/h/s)	Flow control (n/h/s)
+Copier fichiers/dossiers RDP (opt-in)	Copy RDP files/folders (opt-in)
+Créer le magasin de profils	Create profile store
+Domaine AD / realm	AD domain / realm
+Débit série	Serial baud rate
+Déconnexion demandée	Disconnect requested
+Démonstration : aucun mot de passe n’est enregistré durablement.	Demo: passwords are not stored persistently.
+Démonstration indisponible	Demo unavailable
+Désactivée	Disabled
+Empreinte SHA256 du certificat	Certificate SHA256 fingerprint
+Enregistrement en cours	Saving
+Enregistrer le mot de passe avec cette connexion	Save password with this session
+Facultatif : 64 caractères hexadécimaux	Optional: 64 hexadecimal characters
+Facultatif : fichier de configuration OpenSSH (ex. /dev/null pour l’ignorer)	Optional: OpenSSH config file (e.g. /dev/null to ignore config)
+Facultatif : known_hosts propre à ce profil (chemin absolu)	Optional: profile-specific known_hosts (absolute path)
+Gestionnaire de profils	Session manager
+Identifiants de connexion	Connection credentials
+Informations de sécurité	Security information
+Lancement impossible	Cannot start client
+Le client s’ouvrira dans une fenêtre externe.	The client will open in a separate window.
+Le fichier de clé SSH n’existe pas.	The SSH key file does not exist.
+Le mot de passe enregistré n’existe plus : modifiez le profil	The saved password no longer exists: edit the profile
+Le terminal s’ouvrira dans un onglet intégré.	The terminal will open in an integrated tab.
+Les connexions réelles sont interdites hors ligne	Real connections are blocked offline
+Magasin verrouillé	Profile store locked
+Mot de passe (facultatif, jamais exporté)	Password (optional, never exported)
+Mot de passe de la connexion	Session password
+Mot de passe enregistré : laissez vide pour le conserver	Saved password: leave blank to keep it
+Mot de passe pour cette connexion	Password for this session
+Multi-écrans (plein écran)	Multiple monitors (full screen)
+Nettoyage du coffre	Vault cleanup
+Non chiffré, permissions privées (0600)	Unencrypted, private permissions (0600)
+Non ouvert	Not open
+Nouvelle connexion SSH / RDP / VNC / série	New SSH / RDP / VNC / serial session
+Opération en cours	Operation in progress
+Opération interrompue	Operation interrupted
+Ou créer un nouveau dossier pour cette connexion	Or create a new folder for this session
+Parité (n/e/o)	Parity (n/e/o)
+Partager le microphone local (opt-in)	Share local microphone (opt-in)
+Partager le presse-papiers (opt-in)	Share clipboard (opt-in)
+Passerelle SSH	SSH gateway
+Phrase secrète (12 caractères minimum)	Passphrase (at least 12 characters)
+Phrase secrète des profils	Profile passphrase
+Plein écran	Full screen
+Port de la passerelle SSH	SSH gateway port
+Profils indisponibles	Profiles unavailable
+Profils verrouillés · sessions ouvertes conservées	Profiles locked · open sessions kept
+Protection des profils	Profile protection
+Protégé par le coffre système ; sinon conservé uniquement pendant cette ouverture de RustRemote	Protected by the system vault; otherwise kept only for this RustRemote session
+Périphérique série	Serial device
+Périphériques RDP	RDP devices
+Quittez la démonstration pour enregistrer un mot de passe	Leave demo mode to save a password
+Rediriger les imprimantes locales (opt-in)	Redirect local printers (opt-in)
+Saisissez le mot de passe RDP ici ou dans le profil	Enter the RDP password here or in the profile
+Saisissez le mot de passe à enregistrer	Enter the password to save
+Se connecter…	Connect…
+Simulation indisponible	Simulation unavailable
+Simulation locale (aucun réseau)	Local simulation (no network)
+Sortie audio :	Audio output:
+Sur ce poste	On this computer
+Sur le serveur	On the server
+Système non précisé	Unspecified system
+Sécuriser VNC par un tunnel SSH	Secure VNC with an SSH tunnel
+Sécurité RDP	RDP security
+Série / switch	Serial / switch
+Taille RDP	RDP size
+Taille fixe	Fixed size
+Traitement en cours…	Processing…
+Tunnel refusé	Tunnel refused
+Type de machine	Machine type
+Utilisateur de la passerelle SSH	SSH gateway username
+Utiliser SSH Agent (sans transfert vers le serveur)	Use SSH Agent (no agent forwarding)
+VNC en lecture seule	VNC read-only
+Verrouiller les profils et oublier les mots de passe temporaires	Lock profiles and forget temporary passwords
+Mode concentration	Terminal focus mode
+Informations système	System information
+Empreinte de clé publique SSH…	SSH public key fingerprint…
+Empreinte de clé publique SSH	SSH public key fingerprint
+Dossier des profils…	Profile directory…
+Dossier des profils	Profile directory
+Navigateur SFTP…	SFTP browser…
+Gestionnaire de fichiers	File manager
+Aucun gestionnaire de fichiers disponible	No file manager available
+Créez ou ouvrez d’abord vos profils	Create or open your profiles first
+Chemin absolu du fichier .pub	Absolute path to the .pub file
+Clé publique SSH	SSH public key
+Calculer l’empreinte SHA256	Calculate SHA256 fingerprint
+Coffre : service Secret Service requis (GNOME Keyring ou KWallet compatible). Aucun service n’est installé automatiquement.	Vault: requires Secret Service (GNOME Keyring or compatible KWallet). No service is installed automatically.
+Aucune session distante ouverte.	No remote session open.
+RustRemote · laboratoire de connexions	RustRemote · connection lab
+• Configurez une session SSH ou RDP depuis la barre d’outils.	• Configure an SSH or RDP session from the toolbar.
+• Importez vos profils et classez-les dans des dossiers.	• Import your profiles and organize them into folders.
+• Testez l’édition et les transferts dans le laboratoire local.	• Test editing and transfers in the local lab.
+Les onglets de démonstration ne sont pas des terminaux SSH.	Demo tabs are not SSH terminals.
+Hors ligne · aperçu de démonstration	Offline · demo preview
+Profils persistants · aucune session connectée	Saved profiles · no connected session
+SSH  │  SFTP  │  Vérification des empreintes	SSH  │  SFTP  │  Host key verification
+SSH  │  SFTP  │  Aucun accès réseau	SSH  │  SFTP  │  No network access
+Fichiers fictifs · aucune session connectée	Sample files · no connected session
+Aucun transfert en cours	No transfer in progress
+File d’attente vide	Queue empty
+Transferts	Transfers
+File d’attente	Queue
+Progression	Progress
+Statut	Status
+Nom	Name
+Taille	Size
+Modifié	Modified
+Ouvrir le navigateur SFTP de l’onglet SSH courant	Open SFTP browser for current SSH tab
+Connectez un profil SSH, puis ouvrez son navigateur pour éditer et transférer vos fichiers et dossiers.	Connect an SSH profile, then open its browser to edit and transfer files and folders.
+Agent, clés et mot de passe du profil. HostName et ProxyJump pris en charge ; bastion par clé/agent, empreinte déjà validée. ProxyCommand personnalisé refusé.	Profile agent, keys and password. HostName and ProxyJump supported; bastion uses key/agent and an approved host key. Custom ProxyCommand is refused.
+Réglages appliqués aux terminaux ouverts et aux nouvelles sessions. Les paramètres de démonstration restent temporaires.	Settings apply to open terminals and new sessions. Demo settings remain temporary.
+Cette action contacte le serveur.	This action contacts the server.
+Cette action ouvre le périphérique série local.	This action opens the local serial device.
+Attendez la fin de l’enregistrement avant de vous connecter.	Wait for saving to finish before connecting.
+Un enregistrement est déjà en cours. Réessayez ensuite.	A save is already in progress. Try again afterwards.
+Informations de connexion	Connection details
+Éditeur SFTP réel	Remote SFTP editor
+Ouvrir un fichier avant d’enregistrer	Open a file before saving
+0 octets · 0 entrée(s)	0 bytes · 0 entries
+SFTP en cours · annulation disponible · limite 30 s / 16 Mio	SFTP in progress · cancellation available · 30 s / 16 MiB limit
+Ouvrir les profils sans chiffrement	Open profiles without encryption
+État SFTP réel	SFTP status
+Bienvenue dans RustRemote	Welcome to RustRemote
+SSH et série : terminaux intégrés. SFTP : navigateur natif depuis une session SSH.	SSH and serial: integrated terminals. SFTP: native browser from an SSH session.
+RDP/VNC utilisent les clients système ; les onglets de démonstration restent hors ligne.	RDP/VNC use system clients; demo tabs stay offline.
+Nouveau dossier	New folder
+Connexion Linux (SSH)	Linux connection (SSH)
+Connexion Windows (RDP)	Windows connection (RDP)
+★  Mes profils	★  My profiles
+Ouvrir le navigateur SFTP de l’onglet SSH	Open SFTP browser for the SSH tab
+Dossier dupliqué.	Duplicate folder.
+Dossier parent absent	Parent folder is missing
+Saisissez un nouveau nom	Enter a new name
+Racine / sans dossier	Root / unassigned
+Déposez ici pour déplacer à la racine	Drop here to move to root
+Lot terminé : 	Batch complete: 
+Envoi terminé : 	Upload complete: 
+Téléchargement terminé : 	Download complete: 
+Reprise terminée : 	Resume complete: 
+Suppression terminée : 	Deletion complete: 
+Dossier distant créé	Remote folder created
+Permissions distantes modifiées	Remote permissions updated
+Élément distant renommé · actualisez le listing	Remote item renamed · refresh the listing
+FreeRDP 3 est requis pour cette connexion	FreeRDP 3 is required for this connection
+Fermer et déconnecter ce terminal	Close and disconnect this terminal
+Terminal actif · authentification et empreinte dans le terminal	Terminal active · authentication and host key checks in the terminal
+Terminal intégré actif · validation SSH contrôlée par OpenSSH	Integrated terminal active · SSH verification handled by OpenSSH
+Liaison série active · port local, sans authentification SSH	Serial link active · local port, no SSH authentication
+Série locale active · liaison non chiffrée	Local serial connection active · unencrypted link
+Client indépendant, sans code propriétaire MobaXterm.	Independent client, without proprietary MobaXterm code.
+Gestion des profils SSH/RDP, chiffrement age optionnel.	SSH/RDP profiles, optional age encryption.
+SSH et série dans les onglets ; navigateur SFTP natif. RDP/VNC restent externes.	Tabbed SSH and serial; native SFTP browser. RDP/VNC remain external clients.
+Les profils contiennent les hôtes, utilisateurs et options, jamais les mots de passe ni les clés privées. Le chiffrement protège ces métadonnées sur disque. Sans la phrase secrète, aucune récupération n’est possible.	Profiles contain hosts, usernames and options, never passwords or private keys. Encryption protects this metadata on disk. Without the passphrase, recovery is impossible.
+Accès disponibles : profils SSH et RDP configurables.	Available connections: configurable SSH and RDP profiles.
+Les accès actuels utilisent les clients système OpenSSH / FreeRDP 3 ; aucune connexion ne part sans confirmation de sa cible.	Connections use the system OpenSSH / FreeRDP 3 clients; each target must be confirmed before connecting.
+Ouvrir une connexion vers	Connect to
+Les changements non enregistrés ne seront pas utilisés.	Unsaved changes will not be used.
+Sélection copiée dans le presse-papiers	Selection copied to clipboard
+ (lien/spécial)	 (link/special)
+Lignes d’historique	Scrollback lines
+Sécurité et stockage	Security and storage
+Appliquer la modification SFTP	Apply SFTP change
+Autoriser le presse-papiers de la simulation	Allow clipboard in the simulation
+Ce texte contient des retours à la ligne qui peuvent exécuter des commandes. Coller uniquement si vous avez vérifié son contenu.	This text contains line breaks that may execute commands. Paste only after reviewing its contents.
+Charger l’exemple Serveur IA (simulation)	Load the AI Server example (simulation)
+Confirmer la reprise du fichier SFTP	Confirm SFTP file resume
+Créer dans le laboratoire	Create in the lab
+Déconnecter la simulation	Disconnect simulation
+Enregistrer le fichier simulé	Save simulated file
+Envoyer au switch simulé	Send to simulated switch
+Fermer l’import	Close import
+Fichiers / SFTP simulé	Files / simulated SFTP
+Ouverture du terminal…	Opening terminal…
+Ouvrir mes profils persistants	Open my saved profiles
+Parcourir…	Browse…
+Presse-papiers simulé	Simulated clipboard
+Supprimer définitivement la sélection SFTP	Permanently delete SFTP selection
+Vérifier le fichier	Check file
+Éditer / transférer en simulation…	Edit / transfer in simulation…

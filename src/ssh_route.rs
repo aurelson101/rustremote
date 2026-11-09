@@ -61,6 +61,9 @@ fn command() -> Command {
     for name in [
         "LD_LIBRARY_PATH",
         "LD_PRELOAD",
+        "GDK_PIXBUF_MODULE_FILE",
+        "GIO_MODULE_DIR",
+        "GTK_PATH",
         "SSH_ASKPASS",
         "SSH_ASKPASS_REQUIRE",
         "RUSTREMOTE_ASKPASS_SOCKET",

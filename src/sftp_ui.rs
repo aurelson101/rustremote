@@ -13,7 +13,15 @@ use std::{
     },
 };
 
+mod local;
 struct Browser {
+    local_path: gtk::Entry,
+    local_list: gtk::ListBox,
+    local_entries: RefCell<Vec<local::LocalEntry>>,
+    local_generation: Cell<u64>,
+    local_loading: Cell<bool>,
+    local_pending: Cell<bool>,
+    editor_expander: gtk::Expander,
     connection: Arc<Mutex<Option<Connection>>>,
     cancel: Arc<AtomicBool>,
     profile: SessionProfile,
@@ -28,6 +36,7 @@ struct Browser {
     entries: RefCell<Vec<Entry>>,
     editor: gtk::TextView,
     editing: RefCell<Option<(PathBuf, Vec<u8>)>>,
+    refresh_after: RefCell<Option<String>>,
     status: gtk::Label,
     progress: Arc<crate::sftp::Progress>,
     progress_bar: gtk::ProgressBar,
@@ -41,18 +50,30 @@ impl Browser {
         }
     }
     fn submit(self: &Rc<Self>, operation: Operation) {
+        if self
+            .path
+            .root()
+            .and_downcast::<gtk::Window>()
+            .is_none_or(|w| !w.is_visible())
+        {
+            return;
+        }
         if self.busy.replace(true) {
             self.status.set_text("Attendez la fin de l’opération SFTP");
             return;
         }
         self.cancel.store(false, Ordering::Relaxed);
-        self.progress.reset();
-        self.progress_bar.set_fraction(0.0);
-        self.progress_bar.set_text(Some("0 octets · 0 entrée(s)"));
-        self.progress_bar
-            .update_property(&[gtk::accessible::Property::Description(
-                "0 octets · 0 entrée(s)",
-            )]);
+        let automatic_listing =
+            matches!(&operation, Operation::List(_)) && self.refresh_after.borrow().is_some();
+        if !automatic_listing {
+            self.progress.reset();
+            self.progress_bar.set_fraction(0.0);
+            self.progress_bar.set_text(Some("0 octets · 0 entrée(s)"));
+            self.progress_bar
+                .update_property(&[gtk::accessible::Property::Description(
+                    "0 octets · 0 entrée(s)",
+                )]);
+        }
         let weak = Rc::downgrade(self);
         gtk::glib::timeout_add_local(std::time::Duration::from_millis(100), move || {
             let Some(state) = weak.upgrade() else {
@@ -79,6 +100,16 @@ impl Browser {
         self.controls.set_sensitive(false);
         self.status
             .set_text("SFTP en cours · annulation disponible · limite 30 s / 16 Mio");
+        let refresh_remote = matches!(
+            &operation,
+            Operation::Upload { .. }
+                | Operation::Batch(_)
+                | Operation::Mkdir(_)
+                | Operation::Rename { .. }
+                | Operation::Delete(_)
+                | Operation::Permissions { .. }
+                | Operation::Resume { upload: true, .. }
+        );
         let connection = self.connection.clone();
         let profile = self.profile.clone();
         let credential = self.credential.clone();
@@ -112,13 +143,12 @@ impl Browser {
                 };
                 state.busy.set(false);
                 let (bytes, entries) = state.progress.snapshot();
-                state
-                    .progress_bar
-                    .set_fraction(if result.is_ok() { 1.0 } else { 0.0 });
+                state.progress_bar.set_fraction(0.0);
                 state
                     .progress_bar
                     .set_text(Some(&format!("{bytes} octets · {entries} entrée(s)")));
                 state.controls.set_sensitive(true);
+                state.refresh_local();
                 match result{
                 Ok(Output::Entries(entries))=>{
                     while let Some(child)=state.list.first_child(){state.list.remove(&child);}
@@ -127,16 +157,16 @@ impl Browser {
                     for entry in entries{
                         let row=gtk::ListBoxRow::new();row.set_widget_name(&entry.name);
                         let line=gtk::Box::new(gtk::Orientation::Horizontal,8);line.append(&crate::icons::image(if entry.directory{"folder"}else{"file"}));
-                        let name=gtk::Label::new(Some(&format!("{}{} · {} o",entry.name,if !entry.directory && !entry.regular{" (lien/spécial)"}else{""},entry.size)));name.set_xalign(0.0);name.set_ellipsize(gtk::pango::EllipsizeMode::End);line.append(&name);row.set_child(Some(&line));
+                        let name=gtk::Label::new(Some(&format!("{}{} · {} B",entry.name,if !entry.directory && !entry.regular{crate::i18n::text(" (lien/spécial)")}else{String::new()},entry.size)));name.set_xalign(0.0);name.set_ellipsize(gtk::pango::EllipsizeMode::End);line.append(&name);row.set_child(Some(&line));
                         let weak=Rc::downgrade(&state);let copy=entry.clone();row.connect_activate(move |_|{if let Some(s)=weak.upgrade(){s.selected.replace(Some(copy.clone()));s.open_selected();}});
                         state.list.append(&row);
                     }
-                    state.status.set_text("Listing SFTP authentifié chargé · liens non transférables");
+                    state.status.set_text(&state.refresh_after.borrow_mut().take().unwrap_or_else(||"Listing SFTP authentifié chargé · liens non transférables".into()));
                 }
                 Ok(Output::Text{path,bytes})=>{
-                    let text=String::from_utf8(bytes.clone()).unwrap_or_default();state.editor.buffer().set_text(&text);state.editing.replace(Some((path,bytes)));state.status.set_text("Texte distant chargé ou enregistré · UTF-8, maximum 1 Mio");
+                    state.editor_expander.set_expanded(true);let text=String::from_utf8(bytes.clone()).unwrap_or_default();state.editor.buffer().set_text(&text);state.editing.replace(Some((path,bytes)));state.status.set_text("Texte distant chargé ou enregistré · UTF-8, maximum 1 Mio");
                 }
-                Ok(Output::Done(message))=>state.status.set_text(&message),
+                Ok(Output::Done(message))=>{state.status.set_text(&message);if refresh_remote{state.refresh_after.replace(Some(message));let path=PathBuf::from(state.path.text().as_str());state.submit(Operation::List(path));}},
                 Err(message)=>state.status.set_text(&format!("{message}. Un envoi interrompu peut laisser une destination partielle ; aucun fichier existant n’a été écrasé par un transfert.")),
             }
             },
@@ -369,7 +399,7 @@ impl Browser {
             }
             chooser.destroy();
         });
-        chooser.present();
+        crate::i18n::present(&chooser);
     }
     fn resume_selected(self: &Rc<Self>, upload: bool) {
         let entries = self.selected_entries();
@@ -472,8 +502,8 @@ pub fn open(
         .title(format!("SFTP — {}", profile.name))
         .transient_for(parent)
         .destroy_with_parent(true)
-        .default_width(780)
-        .default_height(720)
+        .default_width(1180)
+        .default_height(780)
         .build();
     window.set_application(parent.application().as_ref());
     let header = gtk::HeaderBar::new();
@@ -489,14 +519,20 @@ pub fn open(
         profile.host, profile.port, profile.username
     )));
     info.set_wrap(true);
-    body.append(&info);
+    let details = gtk::Expander::new(Some("Informations de connexion"));
+    details.set_child(Some(&info));
+    body.append(&details);
     let status = gtk::Label::new(Some("Aucune connexion SFTP ouverte"));
     status.set_wrap(true);
-    status.update_property(&[gtk::accessible::Property::Label("État SFTP réel")]);
+    status.update_property(&[gtk::accessible::Property::Label(&crate::i18n::text(
+        "État SFTP réel",
+    ))]);
     body.append(&status);
     let progress_bar = gtk::ProgressBar::new();
     progress_bar.set_show_text(true);
-    progress_bar.update_property(&[gtk::accessible::Property::Label("Progression SFTP")]);
+    progress_bar.update_property(&[gtk::accessible::Property::Label(&crate::i18n::text(
+        "Progression SFTP",
+    ))]);
     body.append(&progress_bar);
     let controls = gtk::Box::new(gtk::Orientation::Vertical, 8);
     fn field(body: &gtk::Box, label: &str, value: &str) -> gtk::Entry {
@@ -504,34 +540,93 @@ pub fn open(
         entry.set_text(value);
         entry.set_placeholder_text(Some(label));
         entry.set_max_length(4096);
-        entry.update_property(&[gtk::accessible::Property::Label(label)]);
+        entry.update_property(&[gtk::accessible::Property::Label(&crate::i18n::text(label))]);
         body.append(&entry);
         entry
     }
-    let path = field(&controls, "Chemin distant SFTP", ".");
+    let toolbar = gtk::Box::new(gtk::Orientation::Horizontal, 6);
+    controls.append(&toolbar);
+    let panes = gtk::Paned::new(gtk::Orientation::Horizontal);
+    panes.set_wide_handle(true);
+    panes.set_position(530);
+    panes.set_vexpand(true);
+    panes.set_shrink_start_child(true);
+    panes.set_shrink_end_child(true);
+    let local_panel = gtk::Box::new(gtk::Orientation::Vertical, 6);
+    local_panel.add_css_class("sftp-pane");
+    local_panel.append(&gtk::Label::new(Some("Site local")));
+    let initial = std::env::var_os("HOME")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from("/"));
+    let local_path = field(&local_panel, "Dossier local", &initial.to_string_lossy());
+    let local_toolbar = gtk::Box::new(gtk::Orientation::Horizontal, 6);
+    local_panel.append(&local_toolbar);
+    let local_list = gtk::ListBox::new();
+    local_list.set_selection_mode(gtk::SelectionMode::Multiple);
+    local_list.set_activate_on_single_click(false);
+    local_list.update_property(&[gtk::accessible::Property::Label(&crate::i18n::text(
+        "Fichiers locaux",
+    ))]);
+    local_panel.append(
+        &gtk::ScrolledWindow::builder()
+            .child(&local_list)
+            .min_content_height(160)
+            .vexpand(true)
+            .build(),
+    );
+    let remote_panel = gtk::Box::new(gtk::Orientation::Vertical, 6);
+    remote_panel.add_css_class("sftp-pane");
+    remote_panel.append(&gtk::Label::new(Some("Site distant")));
+    let path = field(&remote_panel, "Chemin distant SFTP", ".");
+    let remote_toolbar = gtk::Box::new(gtk::Orientation::Horizontal, 6);
+    remote_panel.append(&remote_toolbar);
     let list = gtk::ListBox::new();
     list.set_selection_mode(gtk::SelectionMode::Multiple);
-    controls.append(
+    list.set_activate_on_single_click(false);
+    list.update_property(&[gtk::accessible::Property::Label(&crate::i18n::text(
+        "Fichiers distants",
+    ))]);
+    remote_panel.append(
         &gtk::ScrolledWindow::builder()
             .child(&list)
-            .min_content_height(150)
+            .min_content_height(160)
             .vexpand(true)
             .build(),
     );
-    let name = field(&controls, "Nom distant pour création ou envoi", "");
-    let local = field(&controls, "Chemin local absolu pour transfert", "");
+    panes.set_start_child(Some(&local_panel));
+    panes.set_end_child(Some(&remote_panel));
+    controls.append(&panes);
+    let advanced = gtk::Box::new(gtk::Orientation::Vertical, 6);
+    let name = field(&advanced, "Nom distant pour création ou envoi", "");
+    let local = field(&advanced, "Chemin local absolu pour transfert", "");
     let editor = gtk::TextView::new();
     editor.set_monospace(true);
-    editor.update_property(&[gtk::accessible::Property::Label("Éditeur SFTP réel")]);
+    editor.update_property(&[gtk::accessible::Property::Label(&crate::i18n::text(
+        "Éditeur SFTP réel",
+    ))]);
     crate::simulation::bound_text(&editor, &status, 1024 * 1024);
-    controls.append(
+    let editor_expander = gtk::Expander::new(Some("Éditeur distant"));
+    let editor_body = gtk::Box::new(gtk::Orientation::Vertical, 4);
+    let editor_buttons = gtk::Box::new(gtk::Orientation::Horizontal, 4);
+    editor_body.append(&editor_buttons);
+    editor_body.append(
         &gtk::ScrolledWindow::builder()
             .child(&editor)
-            .min_content_height(150)
-            .vexpand(true)
+            .min_content_height(90)
+            .max_content_height(180)
+            .propagate_natural_height(true)
             .build(),
     );
+    editor_expander.set_child(Some(&editor_body));
+    controls.append(&editor_expander);
     let state = Rc::new(Browser {
+        local_path,
+        local_list,
+        local_entries: RefCell::new(Vec::new()),
+        local_generation: Cell::new(0),
+        local_loading: Cell::new(false),
+        local_pending: Cell::new(false),
+        editor_expander,
         connection: Arc::new(Mutex::new(None)),
         cancel: Arc::new(AtomicBool::new(false)),
         profile: profile.clone(),
@@ -546,6 +641,7 @@ pub fn open(
         entries: RefCell::new(Vec::new()),
         editor,
         editing: RefCell::new(None),
+        refresh_after: RefCell::new(None),
         status,
         progress: Arc::new(crate::sftp::Progress::default()),
         progress_bar,
@@ -572,11 +668,61 @@ pub fn open(
             s.selected.replace(item);
         }
     });
-    let connect = button(&controls, "Connecter / Actualiser SFTP", &state, |s| {
-        let path = PathBuf::from(s.path.text().as_str());
-        s.submit(Operation::List(path));
+    state.graphical_actions(&toolbar);
+    state.context_actions(true);
+    state.context_actions(false);
+    button(&local_toolbar, "Dossier parent local", &state, |s| {
+        let p = PathBuf::from(s.local_path.text().as_str());
+        if let Some(p) = p.parent() {
+            s.local_path.set_text(&p.to_string_lossy());
+            s.refresh_local();
+        }
     });
-    controls.reorder_child_after(&connect, Some(&state.path));
+    button(&local_toolbar, "Actualiser le dossier local", &state, |s| {
+        s.refresh_local()
+    });
+    let weak = Rc::downgrade(&state);
+    state.local_path.connect_changed(move |_| {
+        if let Some(s) = weak.upgrade() {
+            s.local_generation
+                .set(s.local_generation.get().wrapping_add(1));
+            s.local_entries.borrow_mut().clear();
+            while let Some(c) = s.local_list.first_child() {
+                s.local_list.remove(&c);
+            }
+        }
+    });
+    let weak = Rc::downgrade(&state);
+    state.local_path.connect_activate(move |_| {
+        if let Some(s) = weak.upgrade() {
+            s.refresh_local();
+        }
+    });
+    let weak = Rc::downgrade(&state);
+    state.path.connect_activate(move |_| {
+        if let Some(s) = weak.upgrade() {
+            s.submit(Operation::List(PathBuf::from(s.path.text().as_str())));
+        }
+    });
+    let connect = button(
+        &remote_toolbar,
+        "Connecter / Actualiser SFTP",
+        &state,
+        |s| {
+            let path = PathBuf::from(s.path.text().as_str());
+            s.submit(Operation::List(path));
+        },
+    );
+    connect.set_hexpand(true);
+    button(&remote_toolbar, "Dossier parent distant", &state, |s| {
+        let current = PathBuf::from(s.path.text().as_str());
+        let p = current
+            .parent()
+            .filter(|p| !p.as_os_str().is_empty())
+            .map_or_else(|| current.join(".."), PathBuf::from);
+        s.path.set_text(&p.to_string_lossy());
+        s.submit(Operation::List(p));
+    });
     let action_box = gtk::Box::new(gtk::Orientation::Vertical, 6);
     button(
         &action_box,
@@ -707,16 +853,45 @@ pub fn open(
     actions.set_column_spacing(6);
     while let Some(child) = action_box.first_child() {
         action_box.remove(&child);
-        actions.insert(&child, -1);
+        if child
+            .downcast_ref::<gtk::Button>()
+            .and_then(|b| b.label())
+            .is_some_and(|l| l == "Enregistrer le fichier distant")
+        {
+            editor_buttons.append(&child);
+        } else {
+            actions.insert(&child, -1);
+        }
     }
-    controls.append(&actions);
-    body.append(
+    advanced.append(&actions);
+    let more = gtk::Expander::new(Some("Commandes avancées"));
+    more.set_child(Some(
         &gtk::ScrolledWindow::builder()
-            .child(&controls)
-            .min_content_height(220)
-            .vexpand(true)
+            .child(&advanced)
+            .min_content_height(160)
+            .max_content_height(240)
+            .propagate_natural_height(true)
             .build(),
-    );
+    ));
+    let other = state.editor_expander.downgrade();
+    more.connect_expanded_notify(move |e| {
+        if e.is_expanded()
+            && let Some(o) = other.upgrade()
+        {
+            o.set_expanded(false);
+        }
+    });
+    let other = more.downgrade();
+    state.editor_expander.connect_expanded_notify(move |e| {
+        if e.is_expanded()
+            && let Some(o) = other.upgrade()
+        {
+            o.set_expanded(false);
+        }
+    });
+    controls.append(&more);
+    controls.set_vexpand(true);
+    body.append(&controls);
     let cancel = gtk::Button::with_label("Déconnecter / Annuler SFTP");
     let weak = Rc::downgrade(&state);
     cancel.connect_clicked(move |_| {
@@ -733,12 +908,17 @@ pub fn open(
         }
     });
     body.append(&close);
+    window.connect_close_request(|w| {
+        gtk::prelude::GtkWindowExt::set_focus(w, None::<&gtk::Widget>);
+        gtk::glib::Propagation::Proceed
+    });
     let s = state.clone();
     window.connect_hide(move |w| {
         s.stop();
-        w.set_child(None::<&gtk::Widget>);
+        crate::dialogs::clear_window_later(w);
     });
     window.set_child(Some(&body));
-    window.present();
+    state.refresh_local();
+    crate::i18n::present(&window);
     window
 }

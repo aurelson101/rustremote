@@ -10,8 +10,8 @@
 | P0-04 | Modèle | Critique | DONE | Types de profils sans secrets, sérialisation, tests unitaires. |
 | P1-01 | SSH | Critique | DONE | Connexion à laboratoire, vérification clé hôte, SSH Agent, gestion des refus ; tests. |
 | P1-02 | Terminal | Critique | DONE | PTY interactif, resize, ANSI, UTF-8, copie/collage, fermeture propre. |
-| P1-03 | SFTP | Haute | DONE | SFTP natif : listing, transferts réels, progression, erreurs et refus d’écrasement validés en 0.5.0 ; reprise de fichiers ajoutée. File persistante/limites configurables restent des évolutions. |
-| P1-04 | Ergonomie | Haute | PARTIAL | Favoris, stockage SQLite, édition de profils, recherches et raccourcis. |
+| P1-03 | SFTP | Haute | DONE | SFTP natif : listing, transferts, progression, reprise et édition validés ; vue locale/distante et DND rejoués en 0.6.0. File persistante/limites configurables restent des évolutions. |
+| P1-04 | Ergonomie | Haute | PARTIAL | Favoris, édition, recherche/raccourcis et dossiers hiérarchiques avec DND livrés ; migration SQLite reste ouverte. |
 | P2-01 | RDP | Haute | PARTIAL | PoC IronRDP sécurisée avec labo Windows, certificat, UI basique. |
 | P2-02 | VNC | Moyenne | PARTIAL | Lanceur TigerVNC avec tunnel SSH ; moteur intégré/redimensionnement à livrer. |
 | P2-06 | Série | Moyenne | PARTIAL | Profil picocom et switch simulé ; liaison PTY testée, matériel physique non testé. |
@@ -224,3 +224,21 @@ Publication 0.5.0 effectuée sur GitHub privé, AppImage et SHA256 téléversés
 retéléchargés et comparés. Anciennes AppImages locales 0.1.0–0.4.1 retirées après
 validation ; aucune ancienne pièce jointe GitHub n’existait. P3-02 reste PARTIAL
 (portabilité, signature, CI/.deb et installation multi-distribution non qualifiées).
+
+## Aperçu 0.6.0 — 2026-11-09
+
+Anglais par défaut et français configurable après redémarrage. Navigateur SFTP à
+panneaux local/distant, boutons de transfert, DND et édition ; arborescence des
+sessions avec sous-dossiers et déplacements par souris ou clic droit. Nouveaux
+contrôles Affichage et outils d’information/empreinte publique.
+
+AppImage x86_64 construite dans Debian 12 avec ABI glibc minimale 2.36 auditée ;
+GTK/VTE/SVG et modules de saisie embarqués, pilotes graphiques de l’hôte conservés.
+Démarrage réel Debian 12 et essais Ubuntu 26.04 X11/Wayland ; pas de certification
+universelle des distributions, ARM/musl ni des bureaux KDE/Xfce/Cinnamon complets.
+Voir `VALIDATION-0.6.0.md` et `validation/0.6.0.json` pour résultats et limites.
+
+39 tests Rust et contrôles Cargo réussis. P1-04 reste PARTIAL (SQLite), P3-02 reste
+PARTIAL (signature, CI, .deb et autres architectures). Les diagnostics de focus
+GTK 4.8 connus restent ouverts ; la nouvelle ergonomie n’implique pas une parité
+complète avec MobaXterm/FileZilla ni une qualification Windows/AD ou du matériel.

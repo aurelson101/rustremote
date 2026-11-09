@@ -1,7 +1,8 @@
 [Desktop Entry]
 Type=Application
 Name=RustRemote
-Comment=Prototype de client de sessions distantes
+Comment=Linux remote session manager
+Comment[fr]=Gestionnaire de sessions distantes Linux
 Exec=rustremote
 Icon=rustremote
 Terminal=false

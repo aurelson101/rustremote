@@ -2,10 +2,12 @@ use crate::profiles::{ProtocolOptions, SessionProfile, SessionState, Workspace};
 mod automation;
 mod connections;
 mod credentials;
+mod desktop;
 mod diagnostics;
 mod exchange;
 mod rdp;
 mod settings;
+mod tree;
 use crate::store::{self, Store};
 use age::secrecy::SecretString;
 use gtk::prelude::*;
@@ -35,6 +37,23 @@ pub(crate) fn io<T: Send + 'static>(
                 gtk::glib::ControlFlow::Break
             }
         }
+    });
+}
+
+pub(crate) fn defer_unparent(widget: &impl IsA<gtk::Widget>) {
+    let widget = widget.as_ref().clone();
+    gtk::glib::idle_add_local_once(move || {
+        if widget.parent().is_some() {
+            widget.unparent();
+        }
+    });
+}
+
+pub(crate) fn clear_window_later(window: &gtk::Window) {
+    let window = window.clone();
+    gtk::glib::idle_add_local_once(move || {
+        gtk::prelude::GtkWindowExt::set_focus(&window, None::<&gtk::Widget>);
+        window.set_child(None::<&gtk::Widget>);
     });
 }
 
@@ -180,7 +199,11 @@ impl Controller {
         {
             window.set_transient_for(Some(parent));
         }
-        window.connect_hide(|w| w.set_child(None::<&gtk::Widget>));
+        window.connect_close_request(|w| {
+            gtk::prelude::GtkWindowExt::set_focus(w, None::<&gtk::Widget>);
+            gtk::glib::Propagation::Proceed
+        });
+        window.connect_hide(crate::dialogs::clear_window_later);
         window
     }
     pub fn information(&self, title: &str, text: &str) {
@@ -196,7 +219,7 @@ impl Controller {
         close.connect_clicked(move |_| w.close());
         content.append(&close);
         window.set_child(Some(&content));
-        window.present();
+        crate::i18n::present(&window);
     }
     pub fn startup(&self) {
         if self.0.busy.get() {
@@ -253,14 +276,14 @@ impl Controller {
         let password = gtk::PasswordEntry::new();
         password.set_placeholder_text(Some("Phrase secrète (12 caractères minimum)"));
         password.set_show_peek_icon(true);
-        password.update_property(&[gtk::accessible::Property::Label(
+        password.update_property(&[gtk::accessible::Property::Label(&crate::i18n::text(
             "Phrase secrète des profils",
-        )]);
+        ))]);
         let confirmation = gtk::PasswordEntry::new();
         confirmation.set_placeholder_text(Some("Confirmer la phrase secrète"));
-        confirmation.update_property(&[gtk::accessible::Property::Label(
+        confirmation.update_property(&[gtk::accessible::Property::Label(&crate::i18n::text(
             "Confirmation de la phrase secrète",
-        )]);
+        ))]);
         content.append(&password);
         content.append(&confirmation);
         password.set_visible(encrypted.is_active());
@@ -355,10 +378,13 @@ impl Controller {
             );
         });
         window.set_child(Some(&content));
-        window.present();
+        crate::i18n::present(&window);
     }
     pub fn filter(&self, query: &str) {
         self.0.query.replace(query.to_string());
+        if !query.is_empty() {
+            self.expand_folders(true);
+        }
         for (search, button) in self.0.profile_buttons.borrow().iter() {
             button.set_visible(search.contains(query));
         }
@@ -381,13 +407,34 @@ impl Controller {
                 .rows
                 .append(&gtk::Label::new(Some("Aucun profil enregistré")));
         }
+        let root_drop = gtk::Box::new(gtk::Orientation::Horizontal, 6);
+        root_drop.append(&crate::icons::image("folder"));
+        root_drop.append(&gtk::Label::new(Some(&crate::i18n::text(
+            "Racine / sans dossier",
+        ))));
+        root_drop.add_css_class("session-drop-root");
+        root_drop.set_tooltip_text(Some(&crate::i18n::text(
+            "Déposez ici pour déplacer à la racine",
+        )));
+        self.drop_folder(&root_drop, "");
+        self.0.rows.append(&root_drop);
         let mut groups = std::collections::HashMap::new();
-        for folder in &data.folders {
+        let mut sorted_folders = data.folders.clone();
+        sorted_folders.sort();
+        for folder in &sorted_folders {
             let expander = gtk::Expander::new(None);
             let title = gtk::Box::new(gtk::Orientation::Horizontal, 7);
             title.append(&crate::icons::image("folder"));
-            title.append(&gtk::Label::new(Some(folder)));
+            title.append(&gtk::Label::new(Some(
+                folder.rsplit('/').next().unwrap_or(folder),
+            )));
+            expander.set_tooltip_text(Some(folder));
+            title.add_css_class("user-content");
+            self.drag_item(&title, format!("folder:{folder}"));
+            self.drop_folder(&expander, folder);
             expander.set_label_widget(Some(&title));
+            // Expander labels are non-targetable by default; the header owns DND.
+            title.set_can_target(true);
             let gesture = gtk::GestureClick::new();
             gesture.set_button(3);
             let c = self.clone();
@@ -408,9 +455,19 @@ impl Controller {
             expander.add_controller(gesture);
             expander.set_expanded(true);
             expander.add_css_class("session-group");
+            expander.add_css_class("user-content");
             let children = gtk::Box::new(gtk::Orientation::Vertical, 3);
             expander.set_child(Some(&children));
-            self.0.rows.append(&expander);
+            if let Some((parent, _)) = folder.rsplit_once('/') {
+                if let Some(group) = groups.get(parent) {
+                    let group: &gtk::Box = group;
+                    group.append(&expander);
+                } else {
+                    self.0.rows.append(&expander);
+                }
+            } else {
+                self.0.rows.append(&expander);
+            }
             groups.insert(folder.clone(), children);
         }
         for (index, profile) in data.profiles.iter().enumerate() {
@@ -436,10 +493,12 @@ impl Controller {
             label.set_ellipsize(gtk::pango::EllipsizeMode::End);
             label.set_max_width_chars(25);
             content.append(&label);
+            content.add_css_class("user-content");
             button.set_child(Some(&content));
             button.update_property(&[gtk::accessible::Property::Label(&caption)]);
             button.set_tooltip_text(Some(&profile.name));
             button.add_css_class("session-row");
+            button.add_css_class("user-content");
             let controller = self.clone();
             button.connect_clicked(move |_| controller.editor(Some(index), false));
             let context = gtk::GestureClick::new();
@@ -452,6 +511,7 @@ impl Controller {
                 }
             });
             button.add_controller(context);
+            self.drag_item(&button, format!("profile:{}", profile.name));
             let row = gtk::Box::new(gtk::Orientation::Horizontal, 2);
             button.set_hexpand(true);
             row.append(&button);
@@ -480,6 +540,7 @@ impl Controller {
         }
         let query = self.0.query.borrow().clone();
         self.filter(&query);
+        crate::i18n::translate(self.0.rows.upcast_ref());
         self.0.status.set_text(
             if self.0.store.borrow().as_ref().is_some_and(Store::encrypted) {
                 "Profils chiffrés · déverrouillés"
@@ -625,7 +686,7 @@ impl Controller {
             .max_content_height(500)
             .build();
         window.set_child(Some(&scroll));
-        window.present();
+        crate::i18n::present(&window);
     }
     pub fn lock(&self) {
         if self.0.busy.get() {
@@ -699,7 +760,7 @@ impl Controller {
             entry.set_width_chars(12);
             entry.set_text(value);
             entry.set_hexpand(true);
-            entry.update_property(&[gtk::accessible::Property::Label(title)]);
+            entry.update_property(&[gtk::accessible::Property::Label(&crate::i18n::text(title))]);
             grid.attach(&entry, 1, row, 1, 1);
             entry
         }
@@ -751,7 +812,7 @@ impl Controller {
                 .to_string(),
         );
         body.append(&grid);
-        let platform = gtk::DropDown::from_strings(&["Système non précisé", "Linux", "Windows"]);
+        let platform = crate::i18n::dropdown(&["Système non précisé", "Linux", "Windows"]);
         platform.set_selected(original.as_ref().map_or(
             if selected_protocol == 0 {
                 1
@@ -766,11 +827,15 @@ impl Controller {
                 crate::profiles::Platform::Windows => 2,
             },
         ));
-        platform.update_property(&[gtk::accessible::Property::Label("Type de machine")]);
+        platform.update_property(&[gtk::accessible::Property::Label(&crate::i18n::text(
+            "Type de machine",
+        ))]);
         body.append(&platform);
-        let protocol = gtk::DropDown::from_strings(&["SSH", "RDP", "VNC", "Série / switch"]);
+        let protocol = crate::i18n::dropdown(&["SSH", "RDP", "VNC", "Série / switch"]);
         protocol.set_selected(selected_protocol);
-        protocol.update_property(&[gtk::accessible::Property::Label("Protocole")]);
+        protocol.update_property(&[gtk::accessible::Property::Label(&crate::i18n::text(
+            "Protocole",
+        ))]);
         body.append(&protocol);
         let favorite = gtk::ToggleButton::with_label("Favori");
         favorite.set_active(original.as_ref().is_some_and(|p| p.favorite));
@@ -806,13 +871,15 @@ impl Controller {
                 })
                 .unwrap_or(0) as u32,
         );
-        folder.update_property(&[gtk::accessible::Property::Label("Dossier de sessions")]);
+        folder.update_property(&[gtk::accessible::Property::Label(&crate::i18n::text(
+            "Dossier de sessions",
+        ))]);
         body.append(&folder);
         let new_folder = gtk::Entry::new();
         new_folder.set_placeholder_text(Some("Ou créer un nouveau dossier pour cette connexion"));
-        new_folder.update_property(&[gtk::accessible::Property::Label(
+        new_folder.update_property(&[gtk::accessible::Property::Label(&crate::i18n::text(
             "Nouveau dossier du profil",
-        )]);
+        ))]);
         body.append(&new_folder);
         let authentication = gtk::Box::new(gtk::Orientation::Vertical, 8);
         let auth_title = gtk::Label::new(Some("Identifiants de connexion"));
@@ -822,9 +889,9 @@ impl Controller {
             .show_peek_icon(true)
             .hexpand(true)
             .build();
-        password.update_property(&[gtk::accessible::Property::Label(
+        password.update_property(&[gtk::accessible::Property::Label(&crate::i18n::text(
             "Mot de passe de la connexion",
-        )]);
+        ))]);
         let password_label = gtk::Label::new(Some(
             if original
                 .as_ref()
@@ -857,17 +924,23 @@ impl Controller {
         ssh.append(&agent);
         let key = gtk::Entry::new();
         key.set_placeholder_text(Some("Chemin absolu de la clé privée (facultatif)"));
-        key.update_property(&[gtk::accessible::Property::Label("Clé SSH")]);
+        key.update_property(&[gtk::accessible::Property::Label(&crate::i18n::text(
+            "Clé SSH",
+        ))]);
         let known_hosts = gtk::Entry::new();
         known_hosts.set_placeholder_text(Some(
             "Facultatif : known_hosts propre à ce profil (chemin absolu)",
         ));
-        known_hosts.update_property(&[gtk::accessible::Property::Label("Fichier known_hosts SSH")]);
+        known_hosts.update_property(&[gtk::accessible::Property::Label(&crate::i18n::text(
+            "Fichier known_hosts SSH",
+        ))]);
         let config_file = gtk::Entry::new();
         config_file.set_placeholder_text(Some(
             "Facultatif : fichier de configuration OpenSSH (ex. /dev/null pour l’ignorer)",
         ));
-        config_file.update_property(&[gtk::accessible::Property::Label("Configuration OpenSSH")]);
+        config_file.update_property(&[gtk::accessible::Property::Label(&crate::i18n::text(
+            "Configuration OpenSSH",
+        ))]);
         if let Some(SessionProfile {
             options:
                 ProtocolOptions::Ssh {
@@ -1131,7 +1204,16 @@ impl Controller {
             }
             let mut folders = controller.0.folders.borrow().clone();
             if !profile_folder.is_empty() && !folders.contains(&profile_folder) {
-                folders.push(profile_folder);
+                let mut tree = Workspace {
+                    folders,
+                    profiles: Vec::new(),
+                    ..Workspace::default()
+                };
+                if let Err(message) = tree.add_folder(&profile_folder) {
+                    error.set_text(&message);
+                    return;
+                }
+                folders = tree.folders;
             }
             let data = Workspace {
                 profiles,
@@ -1154,7 +1236,7 @@ impl Controller {
         footer.append(&buttons);
         content.append(&footer);
         window.set_child(Some(&content));
-        window.present();
+        crate::i18n::present(&window);
     }
     fn context_menu(&self, index: usize, anchor: &gtk::Button, x: f64, y: f64) {
         let Some(profile) = self.0.profiles.borrow().get(index).cloned() else {
@@ -1164,7 +1246,7 @@ impl Controller {
         popover.set_parent(anchor);
         popover.set_pointing_to(Some(&gtk::gdk::Rectangle::new(x as i32, y as i32, 1, 1)));
         let content = gtk::Box::new(gtk::Orientation::Vertical, 3);
-        for action in ["Se connecter", "Modifier", "Déconnecter"] {
+        for action in ["Se connecter", "Modifier", "Déplacer…", "Déconnecter"] {
             let item = gtk::Button::with_label(action);
             item.add_css_class("menu-item");
             if action == "Déconnecter" {
@@ -1202,6 +1284,7 @@ impl Controller {
                 match action {
                     "Se connecter" => controller.connect(index),
                     "Modifier" => controller.editor(Some(index), false),
+                    "Déplacer…" => controller.move_dialog(&format!("profile:{name}"), None),
                     _ => {
                         if let Some(session) = controller.0.terminals.borrow().get(&name) {
                             session.disconnect();
@@ -1225,7 +1308,8 @@ impl Controller {
             content.append(&item);
         }
         popover.set_child(Some(&content));
-        popover.connect_closed(|p| p.unparent());
+        popover.connect_closed(crate::dialogs::defer_unparent);
+        crate::i18n::translate(popover.upcast_ref());
         popover.popup();
     }
     pub fn simulation_lab(&self) {
@@ -1314,7 +1398,7 @@ impl Controller {
                 .get(&profile.name)
                 .and_then(|w| w.upgrade())
             {
-                window.present();
+                crate::i18n::present(&window);
                 return;
             }
             if let Some(app) = self.0.app.upgrade() {
@@ -1363,7 +1447,11 @@ impl Controller {
             "Cette action contacte le serveur."
         };
         let text = gtk::Label::new(Some(&format!(
-            "Ouvrir une connexion vers {target} ?\n\n{presentation} {effect} Les changements non enregistrés ne seront pas utilisés."
+            "{} {target} ?\n\n{} {} {}",
+            crate::i18n::text("Ouvrir une connexion vers"),
+            crate::i18n::text(presentation),
+            crate::i18n::text(effect),
+            crate::i18n::text("Les changements non enregistrés ne seront pas utilisés.")
         )));
         text.set_wrap(true);
         body.append(&text);
@@ -1376,9 +1464,9 @@ impl Controller {
         let controller = self.clone();
         let w = window.clone();
         let password = gtk::PasswordEntry::builder().show_peek_icon(true).build();
-        password.update_property(&[gtk::accessible::Property::Label(
+        password.update_property(&[gtk::accessible::Property::Label(&crate::i18n::text(
             "Mot de passe pour cette connexion",
-        )]);
+        ))]);
         if matches!(
             profile.options,
             ProtocolOptions::Ssh { .. } | ProtocolOptions::Rdp { .. }
@@ -1445,7 +1533,7 @@ impl Controller {
             let terminal=if std::path::Path::new("/usr/bin/ptyxis").is_file() {"/usr/bin/ptyxis"} else {"/usr/bin/xterm"};
             let mut command=std::process::Command::new(terminal); if terminal.ends_with("ptyxis") { command.arg("--standalone").arg("--"); } else { command.arg("-e"); } command.arg(binary).args(args);
             // Ne pas transmettre les bibliothèques privées AppImage aux clients système.
-            command.env_remove("LD_LIBRARY_PATH").env_remove("LD_PRELOAD").env_remove("VNC_VIA_CMD");
+            command.env_remove("LD_LIBRARY_PATH").env_remove("LD_PRELOAD").env_remove("VNC_VIA_CMD").env_remove("GDK_PIXBUF_MODULE_FILE").env_remove("GIO_MODULE_DIR").env_remove("GTK_PATH");
             match profile.vnc_tunnel_command() {
                 Ok(Some(tunnel)) => { command.env("VNC_VIA_CMD", tunnel); }
                 Ok(None) => {}
@@ -1458,6 +1546,6 @@ impl Controller {
             });
         });
         window.set_child(Some(&body));
-        window.present();
+        crate::i18n::present(&window);
     }
 }

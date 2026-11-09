@@ -6,9 +6,11 @@ impl Controller {
         body.add_css_class("dialog-content");
         let host = gtk::Entry::new();
         host.set_text("127.0.0.1");
-        host.update_property(&[gtk::accessible::Property::Label("Cible du diagnostic")]);
+        host.update_property(&[gtk::accessible::Property::Label(&crate::i18n::text(
+            "Cible du diagnostic",
+        ))]);
         body.append(&host);
-        let kind = gtk::DropDown::from_strings(&["Ping (4 requêtes)", "Traceroute (12 sauts max)"]);
+        let kind = crate::i18n::dropdown(&["Ping (4 requêtes)", "Traceroute (12 sauts max)"]);
         body.append(&kind);
         let simulated = gtk::ToggleButton::with_label("Simulation locale — aucun paquet réseau");
         simulated.set_active(true);
@@ -16,7 +18,9 @@ impl Controller {
         let output = gtk::TextView::new();
         output.set_editable(false);
         output.set_monospace(true);
-        output.update_property(&[gtk::accessible::Property::Label("Résultat du diagnostic")]);
+        output.update_property(&[gtk::accessible::Property::Label(&crate::i18n::text(
+            "Résultat du diagnostic",
+        ))]);
         body.append(
             &gtk::ScrolledWindow::builder()
                 .child(&output)
@@ -58,6 +62,6 @@ impl Controller {
         });
         body.append(&close);
         window.set_child(Some(&body));
-        window.present();
+        crate::i18n::present(&window);
     }
 }

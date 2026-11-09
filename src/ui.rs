@@ -102,6 +102,7 @@ fn terminal() -> gtk::ScrolledWindow {
     view.set_left_margin(14);
     view.set_top_margin(12);
     view.add_css_class("terminal");
+    view.add_css_class("ui-text");
     let buffer = view.buffer();
     let green = buffer.create_tag(Some("prompt"), &[("foreground", &"#82e34a")]);
     let red = buffer.create_tag(Some("accent"), &[("foreground", &"#ef6b61")]);
@@ -162,7 +163,7 @@ fn open_demo(tabs: &gtk::Notebook, status: &Label, title: &str) {
 
 pub fn build(app: &Application, offline: bool, demo: bool, enforced_offline: bool) {
     if let Some(window) = app.active_window() {
-        window.present();
+        crate::i18n::present(&window);
         return;
     }
     gtk::gio::resources_register_include!("rustremote.gresource")
@@ -237,6 +238,11 @@ pub fn build(app: &Application, offline: bool, demo: bool, enforced_offline: boo
         "tunnels",
         "macros",
         "multi-exec",
+        "expand-folders",
+        "collapse-folders",
+        "system-info",
+        "profile-directory",
+        "key-fingerprint",
     ] {
         let action = gtk::gio::SimpleAction::new(name, None);
         let controller = profiles.clone();
@@ -258,6 +264,11 @@ pub fn build(app: &Application, offline: bool, demo: bool, enforced_offline: boo
             "tunnels" => controller.tunnels(),
             "macros" => controller.commands(false),
             "multi-exec" => controller.commands(true),
+            "expand-folders" => controller.expand_folders(true),
+            "collapse-folders" => controller.expand_folders(false),
+            "system-info" => controller.system_information(),
+            "profile-directory" => controller.open_profile_directory(),
+            "key-fingerprint" => controller.public_key_fingerprint(),
             "tools" => controller.information("Outils", "Accès disponibles : profils SSH et RDP configurables.
 
 VNC dispose d’un tunnel SSH optionnel ; série utilise picocom. SFTP natif est accessible depuis le terminal SSH. Ping et Traceroute sont configurables dans Paramètres. Tunnels directs, macros prédéfinies et Multi-Exec sont accessibles par leurs boutons ; une confirmation des cibles est obligatoire.
@@ -307,6 +318,10 @@ SSH et série dans les onglets ; navigateur SFTP natif. RDP/VNC restent externes
                 ("Profils enregistrés…", "app.profiles"),
             ],
             "Outils" => &[
+                ("Informations système…", "app.system-info"),
+                ("Empreinte de clé publique SSH…", "app.key-fingerprint"),
+                ("Dossier des profils…", "app.profile-directory"),
+                ("Navigateur SFTP…", "app.sftp"),
                 ("Ping / Traceroute…", "app.diagnostics"),
                 ("Tunnels SSH…", "app.tunnels"),
                 ("Macros SSH…", "app.macros"),
@@ -316,6 +331,11 @@ SSH et série dans les onglets ; navigateur SFTP natif. RDP/VNC restent externes
                 ("Paramètres et protection…", "app.settings"),
             ],
             "Affichage" => &[
+                ("Tout déplier", "app.expand-folders"),
+                ("Tout replier", "app.collapse-folders"),
+                ("Rechercher une session…", "app.find-session"),
+                ("Mode concentration", "app.focus-terminal"),
+                ("Rétablir la disposition", "app.reset-layout"),
                 ("Panneau Sessions", "app.view-sessions"),
                 ("Panneau SFTP", "app.view-sftp"),
                 ("Barre d’outils", "app.view-toolbar"),
@@ -330,9 +350,13 @@ SSH et série dans les onglets ; navigateur SFTP natif. RDP/VNC restent externes
             _ => &[("À propos…", "app.about")],
         };
         let popover = gtk::Popover::new();
+        popover.connect_show(|p| crate::i18n::translate(p.upcast_ref()));
         let items = Box::new(Orientation::Vertical, 3);
         for (title, action) in entries {
-            if action.starts_with("app.view-") || *action == "app.fullscreen" {
+            if action.starts_with("app.view-")
+                || *action == "app.fullscreen"
+                || *action == "app.focus-terminal"
+            {
                 let item = gtk::ToggleButton::with_label(title);
                 item.set_action_name(Some(action));
                 item.add_css_class("menu-item");
@@ -449,9 +473,9 @@ SSH et série dans les onglets ; navigateur SFTP natif. RDP/VNC restent externes
     let sessions_header = panel_title("Sessions");
     let create_folder = gtk::Button::from_icon_name("folder-new-symbolic");
     create_folder.set_tooltip_text(Some("Nouveau dossier de connexions"));
-    create_folder.update_property(&[gtk::accessible::Property::Label(
+    create_folder.update_property(&[gtk::accessible::Property::Label(&crate::i18n::text(
         "Nouveau dossier de connexions",
-    )]);
+    ))]);
     create_folder.set_action_name(Some("app.new-folder"));
     sessions_header.append(&create_folder);
     sessions.append(&sessions_header);
@@ -623,14 +647,14 @@ SSH et série dans les onglets ; navigateur SFTP natif. RDP/VNC restent externes
     right_split.set_end_child(Some(&sftp));
     right_split.set_position(760);
     right_split.set_resize_end_child(false);
-    right_split.set_shrink_start_child(false);
-    right_split.set_shrink_end_child(false);
+    right_split.set_shrink_start_child(true);
+    right_split.set_shrink_end_child(true);
     let split = gtk::Paned::new(Orientation::Horizontal);
     split.set_start_child(Some(&sessions));
     split.set_end_child(Some(&right_split));
     split.set_position(260);
     split.set_resize_start_child(false);
-    split.set_shrink_start_child(false);
+    split.set_shrink_start_child(true);
     split.set_vexpand(true);
     root.append(&split);
     let statusbar = Box::new(Orientation::Horizontal, 12);
@@ -724,6 +748,67 @@ SSH et série dans les onglets ; navigateur SFTP natif. RDP/VNC restent externes
         .child(&root)
         .build();
     window.set_titlebar(Some(&header));
+    let find = gtk::gio::SimpleAction::new("find-session", None);
+    let entry = search.downgrade();
+    find.connect_activate(move |_, _| {
+        if let Some(e) = entry.upgrade() {
+            e.grab_focus();
+        }
+    });
+    app.add_action(&find);
+    app.set_accels_for_action("app.find-session", &["<Primary>f"]);
+    let reset = gtk::gio::SimpleAction::new("reset-layout", None);
+    let application = app.downgrade();
+    let left = split.downgrade();
+    let right = right_split.downgrade();
+    reset.connect_activate(move |_, _| {
+        if let Some(app) = application.upgrade() {
+            for name in ["view-sessions", "view-sftp", "view-toolbar", "view-status"] {
+                app.change_action_state(name, &true.to_variant());
+            }
+            if let Some(a) = app
+                .lookup_action("focus-terminal")
+                .and_downcast::<gtk::gio::SimpleAction>()
+            {
+                a.set_state(&false.to_variant());
+            }
+        }
+        if let Some(p) = left.upgrade() {
+            p.set_position(260);
+        }
+        if let Some(p) = right.upgrade() {
+            p.set_position(760);
+        }
+    });
+    app.add_action(&reset);
+    let focus = gtk::gio::SimpleAction::new_stateful("focus-terminal", None, &false.to_variant());
+    let application = app.downgrade();
+    let previous = std::rc::Rc::new(std::cell::RefCell::new(Vec::<(String, bool)>::new()));
+    focus.connect_activate(move |a, _| {
+        let Some(app) = application.upgrade() else {
+            return;
+        };
+        let active = a.state().and_then(|s| s.get::<bool>()).unwrap_or(false);
+        if active {
+            for (name, state) in previous.borrow().iter() {
+                app.change_action_state(name, &state.to_variant());
+            }
+        } else {
+            let mut old = previous.borrow_mut();
+            old.clear();
+            for name in ["view-sessions", "view-sftp", "view-toolbar"] {
+                let state = app
+                    .action_state(name)
+                    .and_then(|s| s.get::<bool>())
+                    .unwrap_or(true);
+                old.push((name.to_string(), state));
+                app.change_action_state(name, &false.to_variant());
+            }
+        }
+        a.set_state(&(!active).to_variant());
+    });
+    app.add_action(&focus);
+    app.set_accels_for_action("app.focus-terminal", &["F8"]);
     display_actions(
         app,
         &window,
@@ -736,7 +821,7 @@ SSH et série dans les onglets ; navigateur SFTP natif. RDP/VNC restent externes
             ("view-status", statusbar.clone().upcast()),
         ],
     );
-    window.present();
+    crate::i18n::present(&window);
     gtk::glib::idle_add_local_once(move || {
         profiles.initialize(demo);
     });

@@ -1,5 +1,15 @@
 use serde::{Deserialize, Serialize};
 
+pub fn freerdp_binary() -> &'static str {
+    if std::path::Path::new("/usr/bin/xfreerdp3").is_file() {
+        "/usr/bin/xfreerdp3"
+    } else if std::path::Path::new("/usr/bin/xfreerdp").is_file() {
+        "/usr/bin/xfreerdp"
+    } else {
+        "/usr/bin/xfreerdp3"
+    }
+}
+
 pub fn ssh_identity(user: &str, domain: &str) -> Result<String, String> {
     let user = user.trim();
     let domain = domain.trim();
@@ -534,7 +544,7 @@ impl SessionProfile {
                 if settings.printers {
                     args.push("/printer".into());
                 }
-                Ok(("/usr/bin/xfreerdp3", args))
+                Ok((freerdp_binary(), args))
             }
         }
     }
@@ -753,15 +763,17 @@ mod tests {
 }
 
 pub fn validate_folder(name: &str) -> Result<(), String> {
-    if name.trim() != name
-        || name.is_empty()
-        || name.len() > 64
-        || matches!(name, "." | "..")
-        || name
-            .chars()
-            .any(|c| c.is_control() || matches!(c, '/' | '\\'))
+    if name.len() > 512
+        || name.split('/').count() > 8
+        || name.split('/').any(|part| {
+            part.trim() != part
+                || part.is_empty()
+                || part.len() > 64
+                || matches!(part, "." | "..")
+                || part.chars().any(|c| c.is_control() || c == '\\')
+        })
     {
-        return Err("Nom de dossier invalide (1–64 caractères, sans chemin).".into());
+        return Err("Dossier invalide : 8 niveaux maximum, noms de 1 à 64 caractères".into());
     }
     Ok(())
 }
@@ -821,6 +833,11 @@ impl Workspace {
         let mut names = std::collections::HashSet::new();
         for folder in &self.folders {
             validate_folder(folder)?;
+            if let Some((parent, _)) = folder.rsplit_once('/')
+                && !self.folders.iter().any(|f| f == parent)
+            {
+                return Err("Dossier parent absent".into());
+            }
             if !names.insert(folder) {
                 return Err("Dossier dupliqué.".into());
             }

@@ -1,0 +1,157 @@
+{
+  "version": "0.6.0",
+  "date": "2026-11-09",
+  "artifact": "RustRemote-0.6.0-preview-x86_64.AppImage",
+  "sha256": "3009d663af6bc29e93fb6009adf485fa43804f35ff2908ca4466d5cc8cb8a428",
+  "build_baseline": "Debian 12 amd64, rootless; actual X11 startup passed",
+  "abi": {
+    "architecture": "x86_64",
+    "minimum_glibc": "2.36",
+    "gtk": "4.8.3",
+    "vte": "0.70.6"
+  },
+  "test_host": "Ubuntu 26.04.1 LTS / GNOME",
+  "cargo": {
+    "fmt": true,
+    "check": true,
+    "clippy_deny_warnings": true,
+    "tests_passed": 39,
+    "final_catalog_test_passed": true
+  },
+  "wayland": {
+    "startup_private_profiles": true,
+    "compositor_confirmed_fullscreen_restore": true
+  },
+  "local_protocol_results": [
+    {
+      "target": "127.0.0.1",
+      "personal_desktop_accessed": false,
+      "english_default_without_override": true,
+      "profile_context_move_and_nested_creation": true,
+      "folder_drag_moves_descendants_and_profiles": true,
+      "profile_drag_and_drop": true,
+      "view_actions": true,
+      "tools_system_information_and_public_key_fingerprint": true,
+      "sftp_graphical_multiple_files_folders_upload": true,
+      "sftp_graphical_drag_and_drop_upload": true,
+      "sftp_graphical_edit_readback": true,
+      "sftp_graphical_multiple_files_folders_download": true,
+      "french_setting_persisted_after_restart": true,
+      "success": true,
+      "serial_received_bytes": 0,
+      "serial_commands": [],
+      "serial_replies": [],
+      "application_exit_before_cleanup": null
+    },
+    {
+      "target": "127.0.0.1",
+      "system_account_or_shell_used": false,
+      "openssh_utf8_exec": true,
+      "wrong_identity_rejected": true,
+      "changed_host_key_rejected": true,
+      "opensftp_bidirectional_files_folders": true,
+      "ssh_pty_and_resize": true,
+      "sftp_edit_readback": true,
+      "traversal_and_symlink_rejected": true,
+      "application_terminal_gui": true,
+      "success": true,
+      "services_stopped": true,
+      "events": {
+        "publickey_accepted": 9,
+        "publickey_rejected": 1,
+        "pty_requested": 2,
+        "resize_requested": 1,
+        "unsafe_path_rejected": 2,
+        "shell_commands": 0
+      }
+    },
+    {
+      "target": "127.0.0.1",
+      "personal_desktop_accessed": false,
+      "native_app_in_virtual_desktop": true,
+      "bind_verified": true,
+      "wrong_certificate_rejected": true,
+      "negative_failure_causes_verified": true,
+      "wrong_password_rejected": true,
+      "nla_authenticated": true,
+      "certificate_pinned": true,
+      "remote_pixels_verified": true,
+      "desktop_capture": "dist/rdp-local.png",
+      "known_gtk48_focus_diagnostics": 1,
+      "profile_domain_password_stdin_connection_disconnect": true,
+      "tracked_client_closed_on_application_exit": true,
+      "clipboard_real": "non vérifié : le backend Shadow 3.32 ne gère pas CLIPRDR",
+      "audio_printers_dual_screen": "options testables par configuration ; périphériques réels non validés",
+      "log_error_counts": {
+        "shadow.log": 22,
+        "client.log": 2,
+        "bad-pin.log": 23,
+        "bad-password.log": 4,
+        "native-app.log": 1
+      },
+      "native_demo_known_gtk48_focus_diagnostics": 1,
+      "log_errors_redacted": {
+        "shadow.log": [
+          "[ERROR][com.freerdp.server.shadow] - [shadow_server_read_pem]: Certificate PEM [temporary]/config/freerdp/shadow/shadow.crt valid, but some properties failed to be extracted",
+          "[ERROR][com.freerdp.core.transport] - [transport_read_layer]: BIO_read retries exceeded",
+          "[ERROR][com.freerdp.core.peer] - [transport_read_layer]: ERRCONNECT_CONNECT_TRANSPORT_FAILED [0x0002000D]",
+          "[ERROR][com.freerdp.core.nla] - [nla_server_recv_stream]: nla_recv() error: -1",
+          "[ERROR][com.freerdp.core.transport] - [transport_accept_nla]: client authentication failure",
+          "[ERROR][com.freerdp.core.peer] - [peer_recv_callback_internal]: CONNECTION_STATE_NEGO - rdp_server_accept_nego() fail",
+          "[ERROR][com.freerdp.core.transport] - [transport_check_fds]: transport_check_fds: transport->ReceiveCallback() - STATE_RUN_FAILED [-1]",
+          "[ERROR][com.freerdp.client.shadow] - [shadow_client_thread]: Failed to check FreeRDP file descriptor",
+          "[ERROR][com.winpr.sspi.NTLM] - [ntlm_read_AuthenticateMessage]: Message Integrity Check (MIC) verification failed!",
+          "[ERROR][com.freerdp.core.auth] - [credssp_auth_authenticate]: AcceptSecurityContext status SEC_E_MESSAGE_ALTERED [0x8009030f]",
+          "[ERROR][com.freerdp.channels.audin.server] - [audin_server_thread_func]: WTSVirtualChannelQuery failed",
+          "[ERROR][com.freerdp.core.peer] - [rdp_set_error_info]: ERRINFO_LOGOFF_BY_USER [0x0001000C]"
+        ],
+        "client.log": [
+          "[ERROR][com.freerdp.utils.signal] - [fsig_term_handler]: Caught signal 'Terminated' [15]",
+          "[ERROR][com.freerdp.core] - [freerdp_abort_connect_context]: ERRCONNECT_CONNECT_CANCELLED [0x0002000B]"
+        ],
+        "bad-pin.log": [
+          "[ERROR][com.freerdp.crypto] - [x509_utils_from_pem]: BIO_new failed for certificate",
+          "[ERROR][com.freerdp.crypto] - [tls_print_certificate_name_mismatch_error]: @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@",
+          "[ERROR][com.freerdp.crypto] - [tls_print_certificate_name_mismatch_error]: @           WARNING: CERTIFICATE NAME MISMATCH!           @",
+          "[ERROR][com.freerdp.crypto] - [tls_print_certificate_name_mismatch_error]: The hostname used for this connection (127.0.0.1:34103) ",
+          "[ERROR][com.freerdp.crypto] - [tls_print_certificate_name_mismatch_error]: does not match the name given in the certificate:",
+          "[ERROR][com.freerdp.crypto] - [tls_print_certificate_name_mismatch_error]: Common Name (CN):",
+          "[ERROR][com.freerdp.crypto] - [tls_print_certificate_name_mismatch_error]: \tno CN found in certificate",
+          "[ERROR][com.freerdp.crypto] - [tls_print_certificate_name_mismatch_error]: A valid certificate for the wrong name should NOT be trusted!",
+          "[ERROR][com.freerdp.crypto] - [tls_print_new_certificate_warn]: The host key for 127.0.0.1:34103 has changed",
+          "[ERROR][com.freerdp.crypto] - [tls_print_new_certificate_warn]: @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@",
+          "[ERROR][com.freerdp.crypto] - [tls_print_new_certificate_warn]: @    WARNING: REMOTE HOST IDENTIFICATION HAS CHANGED!     @",
+          "[ERROR][com.freerdp.crypto] - [tls_print_new_certificate_warn]: IT IS POSSIBLE THAT SOMEONE IS DOING SOMETHING NASTY!",
+          "[ERROR][com.freerdp.crypto] - [tls_print_new_certificate_warn]: Someone could be eavesdropping on you right now (man-in-the-middle attack)!",
+          "[ERROR][com.freerdp.crypto] - [tls_print_new_certificate_warn]: It is also possible that a host key has just been changed.",
+          "[ERROR][com.freerdp.crypto] - [tls_print_new_certificate_warn]: The fingerprint for the host key sent by the remote host is 80:a1:a1:d4:f0:81:94:84:08:18:78:95:57:b9:7e:bf:ea:41:d1:05:de:38:2e:b5:7f:f2:a9:49:02:b0:9e:99",
+          "[ERROR][com.freerdp.crypto] - [tls_print_new_certificate_warn]: Please contact your system administrator.",
+          "[ERROR][com.freerdp.crypto] - [tls_print_new_certificate_warn]: Add correct host key in [temporary]/config/freerdp/server/127.0.0.1_34103.pem to get rid of this message.",
+          "[ERROR][com.freerdp.crypto] - [tls_print_new_certificate_warn]: Host key for 127.0.0.1 has changed and you have requested  checking.",
+          "[ERROR][com.freerdp.crypto] - [tls_print_new_certificate_warn]: Host key verification failed.",
+          "[ERROR][com.freerdp.crypto] - [freerdp_tls_handshake]: certificate not trusted, aborting.",
+          "[ERROR][com.freerdp.core] - [transport_default_connect_tls]: ERRCONNECT_TLS_CONNECT_FAILED [0x00020008]"
+        ],
+        "bad-password.log": [
+          "[ERROR][com.freerdp.core] - [nla_recv_pdu]: ERRCONNECT_LOGON_FAILURE [0x00020014]",
+          "[ERROR][com.freerdp.core.rdp] - [rdp_recv_callback_int][0x646db3ecb5b0]: CONNECTION_STATE_NLA - nla_recv_pdu() fail",
+          "[ERROR][com.freerdp.core.rdp] - [rdp_recv_callback_int][0x646db3ecb5b0]: CONNECTION_STATE_NLA status STATE_RUN_FAILED [-1]",
+          "[ERROR][com.freerdp.core.transport] - [transport_check_fds]: transport_check_fds: transport->ReceiveCallback() - STATE_RUN_FAILED [-1]"
+        ]
+      },
+      "success": true,
+      "services_stopped": true
+    }
+  ],
+  "known_limitations": [
+    "GTK4.8 focus warnings and gtk_root_get_focus criticals remain; counted explicitly, other RDP criticals fail tests",
+    "No KDE/Xfce/Cinnamon full desktop qualification",
+    "No ARM, musl or glibc below 2.36 build",
+    "No new Windows/AD, physical audio/printer/multimonitor/serial, CLIPRDR or endurance qualification",
+    "SFTP 16MiB/128 entries/8 levels/30s; UTF-8 editor 1MiB; no persistent queue or recursive resume"
+  ],
+  "publication": {
+    "status": "pending",
+    "release": "https://github.com/aurelson101/rustremote/releases/tag/v0.6.0"
+  }
+}

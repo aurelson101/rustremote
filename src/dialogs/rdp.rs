@@ -47,13 +47,15 @@ impl RdpForm {
         let display = grid();
         let width = field(&display, 0, "Largeur", "1280");
         let height = field(&display, 1, "Hauteur", "720");
-        let size_mode = gtk::DropDown::from_strings(&[
+        let size_mode = crate::i18n::dropdown(&[
             "Taille fixe",
             "Automatique (résolution dynamique)",
             "Adapter l’image (smart sizing)",
         ]);
         size_mode.set_selected(1);
-        size_mode.update_property(&[gtk::accessible::Property::Label("Taille RDP")]);
+        size_mode.update_property(&[gtk::accessible::Property::Label(&crate::i18n::text(
+            "Taille RDP",
+        ))]);
         display.attach(&size_mode, 0, 2, 2, 1);
         let fullscreen = gtk::ToggleButton::with_label("Plein écran");
         display.attach(&fullscreen, 0, 3, 2, 1);
@@ -68,9 +70,11 @@ impl RdpForm {
         let devices = gtk::Box::new(gtk::Orientation::Vertical, 10);
         devices.set_margin_top(12);
         devices.append(&gtk::Label::new(Some("Sortie audio :")));
-        let audio = gtk::DropDown::from_strings(&["Sur ce poste", "Sur le serveur", "Désactivée"]);
+        let audio = crate::i18n::dropdown(&["Sur ce poste", "Sur le serveur", "Désactivée"]);
         audio.set_selected(2);
-        audio.update_property(&[gtk::accessible::Property::Label("Audio RDP")]);
+        audio.update_property(&[gtk::accessible::Property::Label(&crate::i18n::text(
+            "Audio RDP",
+        ))]);
         devices.append(&audio);
         let microphone = gtk::ToggleButton::with_label("Partager le microphone local (opt-in)");
         devices.append(&microphone);

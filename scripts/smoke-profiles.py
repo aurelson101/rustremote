@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Parcours GTK isolé : aucune connexion réseau, uniquement des profils fictifs."""
 import os
+os.environ.setdefault("RUSTREMOTE_LANGUAGE", "fr")
 import json
 import re
 from pathlib import Path
@@ -43,9 +44,13 @@ Atspi.set_timeout(2000, 3000)
 def walk(node):
     yield node
     for i in range(node.get_child_count()):
-        child = node.get_child_at_index(i)
-        if child:
-            yield from walk(child)
+        try:
+            child = node.get_child_at_index(i)
+            if child:
+                yield from walk(child)
+        except GLib.Error:
+            # A closing popover may invalidate its accessibility object.
+            continue
 
 
 def app():
@@ -81,8 +86,12 @@ def wait(name):
 def absent(name):
     deadline = time.monotonic() + 20
     while time.monotonic() < deadline:
-        if find(name) is None:
+        node=find(name)
+        if node is None or not node.get_state_set().contains(Atspi.StateType.VISIBLE):
             return
+        if os.environ.get("GDK_BACKEND")=="x11" and node.get_role() in (Atspi.Role.FRAME,Atspi.Role.DIALOG):
+            info=subprocess.run(["xwininfo","-name",name],capture_output=True,text=True)
+            if info.returncode!=0 or "Map State: IsViewable" not in info.stdout:return
         time.sleep(0.1)
     raise AssertionError("Fenêtre toujours ouverte : " + name)
 
@@ -93,13 +102,24 @@ def click(name):
     scrolled = False
     while time.monotonic() < deadline:
         root = app()
-        candidates = [n for n in walk(root) if n.get_name() == name
-                      and n.get_state_set().contains(Atspi.StateType.SENSITIVE)
-                      and any(i.endswith("Action") for i in n.get_interfaces())
-                      and any(Atspi.Action.get_action_name(n.get_action_iface(), i)
-                              in ("click", "activate", "press", "toggle")
-                              for i in range(n.get_action_iface().get_n_actions()))] if root else []
-        shown = [n for n in candidates if n.get_state_set().contains(Atspi.StateType.SHOWING)]
+        candidates = []
+        for label in walk(root) if root else []:
+            if label.get_name() != name:
+                continue
+            node = label
+            for _ in range(5):
+                if any(i.endswith("Action") for i in node.get_interfaces()) and any(
+                    Atspi.Action.get_action_name(node.get_action_iface(), i)
+                    in ("click", "activate", "press", "toggle")
+                    for i in range(node.get_action_iface().get_n_actions())
+                ):
+                    if node.get_state_set().contains(Atspi.StateType.SENSITIVE):
+                        candidates.append(node)
+                    break
+                node = node.get_parent()
+                if not node or node.get_role() in (Atspi.Role.FRAME, Atspi.Role.APPLICATION):
+                    break
+        shown = [n for n in candidates if n.get_state_set().contains(Atspi.StateType.SHOWING) or (n.get_state_set().contains(Atspi.StateType.VISIBLE) and n.get_component_iface().get_extents(Atspi.CoordType.WINDOW).width > 0)]
         if shown:
             actionable = shown[-1]
             break
@@ -110,6 +130,9 @@ def click(name):
             except GLib.Error:
                 pass
         time.sleep(.1)
+    if not actionable:
+        root=app()
+        print("Action diagnostic:",[(n.get_role_name(),n.get_name(),str(n.get_state_set().get_states()),[Atspi.Action.get_action_name(n.get_action_iface(),i) for i in range(n.get_action_iface().get_n_actions())] if any(i.endswith("Action") for i in n.get_interfaces()) else []) for n in walk(root) if n.get_name()==name],flush=True)
     assert actionable, "Élément actif et visible absent : " + name
     action_iface = actionable.get_action_iface()
     index = next(i for i in range(action_iface.get_n_actions()) if Atspi.Action.get_action_name(action_iface, i) in ("click", "activate", "press", "toggle"))
@@ -119,8 +142,9 @@ def click(name):
 
 def editable(name):
     wait(name)
-    return next(n for n in walk(app()) if n.get_name() == name
-                and any(i.endswith("EditableText") for i in n.get_interfaces()))
+    parent=next(n for n in walk(app()) if n.get_name()==name and any(i.endswith("EditableText") for i in n.get_interfaces()))
+    delegates=[n for n in walk(parent) if any(i.endswith("EditableText") for i in n.get_interfaces())]
+    return delegates[-1]
 
 
 def text(name, value):
@@ -152,7 +176,8 @@ def select_file(name, occurrence=0):
 
 
 def value(name):
-    return Atspi.Text.get_text(editable(name), 0, -1)
+    node=editable(name)
+    return Atspi.Text.get_text(node, 0, Atspi.Text.get_character_count(node))
 
 
 def plaintext_startup(image):
@@ -328,7 +353,10 @@ def rdp_credentials(image):
         wait("Ouvrir les profils");click("Déverrouiller / ouvrir")
         click("Actions "+profile["name"]);click("Modifier")
         wait("Configuration de connexion")
-        assert value("Domaine AD / realm")=="RUSTREMOTE"
+        if value("Domaine AD / realm")!="RUSTREMOTE":
+            reply=subprocess.check_output(["gdbus","call","--session","--dest","org.freedesktop.DBus","--object-path","/org/freedesktop/DBus","--method","org.freedesktop.DBus.GetConnectionUnixProcessID","com.rustremote.Preview"],text=True)
+            subprocess.run([sys.executable,str(Path(__file__).with_name("capture-preview.py")),"--pid",re.search(r"uint32 (\d+)",reply).group(1),"--title","Configuration de connexion","--output","dist/rdp-domain-check.png"],check=True)
+        assert value("Domaine AD / realm")=="RUSTREMOTE",repr(value("Domaine AD / realm"))
         text("Mot de passe de la connexion",password)
         click("Enregistrer le profil");absent("Configuration de connexion")
         assert password not in (fixture/"rustremote/profiles.json").read_text()
@@ -346,6 +374,19 @@ def rdp_credentials(image):
         from PIL import ImageGrab
         im=ImageGrab.grab(xdisplay=os.environ["DISPLAY"])
         assert sum(abs(r-36)<12 and abs(g-67)<12 and abs(b-108)<12 for r,g,b in im.convert("RGB").getdata())>1000
+        # The external RDP window owns focus. Raise only our application on this
+        # private Xvfb before opening its native popover.
+        import ctypes as c
+        listing = subprocess.check_output(["xwininfo", "-root", "-tree"], text=True)
+        main_window = next(re.search(r"0x[0-9a-f]+", line).group() for line in listing.splitlines() if '\"RustRemote\"' in line)
+        x = c.CDLL("libX11.so.6")
+        x.XOpenDisplay.argtypes = [c.c_char_p]; x.XOpenDisplay.restype = c.c_void_p
+        x.XRaiseWindow.argtypes = [c.c_void_p,c.c_ulong]
+        x.XSetInputFocus.argtypes = [c.c_void_p,c.c_ulong,c.c_int,c.c_ulong]
+        x.XFlush.argtypes = [c.c_void_p]; x.XCloseDisplay.argtypes = [c.c_void_p]
+        display = x.XOpenDisplay(os.environ["DISPLAY"].encode()); assert display
+        x.XRaiseWindow(display,int(main_window,16)); x.XSetInputFocus(display,int(main_window,16),1,0)
+        x.XFlush(display); x.XCloseDisplay(display); time.sleep(.3)
         click("Actions "+profile["name"]);click("Déconnecter")
         deadline=time.monotonic()+10
         while time.monotonic()<deadline:
@@ -373,7 +414,8 @@ def rdp_credentials(image):
             except subprocess.TimeoutExpired:process.terminate();process.wait(timeout=5)
 
 assert app() is None, "Fermez d’abord RustRemote pour éviter de tester vos vrais profils."
-image = Path(sys.argv[1] if len(sys.argv) > 1 else f"dist/RustRemote-{tomllib.loads(Path("Cargo.toml").read_text())["package"]["version"]}-preview-x86_64.AppImage").resolve()
+project_version = tomllib.loads(Path("Cargo.toml").read_text())["package"]["version"]
+image = Path(sys.argv[1] if len(sys.argv) > 1 else f"dist/RustRemote-{project_version}-preview-x86_64.AppImage").resolve()
 if "--rdp-credentials-only" in sys.argv:
     rdp_credentials(image)
     raise SystemExit(0)

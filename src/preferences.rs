@@ -10,6 +10,7 @@ use std::{
 #[serde(default, deny_unknown_fields)]
 pub struct Preferences {
     pub version: u8,
+    pub language: String,
     pub font_size: u8,
     pub scrollback: u32,
     pub black_terminal: bool,
@@ -20,6 +21,7 @@ impl Default for Preferences {
     fn default() -> Self {
         Self {
             version: 1,
+            language: "en".into(),
             font_size: 11,
             scrollback: 5000,
             black_terminal: false,
@@ -30,7 +32,8 @@ impl Default for Preferences {
 }
 impl Preferences {
     pub fn validate(&self) -> Result<(), String> {
-        if self.version != 1
+        if !matches!(self.language.as_str(), "en" | "fr")
+            || self.version != 1
             || !(8..=24).contains(&self.font_size)
             || !(100..=20000).contains(&self.scrollback)
         {
@@ -96,6 +99,26 @@ impl Preferences {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn language_defaults_and_legacy_settings_are_compatible() {
+        let old: Preferences = serde_json::from_str(r#"{"version":1,"font_size":11}"#).unwrap();
+        assert_eq!(old.language, "en");
+        let fr = Preferences {
+            language: "fr".into(),
+            ..old
+        };
+        fr.validate().unwrap();
+        let bytes = serde_json::to_vec(&fr).unwrap();
+        assert_eq!(serde_json::from_slice::<Preferences>(&bytes).unwrap(), fr);
+        assert!(
+            Preferences {
+                language: "invalid".into(),
+                ..fr
+            }
+            .validate()
+            .is_err()
+        );
+    }
     #[test]
     fn private_roundtrip_and_reject_unsafe_settings() {
         let root = tempfile::tempdir().unwrap();

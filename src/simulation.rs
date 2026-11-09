@@ -234,7 +234,7 @@ pub fn show(app: &gtk::Application, profile: &SessionProfile) -> gtk::Window {
     });
     body.append(&close);
     window.set_child(Some(&body));
-    window.present();
+    crate::i18n::present(&window);
     window
 }
 
@@ -254,7 +254,9 @@ fn switch(app: &gtk::Application, profile: &SessionProfile) -> gtk::Window {
     let output = gtk::TextView::new();
     output.set_editable(false);
     output.set_monospace(true);
-    output.update_property(&[gtk::accessible::Property::Label("Console du switch simulé")]);
+    output.update_property(&[gtk::accessible::Property::Label(&crate::i18n::text(
+        "Console du switch simulé",
+    ))]);
     output.buffer().set_text("RustRemote Switch Lab\nswitch-lab> help\nCommandes : show version, show interfaces, show running-config, help\nswitch-lab> ");
     body.append(
         &gtk::ScrolledWindow::builder()
@@ -299,7 +301,7 @@ fn switch(app: &gtk::Application, profile: &SessionProfile) -> gtk::Window {
     });
     body.append(&close);
     window.set_child(Some(&body));
-    window.present();
+    crate::i18n::present(&window);
     window
 }
 
@@ -326,7 +328,9 @@ fn files(sandbox: Rc<Sandbox>, status: &gtk::Label) -> gtk::Box {
     let editor = gtk::TextView::new();
     editor.set_monospace(true);
     bound_text(&editor, status, 1024 * 1024);
-    editor.update_property(&[gtk::accessible::Property::Label("Éditeur SFTP simulé")]);
+    editor.update_property(&[gtk::accessible::Property::Label(&crate::i18n::text(
+        "Éditeur SFTP simulé",
+    ))]);
     let listboxes = [gtk::ListBox::new(), gtk::ListBox::new()];
     let refresh: Rc<dyn Fn()> = {
         let sandbox = sandbox.clone();
@@ -477,7 +481,9 @@ fn files(sandbox: Rc<Sandbox>, status: &gtk::Label) -> gtk::Box {
             let content = gtk::Box::new(gtk::Orientation::Vertical, 8);
             content.add_css_class("dialog-content");
             let name = gtk::Entry::new();
-            name.update_property(&[gtk::accessible::Property::Label("Nom du dossier simulé")]);
+            name.update_property(&[gtk::accessible::Property::Label(&crate::i18n::text(
+                "Nom du dossier simulé",
+            ))]);
             content.append(&name);
             let ok = gtk::Button::with_label("Créer dans le laboratoire");
             content.append(&ok);
@@ -505,7 +511,9 @@ fn files(sandbox: Rc<Sandbox>, status: &gtk::Label) -> gtk::Box {
     }
     let name = gtk::Entry::new();
     name.set_placeholder_text(Some("Nom à destination (vide = même nom)"));
-    name.update_property(&[gtk::accessible::Property::Label("Nom à destination")]);
+    name.update_property(&[gtk::accessible::Property::Label(&crate::i18n::text(
+        "Nom à destination",
+    ))]);
     body.append(&name);
     let actions = gtk::Box::new(gtk::Orientation::Horizontal, 8);
     body.append(&actions);

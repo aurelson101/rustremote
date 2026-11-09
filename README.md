@@ -1,150 +1,137 @@
 # RustRemote
 
-Client de sessions distantes pour Linux, écrit en **Rust** avec une interface
-**GTK4 en français** : terminaux SSH multi-onglets, navigateur SFTP, profils et
-lancement de connexions RDP, VNC et série.
+A native **Rust / GTK4** remote session manager for Linux: tabbed SSH terminals,
+a graphical SFTP browser, saved sessions, and RDP, VNC and serial connections.
 
-**En développement — Ubuntu 26.04 x86_64 est la plateforme actuellement testée.**
-RustRemote est un projet indépendant, inspiré des usages des outils de gestion de
-sessions. Il ne contient pas de code propriétaire de MobaXterm ou de FileZilla.
+**Preview software. English is the default; French is available in Settings
+(restart required).** Developed independently, without proprietary MobaXterm code.
 
-[Validation 0.5.0](docs/VALIDATION-0.5.0.md) ·
-[État des demandes](docs/AUDIT-DEMANDES-2026-11-08.md) ·
-[Feuille de route](docs/ROADMAP.md) · [Sécurité](docs/SECURITY.md) · [Licence](LICENSE)
+[Download v0.6.0](https://github.com/aurelson101/rustremote/releases/tag/v0.6.0) ·
+[Validation](docs/VALIDATION-0.6.0.md) · [Roadmap](docs/ROADMAP.md) ·
+[Security](docs/SECURITY.md) · [License](LICENSE)
 
-## Aperçu
+## Screenshots
 
-### Terminal SSH intégré
+These are real application windows from an isolated local test lab. No production
+server, personal credentials or customer files are shown. Remote terminal output
+and user-defined names retain their original language.
 
-![Terminal SSH multi-onglets de RustRemote](docs/screenshots/terminal-ssh.png)
+### SSH terminal and session folders
 
-Connexion réelle à un serveur SSH de laboratoire local : PTY, commandes et réponses
-UTF-8, sélection et presse-papiers. Aucun serveur de production n'est présenté.
+![English SSH terminal with nested session folders](docs/screenshots/terminal-ssh.png)
 
-### Navigateur SFTP
+### Graphical SFTP transfers and remote editing
 
-![Navigateur SFTP et éditeur de fichier distant](docs/screenshots/navigateur-sftp.png)
+![English local and remote SFTP panes with remote editor](docs/screenshots/navigateur-sftp.png)
 
-Liste et éditeur de fichiers d'un laboratoire SFTP. Les fichiers et dossiers de test
-servent à vérifier les transferts, les collisions et le refus des liens symboliques.
+### Windows / RDP session settings
 
-## Fonctionnalités présentes dans les sources
+![English RDP profile editor](docs/screenshots/rdp-settings.png)
 
-- **SSH** : terminaux VTE/OpenSSH dans des onglets, clé existante, SSH Agent ou mot
-  de passe du profil, vérification des clés d'hôte, redimensionnement, zoom et
-  copier/coller contrôlé, y compris au clic droit.
-- **SFTP** : connexion native ssh2/libssh2, listing, édition UTF-8, création de dossiers,
-  renommage, permissions Unix, suppression confirmée, transferts récursifs et sélection
-  multiple ; progression réelle, annulation et reprise de fichiers après vérification
-  du préfixe ; protection contre l’écrasement et détection des conflits d’édition.
-  Alias HostName et ProxyJump pris en charge avec bastion déjà approuvé et clé/agent.
-- **Profils** : dossiers Linux/Windows, favoris, recherche, édition, menus contextuels,
-  import/export JSON RustRemote ; chiffrement age facultatif au premier lancement.
-- **Identifiants** : mot de passe dans le formulaire de chaque profil SSH/RDP ;
-  sauvegarde facultative dans le coffre du système, référence seule dans les profils.
-  Domaine AD/realm configurable. Coffre et Paramètres sont deux fenêtres distinctes.
-- **RDP** : lancement FreeRDP avec domaine et mot de passe sur pipe, certificat contrôlé,
-  NLA, déconnexion suivie ; options de taille, écrans, son, microphone, imprimantes
-  et presse-papiers avec consentements distincts.
-- **VNC et série** : lanceur TigerVNC avec option de tunnel SSH ; terminal picocom
-  intégré pour les équipements série.
-- **Interface et outils** : thème sombre, icônes embarquées, panneaux et barres
-  masquables, plein écran, paramètres persistants, Ping/Traceroute avec simulation.
-- **Automatisation SSH** : tunnels local/distant/SOCKS avec écoute loopback, macros
-  prédéfinies et Multi-Exec sur 1 à 8 sessions authentifiées, après prévisualisation.
+### Application settings and language selection
 
-## Limites actuelles
+![English settings with language selector](docs/screenshots/settings.png)
 
-Le projet n'est pas une réimplémentation complète de MobaXterm ou de FileZilla.
-RDP/VNC utilisent des fenêtres externes ; X11 forwarding, file de transferts
-persistante et reprise des dossiers restent à développer. Le SFTP ouvre un transport
-distinct ; il accepte HostName/ProxyJump, pas les ProxyCommand personnalisés ni toutes
-les options OpenSSH. Le bastion exige clé/agent et empreinte préalablement validée.
+### Desktop and client diagnostics
 
-Les transferts SFTP sont bornés à **16 Mio, 128 entrées, 8 niveaux et 30 secondes** ;
-l’éditeur accepte du texte UTF-8 jusqu’à 1 Mio. Un envoi interrompu peut laisser une
-cible partielle. La reprise de fichiers vérifie tout le préfixe avant de continuer.
-Les téléchargements interrompus conservent un fichier `.nom.rustremote-part` sans
-publier la destination finale. La suppression distante est définitive et confirmée.
+![English desktop and client information](docs/screenshots/system-information.png)
 
-La copie réelle de texte, fichiers et dossiers dans les deux sens via **CLIPRDR**
-a été vérifiée entre FreeRDP et GNOME Remote Desktop dans un laboratoire isolé.
-Windows/AD réels, son, imprimantes, double écran, matériel série et KDE restent à
-qualifier. Le parcours Wayland natif a réussi sous GNOME ; cela ne certifie pas
-l’ensemble des environnements Linux ni l’absence de fuite sur une longue durée.
+## Features
 
-La version **0.5.0 est un aperçu de test**, disponible dans les
-[releases GitHub](https://github.com/aurelson101/rustremote/releases/tag/v0.5.0).
-Voir les résultats et limites de la [validation](docs/VALIDATION-0.5.0.md).
+- **SSH:** integrated VTE/OpenSSH tabs, keys, SSH Agent or profile passwords,
+  strict host key checks, resizing, zoom and controlled copy/paste.
+- **SFTP:** local/remote panes, multiple files and recursive folders, upload/download
+  buttons, drag local files into the remote pane, double-click navigation, context
+  menus, remote UTF-8 editor, conflict detection, rename, permissions and deletion.
+  Progress, cancellation and verified file resume; HostName and ProxyJump support.
+- **Organization:** nested folders, drag sessions/folders to another folder or use
+  **Move…** in the context menu. Folder moves retain their descendants. Import/export
+  uses RustRemote JSON; optional age encryption protects profile metadata.
+- **Credentials:** passwords belong to their SSH/RDP profile and may be saved in the
+  system Secret Service vault. Passwords and private keys are never exported.
+- **RDP:** system FreeRDP 3 client, domain, protected password input, certificate/NLA
+  checks, sizing and monitor options, opt-in clipboard/audio/device redirection.
+- **VNC / serial:** TigerVNC with an SSH tunnel option; integrated picocom terminal.
+- **Tools:** SSH local/remote/SOCKS tunnels, reviewed macros and Multi-Exec, Ping /
+  Traceroute, public key fingerprints, desktop/client information, profile directory.
+- **View:** show/hide panels and bars, expand/collapse folders, session search,
+  terminal focus mode, reset layout, fullscreen and zoom.
 
-## Compiler et lancer
+## Linux compatibility
 
-Prérequis : Rust/Cargo avec prise en charge de l'édition 2024, compilateur C,
-`pkg-config`, en-têtes GTK4/VTE GTK4/OpenSSL/libssh2, Python 3 et curl pour le packaging.
-Clients système selon le protocole : `openssh-client`, `freerdp3-x11`,
-`tigervnc-viewer`, `picocom`. Ping/Traceroute : `iputils-ping` et `traceroute`.
-Un service compatible Secret Service est nécessaire pour mémoriser les mots de passe.
+The x86_64 AppImage is built in a **pinned Debian 12 userspace**, with an audited
+minimum **glibc 2.36**. It bundles GTK 4.8, VTE 0.70, protocol libraries, SVG loaders
+and compatible input-method modules. Graphics drivers and their libraries come
+from the host. The build does not require sudo or a Docker daemon.
+
+| Environment | Verification |
+|---|---|
+| Ubuntu 26.04 / GNOME | Local protocol and graphical tests; see the validation report. |
+| Debian 12 baseline | Isolated X11 startup on the actual older userspace. |
+| KDE Plasma, Xfce, Cinnamon / Mint and other glibc distributions | Standard GTK/X11/Wayland integration; full desktop installations are not certified. |
+
+This asset targets **x86_64 + glibc ≥ 2.36**, not every Linux architecture or libc.
+ARM and musl-only systems need separate builds. A graphical desktop, fonts and
+system protocol clients are required. The `-ABI.json` release asset records the
+libraries used to build this version.
 
 ```bash
-git clone https://github.com/aurelson101/rustremote.git
-cd rustremote
-cargo build --locked --workspace --bins
-# Démonstration temporaire :
-cargo run --locked -- --demo
-# Profils personnels, sans autoriser les connexions réseau :
-cargo run --locked -- --offline
+chmod +x RustRemote-0.6.0-preview-x86_64.AppImage
+./RustRemote-0.6.0-preview-x86_64.AppImage
+# Without FUSE:
+APPIMAGE_EXTRACT_AND_RUN=1 ./RustRemote-0.6.0-preview-x86_64.AppImage
 ```
 
-Le build produit aussi `rustremote-askpass` : conserver ce helper à côté du binaire
-principal. Au premier démarrage, choisir de chiffrer les métadonnées ou de continuer
-sans chiffrement. Les profils sont conservés dans `$XDG_CONFIG_HOME/rustremote`, ou
-`~/.config/rustremote`, avec permissions privées. Les mots de passe sauvegardés vont
-au coffre OS, jamais au JSON/export ; la phrase secrète age n'est pas récupérable.
+Protocol clients: OpenSSH, **FreeRDP 3** (`xfreerdp3` or a verified version-3
+`xfreerdp`), TigerVNC and picocom. Ping/Traceroute need their system tools.
+Saving passwords requires a Secret Service implementation, such as GNOME Keyring
+or a compatible KWallet setup. RustRemote does not install or start system services.
 
-Pour les connexions réelles, lancer sans `--offline`, puis confirmer la cible dans
-l'application. **Quitter la démonstration** ouvre les profils personnels sans copier
-les exemples. `--offline` reste contraignant après cette sortie : c'est un contrôle
-applicatif, pas une sandbox réseau du système.
+## Build and verify
 
-## Vérifications
+Source builds require Rust/Cargo with edition 2024 support, GTK ≥ 4.8 and
+VTE GTK4 ≥ 0.70 development packages, OpenSSL, libssh2, pkg-config and a C compiler.
 
 ```bash
+cargo build --locked --workspace --bins
 cargo fmt --all -- --check
 cargo check --workspace
 cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace
-python3 scripts/smoke-profiles.py target/debug/rustremote
-python3 scripts/test-ssh-sftp-local.py --gui target/debug/rustremote
-python3 scripts/test-rdp-local.py --app target/debug/rustremote
-python3 scripts/test-rdp-clipboard-local.py
+# Portable AppImage; Python 3.11+, Cargo and unprivileged user namespaces required:
+./scripts/build-appimage.sh
+# Also test startup inside the older build userspace:
+python3 scripts/build-portable-appimage.py --validate
 ```
 
-Les laboratoires nécessitent leurs outils supplémentaires (Paramiko, PyGObject,
-AT-SPI, Xvfb, xauth, xclip, FreeRDP Shadow, Pillow…). Ils utilisent des fixtures
-éphémères et des bureaux privés. Ne pas remplacer leurs cibles locales par une
-infrastructure réelle sans autorisation. Résultats réels et commandes spécialisées :
-[audit du 8 novembre 2026](docs/AUDIT-DEMANDES-2026-11-08.md).
+The build downloads checksum-pinned base/toolchain inputs, vendors locked Rust
+crates, and installs build dependencies only inside `.tools/portable`.
+`RUSTREMOTE_NATIVE_BUILD=1 ./scripts/build-appimage.sh` creates a package for the
+current build system instead of the portable baseline.
 
-Construction AppImage : `./scripts/build-appimage.sh` après incrément de version,
-validation et conservation de l'ancien artefact. Le script embarque les bibliothèques
-ELF hors glibc, leurs licences et le helper d'authentification ; la portabilité vers
-d'autres distributions n'est pas encore validée.
+For a temporary demo: `cargo run --locked -- --demo`. `--offline` blocks actual
+connections. Leaving demo mode opens personal profiles without importing examples.
+Profiles live in `$XDG_CONFIG_HOME/rustremote` or `~/.config/rustremote`.
+Keep the `rustremote-askpass` helper beside a manually installed executable.
 
-## Licence
+## Current limits
 
-**Usage personnel et professionnel autorisé, revente interdite.**
-Les prestations distinctes de support, formation ou intégration peuvent être facturées ;
-la copie du logiciel et son droit d'utilisation doivent rester gratuits.
+SFTP operations are bounded to **16 MiB, 128 entries, 8 levels and 30 seconds**;
+text editing is UTF-8, up to 1 MiB. File resume verifies the existing prefix;
+recursive folder resume and a persistent transfer queue are not implemented.
+Interrupted uploads may leave a partial remote file. Deletion is permanent and
+requires confirmation. Custom ProxyCommand is refused; bastions require a
+key/agent and an already approved host key.
 
-Les éléments originaux sont soumis à la licence personnalisée
-[LicenseRef-RustRemote-No-Resale-1.0](LICENSE). Le code est disponible, mais cette
-restriction de revente en fait un projet **source disponible**, pas une licence open
-source au sens de [l'Open Source Initiative](https://opensource.org/osd).
-Les [composants tiers](NOTICE) conservent leurs propres licences et droits.
+RDP/VNC use external clients. Windows/AD, physical printers/audio/multiple monitors,
+serial hardware and long-duration memory behaviour are not fully qualified.
+Known nonfatal GTK 4.8 focus warnings are recorded in the validation report.
+RustRemote is not a complete reimplementation of MobaXterm or FileZilla.
 
-## Contribuer
+## License
 
-Consulter [AGENTS.md](AGENTS.md), [MEMORY.md](MEMORY.md) et
-[docs/ROADMAP.md](docs/ROADMAP.md) avant toute modification. Préférer les changements
-ciblés, les tests locaux et les rapports qui distinguent ce qui est testé des limites.
-Ne publier aucun secret, clé privée, profil personnel ou capture d'infrastructure réelle.
+**Personal and professional use is allowed; resale is prohibited.**
+Original code uses the custom [RustRemote No-Resale License](LICENSE).
+Separate support, training and integration services may be charged for; the
+software copy and its use rights must remain free of charge. Third-party components
+retain their own licenses; see [NOTICE](NOTICE) and the notices inside the AppImage.

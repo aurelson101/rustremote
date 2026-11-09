@@ -4,6 +4,7 @@ Affichage et clipboard X11 privés ; aucune frappe dans le bureau personnel.
 """
 import json
 import os
+os.environ.setdefault("RUSTREMOTE_LANGUAGE", "fr")
 from pathlib import Path
 import re
 import secrets
@@ -46,6 +47,7 @@ with tempfile.TemporaryDirectory(prefix="rustremote-ssh-display-") as directory:
     Atspi.set_timeout(2000,3000)
 
     def walk(node):
+        node.clear_cache()
         yield node
         for i in range(node.get_child_count()):
             child=node.get_child_at_index(i)
@@ -78,16 +80,26 @@ with tempfile.TemporaryDirectory(prefix="rustremote-ssh-display-") as directory:
             time.sleep(.15)
         raise AssertionError(message)
 
-    def click(name):
+    def click(name, scope=None):
         def current_button(node):
             if name not in {"Tout sélectionner", "Copier la sélection", "Coller dans le terminal…", "Confirmer le collage dans cette session"}:
                 return True
             rect=node.get_component_iface().get_extents(Atspi.CoordType.SCREEN)
             return rect.width>0 and rect.height>0
         def actionable():
-            root=app()
-            return next((n for n in walk(root) if n.get_name()==name and n.get_state_set().contains(Atspi.StateType.SENSITIVE) and "Action" in [i.rsplit('.',1)[-1] for i in n.get_interfaces()] and current_button(n)
-                         and any(Atspi.Action.get_action_name(n.get_action_iface(),i) in ("click","activate","press","toggle") for i in range(n.get_action_iface().get_n_actions()))),None) if root else None
+            root=scope if scope is not None else app()
+            nodes=[]
+            for label in walk(root) if root else []:
+                if label.get_name()!=name:continue
+                n=label
+                for _ in range(5):
+                    if any(i.endswith("Action") for i in n.get_interfaces()) and any(Atspi.Action.get_action_name(n.get_action_iface(),i) in ("click","activate","press","toggle") for i in range(n.get_action_iface().get_n_actions())):
+                        if n.get_state_set().contains(Atspi.StateType.SENSITIVE) and current_button(n):nodes.append(n)
+                        break
+                    n=n.get_parent()
+                    if not n or n.get_role() in (Atspi.Role.FRAME,Atspi.Role.APPLICATION):break
+            shown=[n for n in nodes if n.get_state_set().contains(Atspi.StateType.SHOWING) or n.get_state_set().contains(Atspi.StateType.VISIBLE)]
+            return (shown or nodes)[-1] if nodes else None
         node=wait(actionable,"Action absente : "+name)
         root=app()
         shown=next((n for n in walk(root) if n.get_name()==name and n.get_state_set().contains(Atspi.StateType.SHOWING) and n.get_state_set().contains(Atspi.StateType.SENSITIVE) and "Action" in [i.rsplit('.',1)[-1] for i in n.get_interfaces()] and n.get_action_iface().get_n_actions() and current_button(n)),None)
@@ -123,7 +135,10 @@ with tempfile.TemporaryDirectory(prefix="rustremote-ssh-display-") as directory:
 
     def focus_window(title):
         import ctypes as c
-        info=subprocess.check_output(["xwininfo","-name",title],text=True)
+        def mapped():
+            result=subprocess.run(["xwininfo","-name",title],text=True,capture_output=True)
+            return result.stdout if result.returncode==0 else None
+        info=wait(mapped,"Window not mapped: "+title)
         wid=int(re.search(r"Window id: (0x[0-9a-fA-F]+)",info).group(1),16)
         x=c.CDLL("libX11.so.6")
         x.XOpenDisplay.argtypes=[c.c_char_p];x.XOpenDisplay.restype=c.c_void_p
@@ -132,6 +147,33 @@ with tempfile.TemporaryDirectory(prefix="rustremote-ssh-display-") as directory:
         display=x.XOpenDisplay(os.environ["DISPLAY"].encode());assert display
         try:x.XSetInputFocus(display,wid,1,0);x.XFlush(display)
         finally:x.XCloseDisplay(display)
+
+    def select_combo(title,index):
+        focus_window(title)
+        current="English" if title=="Settings and security" else "Unassigned"
+        label=wait(lambda:next((n for n in walk(app()) if n.get_role()==Atspi.Role.LABEL and n.get_name()==current and n.get_state_set().contains(Atspi.StateType.VISIBLE)),None),"Selected combo label missing")
+        pointer_click(label,1)
+        keypress("Home")
+        for _ in range(index):keypress("Down")
+        keypress("Return")
+
+    def close_window(title):
+        # Private Xvfb only: address the modal itself, not a same-named main-window button.
+        import ctypes as c
+        info=wait(lambda:subprocess.run(["xwininfo","-name",title],text=True,capture_output=True).stdout,"Modal absent: "+title)
+        wid=int(re.search(r"Window id: (0x[0-9a-fA-F]+)",info).group(1),16)
+        class Message(c.Structure):
+            _fields_=[("type",c.c_int),("serial",c.c_ulong),("send_event",c.c_int),("display",c.c_void_p),("window",c.c_ulong),("message_type",c.c_ulong),("format",c.c_int),("data",c.c_long*5)]
+        x=c.CDLL("libX11.so.6");x.XOpenDisplay.argtypes=[c.c_char_p];x.XOpenDisplay.restype=c.c_void_p
+        x.XInternAtom.argtypes=[c.c_void_p,c.c_char_p,c.c_int];x.XInternAtom.restype=c.c_ulong
+        x.XSendEvent.argtypes=[c.c_void_p,c.c_ulong,c.c_int,c.c_long,c.c_void_p];x.XFlush.argtypes=[c.c_void_p];x.XCloseDisplay.argtypes=[c.c_void_p]
+        display=x.XOpenDisplay(os.environ["DISPLAY"].encode());assert display
+        try:
+            event=(c.c_long*24)();msg=c.cast(event,c.POINTER(Message)).contents
+            msg.type=33;msg.window=wid;msg.display=display;msg.message_type=x.XInternAtom(display,b"WM_PROTOCOLS",0);msg.format=32;msg.data[0]=x.XInternAtom(display,b"WM_DELETE_WINDOW",0)
+            assert x.XSendEvent(display,wid,0,0,c.byref(event));x.XFlush(display)
+        finally:x.XCloseDisplay(display)
+        time.sleep(.3)
 
     def keypress(name, ctrl=False):
         import ctypes as c
@@ -221,6 +263,10 @@ with tempfile.TemporaryDirectory(prefix="rustremote-ssh-display-") as directory:
 
     def field(name):
         node=find(name)
+        if not node and name=="SFTP status":
+            root=app()
+            node=next((n for n in walk(root) if n.get_role()==Atspi.Role.LABEL and n.get_name().startswith(("Authenticated SFTP", "SFTP in progress", "Remote text loaded", "SFTP refusé", "Erreur SFTP", "Lot terminé", "Envoi terminé", "Téléchargement terminé"))),None) if root else None
+            return node.get_name() if node else ""
         if not node and name=="État SFTP réel":
             root=app()
             node=next((n for n in walk(root) if n.get_role()==Atspi.Role.LABEL and n.get_name().startswith(("Listing SFTP", "SFTP en cours", "SFTP refusé", "Erreur SFTP", "Texte distant", "Dossier distant", "Envoi terminé", "Téléchargement terminé", "Destination existante", "Déconnexion /", "Le fichier distant", "Liens et fichiers", "Élément distant", "Permissions distantes", "Suppression terminée", "Lot terminé"))),None) if root else None
@@ -332,9 +378,132 @@ with tempfile.TemporaryDirectory(prefix="rustremote-ssh-display-") as directory:
         keyring.stdin.write(secrets.token_urlsafe(24).encode());keyring.stdin.close()
         time.sleep(.5)
         assert keyring.poll() is None,"Coffre de laboratoire indisponible"
-    process=subprocess.Popen(launch,env=os.environ)
+    app_env=dict(os.environ)
+    if os.environ.get("RUSTREMOTE_ENGLISH_GUI")=="1":app_env.pop("RUSTREMOTE_LANGUAGE",None)
+    process=subprocess.Popen(launch,env=app_env)
     result={"target":"127.0.0.1","personal_desktop_accessed":False}
     try:
+        if os.environ.get("RUSTREMOTE_ENGLISH_GUI")=="1":
+            def workspace():return json.loads((config/"rustremote/profiles.json").read_text())
+            def capture(name,title=None):
+                reply=subprocess.check_output(["gdbus","call","--session","--dest","org.freedesktop.DBus","--object-path","/org/freedesktop/DBus","--method","org.freedesktop.DBus.GetConnectionUnixProcessID","com.rustremote.Preview"],text=True)
+                args=[sys.executable,str(Path(__file__).with_name("capture-preview.py")),"--pid",re.search(r"uint32 (\d+)",reply).group(1),"--output","dist/english-"+name+".png"]
+                if title:args += ["--title",title]
+                subprocess.run(args,check=True,timeout=12)
+            def select_row(label):
+                node=wait(lambda:next((n for n in walk(find("Remote files")) if n.get_role()==Atspi.Role.LABEL and n.get_name().startswith(label+" ·")),None),"Missing file: "+label)
+                while node.get_role()!=Atspi.Role.LIST_ITEM:node=node.get_parent()
+                assert Atspi.Selection.select_child(node.get_parent(),node.get_index_in_parent())
+                return node
+            def drag(source,target,title="RustRemote"):
+                import ctypes as c
+                focus_window(title)
+                start=source.get_component_iface().get_extents(Atspi.CoordType.WINDOW);end=target.get_component_iface().get_extents(Atspi.CoordType.WINDOW)
+                x=c.CDLL("libX11.so.6");xt=c.CDLL("libXtst.so.6")
+                x.XOpenDisplay.argtypes=[c.c_char_p];x.XOpenDisplay.restype=c.c_void_p;x.XFlush.argtypes=[c.c_void_p];x.XCloseDisplay.argtypes=[c.c_void_p]
+                xt.XTestFakeMotionEvent.argtypes=[c.c_void_p,c.c_int,c.c_int,c.c_int,c.c_ulong];xt.XTestFakeButtonEvent.argtypes=[c.c_void_p,c.c_uint,c.c_int,c.c_ulong]
+                display=x.XOpenDisplay(os.environ["DISPLAY"].encode());assert display
+                try:
+                    def origin(node):
+                        while node.get_role() not in (Atspi.Role.FRAME,Atspi.Role.DIALOG):node=node.get_parent()
+                        return node.get_component_iface().get_extents(Atspi.CoordType.WINDOW)
+                    so=origin(source);eo=origin(target)
+                    sx,sy=start.x-so.x+start.width//2,start.y-so.y+start.height//2;ex,ey=end.x-eo.x+end.width//2,end.y-eo.y+end.height//2
+                    print("Private DND coordinates:",sx,sy,ex,ey,flush=True)
+                    xt.XTestFakeMotionEvent(display,-1,sx,sy,0);x.XFlush(display);time.sleep(.2);xt.XTestFakeButtonEvent(display,1,1,0);x.XFlush(display)
+                    for n in range(1,21):xt.XTestFakeMotionEvent(display,-1,int(sx+(ex-sx)*n/20),int(sy+(ey-sy)*n/20),0);x.XFlush(display);time.sleep(.06)
+                    xt.XTestFakeButtonEvent(display,1,0,0);x.XFlush(display)
+                finally:x.XCloseDisplay(display)
+            wait(lambda:find("Open profiles"),"Default English startup absent");click("Unlock / open")
+            wait(lambda:find("Actions "+profile["name"]),"Profiles absent")
+            result["english_default_without_override"]=True
+            for name in ("Linux/Servers/Production","Archive"):
+                click("New session folder");text("Folder name",name);click("Create folder")
+                wait(lambda:name in workspace()["folders"],"Folder not saved: "+name)
+            click("Actions "+profile["name"]);click("Move…")
+            position=workspace()["folders"].index("Linux/Servers/Production")+1
+            select_combo("Move to folder",position);click("Move")
+            wait(lambda:workspace()["profiles"][0]["folder"]=="Linux/Servers/Production","Context move not persisted")
+            result["profile_context_move_and_nested_creation"]=True
+            drag(wait(lambda:find("Servers"),"Folder drag source absent"),wait(lambda:find("Archive"),"Folder drop target absent"))
+            wait(lambda:"Archive/Servers/Production" in workspace()["folders"],"Folder drag and drop failed")
+            assert workspace()["profiles"][0]["folder"]=="Archive/Servers/Production"
+            result["folder_drag_moves_descendants_and_profiles"]=True
+            time.sleep(.5);app()
+            source=wait(lambda:next((n for n in walk(app()) if n.get_role()==Atspi.Role.LABEL and n.get_name().endswith(profile["name"]) and not n.get_name().startswith("Actions")),None),"Profile drag source absent")
+            drag(source,wait(lambda:find("Linux"),"Root folder absent"))
+            wait(lambda:workspace()["profiles"][0]["folder"]=="Linux","Profile drag failed")
+            result["profile_drag_and_drop"]=True
+            click("Actions "+profile["name"]);click("Edit");text("Profile name","Linux lab");click("Save profile");profile["name"]="Linux lab"
+            wait(lambda:find("Actions Linux lab"),"Renamed English profile absent")
+            for action in ("collapse-folders","expand-folders","focus-terminal","focus-terminal","reset-layout"):
+                subprocess.run(["gapplication","action","com.rustremote.Preview",action],check=True,timeout=5)
+            click("View");wait(lambda:find("Expand all folders"),"English View menu absent");click("Expand all folders")
+            result["view_actions"]=True
+            click("RDP");wait(lambda:find("Connection settings"),"RDP form absent");text("Profile name","Windows lab");text("Host / IP address","windows.example.invalid");text("Username","Administrator");text("AD domain / realm","LAB");capture("rdp","Connection settings");click("Cancel")
+            click("Tools");click("System information…")
+            wait(lambda:find("System information"),"System information absent");capture("system","System information");close_window("System information")
+            subprocess.run(["gapplication","action","com.rustremote.Preview","key-fingerprint"],check=True)
+            text("SSH public key",profile["options"]["identity_file"]+".pub");click("Calculate SHA256 fingerprint")
+            wait(lambda:any("SHA256:" in n.get_name() for n in walk(app())),"Fingerprint tool failed");close_window("SSH public key fingerprint")
+            result["tools_system_information_and_public_key_fingerprint"]=True
+            click("Actions Linux lab");click("Connect");click("Allow and connect")
+            def copied_terminal():
+                click("Select all");click("Copy selection")
+                out=subprocess.run(["xclip","-selection","clipboard","-out"],timeout=3,capture_output=True)
+                return out.stdout.decode(errors="replace") if out.returncode==0 else ""
+            wait(lambda:"SSH intégré — laboratoire été" in copied_terminal(),"Real SSH banner absent")
+            terminal=next(n for n in walk(app()) if n.get_name()=="Terminal — Linux lab")
+            pointer_click(terminal,1);capture("ssh")
+            click("SFTP");click("Connect / Refresh SFTP")
+            wait(lambda:"Authenticated SFTP listing" in field("SFTP status"),"Native SFTP absent")
+            upload=config.parent/"graphical-local";upload.mkdir();(upload/"docs").mkdir();(upload/"docs/readme.txt").write_text("Graphical folder transfer — local lab")
+            (upload/"client-note.txt").write_text("Graphical upload — local lab")
+            text("Local folder",str(upload));click("Refresh local folder")
+            local_list=wait(lambda:find("Local files"),"Local pane absent")
+            wait(lambda:any(n.get_role()==Atspi.Role.LABEL and n.get_name().startswith("client-note.txt ·") for n in walk(local_list)),"Local listing missing")
+            assert Atspi.Selection.select_child(local_list,0);assert Atspi.Selection.select_child(local_list,1);click("Upload →")
+            data=config.parent/"server-data"
+            wait(lambda:(data/"docs/readme.txt").is_file() and (data/"client-note.txt").is_file(),"Graphical uploads missing")
+            assert (data/"docs/readme.txt").read_bytes()==(upload/"docs/readme.txt").read_bytes()
+            wait(lambda: any(n.get_role()==Atspi.Role.LABEL and n.get_name().startswith("client-note.txt ·") for n in walk(find("Remote files"))),"Remote pane did not refresh")
+            result["sftp_graphical_multiple_files_folders_upload"]=True
+            (upload/"drag-note.txt").write_text("Transferred by graphical drag and drop")
+            click("Refresh local folder")
+            local_node=wait(lambda:next((n for n in walk(find("Local files")) if n.get_role()==Atspi.Role.LABEL and n.get_name().startswith("drag-note.txt ·")),None),"Local drag file absent")
+            local_row=local_node
+            while local_row.get_role()!=Atspi.Role.LIST_ITEM:local_row=local_row.get_parent()
+            Atspi.Selection.clear_selection(find("Local files"));assert Atspi.Selection.select_child(find("Local files"),local_row.get_index_in_parent())
+            drag(local_node,find("Remote files"),"SFTP — Linux lab")
+            wait(lambda:(data/"drag-note.txt").is_file(),"Graphical file drag did not upload")
+            assert (data/"drag-note.txt").read_bytes()==(upload/"drag-note.txt").read_bytes()
+            wait(lambda:find("Save remote file") or any(n.get_role()==Atspi.Role.LABEL and n.get_name().startswith("drag-note.txt ·") for n in walk(find("Remote files"))),"Remote listing did not refresh after drag")
+            result["sftp_graphical_drag_and_drop_upload"]=True
+            row=select_row("client-note.txt");focus_window("SFTP — Linux lab");pointer_click(row,1);keypress("Return")
+            wait(lambda:"Graphical upload" in field("Remote SFTP editor"),"Remote editor did not open")
+            text("Remote SFTP editor","Edited remotely from the graphical browser")
+            click("Save remote file")
+            wait(lambda:(data/"client-note.txt").read_text()=="Edited remotely from the graphical browser","Remote edit was not saved")
+            result["sftp_graphical_edit_readback"]=True
+            download=config.parent/"graphical-download";download.mkdir();text("Local folder",str(download));click("Refresh local folder")
+            node=find("Remote files");Atspi.Selection.clear_selection(node);select_row("client-note.txt");select_row("docs");click("← Download")
+            wait(lambda:(download/"docs/readme.txt").is_file() and (download/"client-note.txt").is_file(),"Graphical download missing")
+            assert (download/"client-note.txt").read_bytes()==(data/"client-note.txt").read_bytes()
+            assert (download/"docs/readme.txt").read_bytes()==(data/"docs/readme.txt").read_bytes()
+            result["sftp_graphical_multiple_files_folders_download"]=True
+            wait(lambda:any(n.get_role()==Atspi.Role.LABEL and n.get_name().startswith("docs ·") for n in walk(find("Remote files"))),"Final SFTP refresh incomplete")
+            wait(lambda:any(n.get_role()==Atspi.Role.LABEL and n.get_name().startswith("docs ·") for n in walk(find("Local files"))),"Downloaded local folder absent from pane")
+            time.sleep(.3);capture("sftp","SFTP — Linux lab");click("Close SFTP browser")
+            click("Settings");wait(lambda:find("Settings and security"),"Settings absent");capture("settings","Settings and security")
+            select_combo("Settings and security",1);click("Save settings")
+            settings=config/"rustremote/settings.json";wait(lambda:settings.exists() and json.loads(settings.read_text())["language"]=="fr","French preference not saved")
+            subprocess.run(["gapplication","action","com.rustremote.Preview","quit"],check=True);process.wait(timeout=10)
+            process=subprocess.Popen(launch,env=app_env)
+            wait(lambda:find("Ouvrir les profils"),"French setting did not apply after restart");click("Déverrouiller / ouvrir")
+            wait(lambda:find("Paramètres"),"French menu absent after restart")
+            result["french_setting_persisted_after_restart"]=True
+            result["success"]=True
+            raise SystemExit(0)
         wait(lambda:find("Ouvrir les profils"),"Déverrouillage absent")
         click("Déverrouiller / ouvrir")
         wait(lambda:find("Actions "+profile["name"]),"Profil non chargé")

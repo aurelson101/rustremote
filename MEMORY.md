@@ -5,17 +5,17 @@
 
 ## 1. État de référence
 
-- **Mise à jour :** 2026-11-08 — version 0.5.0, AppImage publiée sur GitHub privé et téléchargement vérifié.
-- **Dernier agent :** Codex ; SFTP réel, progression/reprise, bastions, tunnels/Multi-Exec, Wayland et CLIPRDR ; laboratoires locaux uniquement.
+- **Mise à jour :** 2026-11-09 — 0.6.0 en validation ; 0.5.0 reste la dernière préversion publiée pour le moment.
+- **Dernier agent :** Codex ; vue SFTP graphique, arborescence/DND, anglais/français et AppImage portable ; laboratoires locaux uniquement.
 - **Phase :** P1 — terminal/SFTP natifs, MVP encore incomplet.
 - **État confirmé :** terminal SSH/série intégré VTE, SFTP natif ssh2/libssh2 ; RDP/VNC externes ; profils/import/export, dossiers et paramètres persistants.
 - **Code existant :** package Rust/GTK4, ui/dialogs/profiles/store/simulation/icons ; scripts AppImage, GTK et laboratoires réseau/PTY.
 - **Plateforme cible initiale :** Ubuntu Linux / GNOME. Debian ensuite.
-- **Dernière vérification réelle :** 34 tests Rust et contrôles Cargo réussis ; AppImage 0.5.0 construite. Voir `docs/VALIDATION-0.5.0.md` et les rapports JSON versionnés pour les parcours réels et limites.
+- **Dernière vérification réelle :** 39 tests Rust et contrôles Cargo réussis ; AppImage portable 0.6.0 construite. Voir `docs/VALIDATION-0.6.0.md` et `docs/validation/0.6.0.json` pour les parcours et limites.
 
 ## 2. Objectif immuable
 
-Créer **RustRemote**, application de bureau Linux centrée sur des sessions SSH/terminal/SFTP, puis RDP, VNC, tunnels, coffre OS, macros, SSH bastion, X11 forwarding. Architecture modulaire en Rust, interface moderne française, inspirée de la maquette. Projet original et non fork de MobaXterm.
+Créer **RustRemote**, application de bureau Linux centrée sur des sessions SSH/terminal/SFTP, puis RDP, VNC, tunnels, coffre OS, macros, SSH bastion, X11 forwarding. Architecture modulaire en Rust, interface moderne anglaise par défaut et française configurable, inspirée de la maquette. Projet original et non fork de MobaXterm.
 
 ## 3. Décisions connues
 
@@ -445,3 +445,60 @@ refusée avec SHA court, corrigée en utilisant le SHA complet ; aucun token exp
 Le dernier harnais avec focus explicite du dialogue a également passé les trois
 modes de tunnel sur l’AppImage. Les changements après le commit applicatif sont
 uniquement les traces de publication/validation dans la documentation.
+
+## Incrément 0.6.0 — 2026-11-09, publication en préparation
+
+Anglais par défaut, français dans Paramètres après redémarrage (`i18n.rs`, catalogue
+`assets/locales/en.tsv`, préférences migrées par défaut en anglais). Traduction des
+contrôles et messages, jamais du contenu terminal/éditeur ni des noms utilisateur.
+Les panneaux créés après démarrage et les expandeurs sont traités explicitement.
+
+SFTP : vue locale/distante, multisélection, boutons toujours accessibles, double-clic,
+DND local vers distant, menus contextuels, éditeur avec bouton Enregistrer visible,
+rafraîchissement après mutation. Listing local borné 2048 entrées, un seul worker
+avec coalescence des rafraîchissements. Budget protocole 16 Mio/128/8/30 s inchangé.
+Progression préservée pendant le rafraîchissement automatique après un transfert.
+
+Dossiers logiques hiérarchiques : `session_tree.rs`, `dialogs/tree.rs`, `exchange.rs`.
+Chemins de 8 niveaux, déplacement atomique du sous-arbre et des connexions, refus
+cycles/collisions. DND GTK et clic droit Déplacer ; zone racine distincte afin que
+le conteneur parent ne vole pas les dépôts. Aucun déplacement de fichiers système.
+Affichage : déplier/replier, rechercher, concentration/restauration. Outils : infos
+système, empreinte de clé publique et ouverture du dossier des profils.
+
+Distribution : build dans Debian 12 amd64 épinglé + Rust 1.93.0 vérifié SHA256,
+`packaging/portable-build.lock.json` et `scripts/build-portable-appimage.py`.
+Rootless unshare/fakeroot, APT uniquement dans `.tools/portable`, aucun sudo ni
+service Docker. Prérequis hôte : Cargo, Python 3.11+, user namespaces. GTK ≥4.8,
+VTE ≥0.70 ; menu contextuel GTK existant conservé, appel VTE ≥0.78 superflu retiré.
+Bibliothèques graphiques/C++/Wayland de l’hôte conservées pour éviter les conflits
+avec Mesa récent. Chargeur SVG et modules IBus/Fcitx compatibles embarqués ; chemins
+GTK/GIO retirés lors du lancement des clients système. FreeRDP `xfreerdp` accepté
+si une sonde bornée confirme la version 3, sinon refus avant connexion.
+
+39 tests Rust et check/Clippy réussis. AppImage construite et démarrage X11 dans
+Debian 12 réussi, ABI glibc minimale 2.36 auditée. Parcours anglais sur l’AppImage :
+dossiers/DND/clic droit, outils, transferts SFTP fichiers+dossiers dans les deux
+sens et édition réelle, préférence française après redémarrage PASS. Captures
+anglaises inspectées et copiées dans docs/screenshots (cinq vues, laboratoire uniquement).
+Les modules IBus/Fcitx compatibles éliminent les symboles indéfinis du parcours.
+Wayland/plein écran/restauration et RDP local NLA depuis le profil (domaine,
+mot de passe, certificat, pixels, déconnexion/reconnexion/arrêt) réussis sur l’image.
+Le harnais compte explicitement le critical GTK connu et refuse les autres ; il
+ne prétend pas avoir des logs sans erreurs. Focus GTK 4.8 toujours à corriger.
+
+Erreurs de harnais résolues : GTK4.8 sans SHOWING (VISIBLE + géométrie), actions
+sur parent du label, lecture Text avec longueur explicite, focus FreeRDP masquant
+le popover (réactiver la fenêtre privée). clear_cache sur chaque nœud AT-SPI causait
+un crash du harnais dans Debian ; retiré puis démarrage rejoué. Pour la capture
+SFTP attendre les lignes distantes après refresh, car le statut conserve le résultat
+du lot (il ne revient pas systématiquement à « Listing authentifié »).
+
+Prochaine action immédiate : terminer le dernier rejeu après complément du catalogue,
+versionner les cinq captures anglaises et le rapport, publier sources/préversion
+v0.6.0 et vérifier les téléchargements AppImage/SHA256/ABI/versions de paquets.
+v0.5.0 existe déjà et reste le retour arrière ; ne pas effacer de tag historique.
+
+Rejeu final après complément du catalogue : Debian 12 startup, Ubuntu X11 anglais/FR
+avec SFTP/DND, RDP NLA et Wayland/plein écran tous PASS sur le même artefact.
+SHA256 et limites conservés dans docs/validation/0.6.0.json. Publication encore à faire.

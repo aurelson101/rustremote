@@ -5,6 +5,9 @@ use std::os::unix::fs::OpenOptionsExt;
 
 impl Controller {
     pub fn new_folder(&self) {
+        self.new_subfolder("");
+    }
+    pub(super) fn new_subfolder(&self, parent: &str) {
         if self.0.store.borrow().is_none() {
             self.startup();
             return;
@@ -14,7 +17,14 @@ impl Controller {
         body.add_css_class("dialog-content");
         let name = gtk::Entry::new();
         name.set_placeholder_text(Some("Linux"));
-        name.update_property(&[gtk::accessible::Property::Label("Nom du dossier")]);
+        name.set_text(&if parent.is_empty() {
+            String::new()
+        } else {
+            format!("{parent}/")
+        });
+        name.update_property(&[gtk::accessible::Property::Label(&crate::i18n::text(
+            "Nom du dossier",
+        ))]);
         body.append(&name);
         let error = gtk::Label::new(None);
         error.set_wrap(true);
@@ -31,15 +41,14 @@ impl Controller {
                 return;
             }
             let mut data = controller.snapshot();
-            if data.folders.contains(&folder) {
-                error.set_text("Ce dossier existe déjà.");
+            if let Err(message) = data.add_folder(&folder) {
+                error.set_text(&message);
                 return;
             }
-            data.folders.push(folder);
             controller.persist(&w, button, &error, data);
         });
         window.set_child(Some(&body));
-        window.present();
+        crate::i18n::present(&window);
     }
     pub fn import_profiles(&self) {
         if self.0.store.borrow().is_none() {
@@ -56,7 +65,9 @@ impl Controller {
         body.append(&hint);
         let path = gtk::Entry::new();
         path.set_placeholder_text(Some("Chemin du fichier .json"));
-        path.update_property(&[gtk::accessible::Property::Label("Fichier à importer")]);
+        path.update_property(&[gtk::accessible::Property::Label(&crate::i18n::text(
+            "Fichier à importer",
+        ))]);
         body.append(&path);
         let browse = gtk::Button::with_label("Parcourir…");
         body.append(&browse);
@@ -206,7 +217,7 @@ impl Controller {
         });
         body.append(&cancel);
         window.set_child(Some(&body));
-        window.present();
+        crate::i18n::present(&window);
     }
 }
 
@@ -226,7 +237,9 @@ impl Controller {
         body.append(&note);
         let path = gtk::Entry::new();
         path.set_placeholder_text(Some("Chemin absolu du fichier .json à créer"));
-        path.update_property(&[gtk::accessible::Property::Label("Fichier d’export")]);
+        path.update_property(&[gtk::accessible::Property::Label(&crate::i18n::text(
+            "Fichier d’export",
+        ))]);
         body.append(&path);
         let accept =
             gtk::ToggleButton::with_label("J’accepte l’export de métadonnées non chiffrées");
@@ -276,7 +289,7 @@ impl Controller {
         });
         body.append(&close);
         window.set_child(Some(&body));
-        window.present();
+        crate::i18n::present(&window);
     }
 }
 
@@ -289,7 +302,8 @@ impl Controller {
         for (title, operation) in [
             ("Nouvelle connexion SSH dans ce dossier", 0),
             ("Nouvelle connexion RDP dans ce dossier", 1),
-            ("Nouveau dossier", 2),
+            ("Nouveau sous-dossier", 2),
+            ("Déplacer ce dossier…", 5),
             ("Renommer ce dossier", 3),
             ("Supprimer ce dossier vide", 4),
         ] {
@@ -314,14 +328,16 @@ impl Controller {
                 }
                 match operation {
                     0 | 1 => c.editor_details(None, operation, Some(&folder)),
-                    2 => c.new_folder(),
+                    2 => c.new_subfolder(&folder),
+                    5 => c.move_dialog(&format!("folder:{folder}"), None),
                     _ => c.edit_folder(&folder, operation == 4),
                 }
             });
             body.append(&item);
         }
         popover.set_child(Some(&body));
-        popover.connect_closed(|p| p.unparent());
+        popover.connect_closed(crate::dialogs::defer_unparent);
+        crate::i18n::translate(popover.upcast_ref());
         popover.popup();
     }
     fn edit_folder(&self, old: &str, remove: bool) {
@@ -337,7 +353,9 @@ impl Controller {
         body.add_css_class("dialog-content");
         let name = gtk::Entry::new();
         name.set_text(old);
-        name.update_property(&[gtk::accessible::Property::Label("Nouveau nom du dossier")]);
+        name.update_property(&[gtk::accessible::Property::Label(&crate::i18n::text(
+            "Nouveau nom du dossier",
+        ))]);
         if remove {
             let note = gtk::Label::new(Some(&format!(
                 "Supprimer le dossier vide « {old} » ? Aucune connexion ne sera supprimée."
@@ -368,32 +386,14 @@ impl Controller {
                 error.set_text("Ce dossier n’existe plus");
                 return;
             }
-            if remove {
-                if data.profiles.iter().any(|p| p.folder == old) {
-                    error.set_text("Le dossier contient des connexions : suppression refusée");
-                    return;
-                }
-                data.folders.retain(|folder| folder != &old);
+            let result = if remove {
+                data.remove_empty_folder(&old)
             } else {
-                let new = name.text().trim().to_string();
-                if let Err(message) = validate_folder(&new) {
-                    error.set_text(&message);
-                    return;
-                }
-                if new != old && data.folders.contains(&new) {
-                    error.set_text("Ce nom de dossier existe déjà");
-                    return;
-                }
-                for folder in &mut data.folders {
-                    if folder == &old {
-                        *folder = new.clone();
-                    }
-                }
-                for profile in &mut data.profiles {
-                    if profile.folder == old {
-                        profile.folder = new.clone();
-                    }
-                }
+                data.rename_folder(&old, name.text().trim())
+            };
+            if let Err(message) = result {
+                error.set_text(&message);
+                return;
             }
             c.persist(&w, button, &error, data);
         });
@@ -407,6 +407,6 @@ impl Controller {
         });
         body.append(&cancel);
         window.set_child(Some(&body));
-        window.present();
+        crate::i18n::present(&window);
     }
 }

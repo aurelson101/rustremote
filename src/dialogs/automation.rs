@@ -14,7 +14,9 @@ impl Controller {
         body.add_css_class("dialog-content");
         let input = gtk::Entry::new();
         input.set_max_length(4096);
-        input.update_property(&[gtk::accessible::Property::Label("Commande SSH à vérifier")]);
+        input.update_property(&[gtk::accessible::Property::Label(&crate::i18n::text(
+            "Commande SSH à vérifier",
+        ))]);
         let note = gtk::Label::new(Some(
             "Commandes non mémorisées par RustRemote. Vérifiez la commande et chaque cible ; leur résultat reste dans les terminaux. Jusqu’à 8 sessions SSH authentifiées, hors tunnels.",
         ));
@@ -121,7 +123,7 @@ impl Controller {
             });
             content.append(&cancel);
             preview.set_child(Some(&content));
-            preview.present();
+            crate::i18n::present(&preview);
         });
         body.append(&verify);
         let close = gtk::Button::with_label("Fermer les outils de commandes");
@@ -139,7 +141,7 @@ impl Controller {
                 .vexpand(true)
                 .build(),
         ));
-        window.present();
+        crate::i18n::present(&window);
     }
 
     pub fn tunnels(&self) {
@@ -176,14 +178,18 @@ impl Controller {
             .collect::<Vec<_>>();
         let names = profiles.iter().map(|p| p.name.as_str()).collect::<Vec<_>>();
         let profile = gtk::DropDown::from_strings(&names);
-        profile.update_property(&[gtk::accessible::Property::Label("Profil SSH du tunnel")]);
+        profile.update_property(&[gtk::accessible::Property::Label(&crate::i18n::text(
+            "Profil SSH du tunnel",
+        ))]);
         body.append(&profile);
-        let kind = gtk::DropDown::from_strings(&[
+        let kind = crate::i18n::dropdown(&[
             "Local — poste vers serveur",
             "Distant — serveur vers poste",
             "SOCKS — proxy local",
         ]);
-        kind.update_property(&[gtk::accessible::Property::Label("Type de tunnel SSH")]);
+        kind.update_property(&[gtk::accessible::Property::Label(&crate::i18n::text(
+            "Type de tunnel SSH",
+        ))]);
         body.append(&kind);
         fn field(body: &gtk::Box, name: &str, value: &str) -> gtk::Entry {
             let e = gtk::Entry::new();
@@ -228,7 +234,7 @@ impl Controller {
                 });
             });content.append(&confirm);
             let cancel=gtk::Button::with_label("Annuler le tunnel");let w=confirmation.downgrade();cancel.connect_clicked(move |_| { if let Some(w)=w.upgrade(){w.close();} });content.append(&cancel);
-            confirmation.set_child(Some(&content));confirmation.present();
+            confirmation.set_child(Some(&content));crate::i18n::present(&confirmation);
         });
         body.append(&start);
         let close = gtk::Button::with_label("Fermer les tunnels");
@@ -246,6 +252,6 @@ impl Controller {
                 .vexpand(true)
                 .build(),
         ));
-        window.present();
+        crate::i18n::present(&window);
     }
 }

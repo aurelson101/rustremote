@@ -1,0 +1,17 @@
+{
+  "base": "debian:bookworm-slim",
+  "manifest": "sha256:c67e92c8099ba22853ab4cfda7cfb494d253d6012ca82dee98ba8976772af018",
+  "layers": [
+    {
+      "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+      "digest": "sha256:dd051e1b8c92ff101fa3071ab97ea4924885942f15644e01c3dc095764e863e3",
+      "size": 28247982
+    }
+  ],
+  "rust": "1.93.0",
+  "components": {
+    "rustc-1.93.0-x86_64-unknown-linux-gnu.tar.xz": "00c6e6740ea6a795e33568cd7514855d58408a1180cd820284a7bbf7c46af715",
+    "rust-std-1.93.0-x86_64-unknown-linux-gnu.tar.xz": "a849a418d0f27e69573e41763c395e924a0b98c16fcdc55599c1c79c27c1c777",
+    "cargo-1.93.0-x86_64-unknown-linux-gnu.tar.xz": "c23de3ae709ff33eed5e4ae59d1f9bcd75fa4dbaa9fb92f7b06bfb534b8db880"
+  }
+}

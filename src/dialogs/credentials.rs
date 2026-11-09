@@ -101,7 +101,7 @@ impl Controller {
         });
         body.append(&close);
         window.set_child(Some(&body));
-        window.present();
+        crate::i18n::present(&window);
     }
     pub(super) fn with_password(
         &self,

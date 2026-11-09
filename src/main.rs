@@ -3,9 +3,11 @@ mod clipboard;
 mod credentials;
 mod dialogs;
 mod external;
+mod i18n;
 mod icons;
 mod preferences;
 mod profiles;
+mod session_tree;
 mod sftp;
 mod sftp_ui;
 mod simulation;
@@ -21,11 +23,12 @@ use gtk::prelude::*;
 fn main() -> gtk::glib::ExitCode {
     if std::env::args().any(|arg| arg == "--version") {
         println!(
-            "RustRemote {} — client Linux SSH/RDP",
+            "RustRemote {} — Linux SSH/RDP client",
             env!("CARGO_PKG_VERSION")
         );
         return gtk::glib::ExitCode::SUCCESS;
     }
+    i18n::initialize();
     let app = gtk::Application::builder()
         .application_id("com.rustremote.Preview")
         .build();
