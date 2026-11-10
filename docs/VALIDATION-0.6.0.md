@@ -95,4 +95,7 @@ restent ouverts. Ce n’est pas une parité complète MobaXterm/FileZilla.
 3009d663af6bc29e93fb6009adf485fa43804f35ff2908ca4466d5cc8cb8a428
 ```
 
-Publication GitHub en préparation ; le statut final figure dans le rapport JSON.
+Publication du 2026-11-10 vérifiée : [préversion v0.6.0](https://github.com/aurelson101/rustremote/releases/tag/v0.6.0)
+sur le commit `86615985090071be9a0d44227d5cb6f342d361b2`. Les quatre assets
+AppImage/SHA256/ABI/versions des paquets ont été retéléchargés et comparés aux
+fichiers locaux. Le dépôt reste privé et v0.5.0 est conservée.

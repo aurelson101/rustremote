@@ -151,7 +151,19 @@
     "SFTP 16MiB/128 entries/8 levels/30s; UTF-8 editor 1MiB; no persistent queue or recursive resume"
   ],
   "publication": {
-    "status": "pending",
-    "release": "https://github.com/aurelson101/rustremote/releases/tag/v0.6.0"
+    "status": "published",
+    "release": "https://github.com/aurelson101/rustremote/releases/tag/v0.6.0",
+    "date": "2026-11-10",
+    "source_commit": "86615985090071be9a0d44227d5cb6f342d361b2",
+    "private_repository": true,
+    "prerelease": true,
+    "draft": false,
+    "downloaded_assets_match_local": true,
+    "assets": [
+      "RustRemote-0.6.0-preview-x86_64.AppImage",
+      "RustRemote-0.6.0-preview-x86_64.AppImage.sha256",
+      "RustRemote-0.6.0-ABI.json",
+      "build-packages.txt"
+    ]
   }
 }

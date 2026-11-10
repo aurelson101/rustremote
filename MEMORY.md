@@ -5,7 +5,7 @@
 
 ## 1. État de référence
 
-- **Mise à jour :** 2026-11-09 — 0.6.0 en validation ; 0.5.0 reste la dernière préversion publiée pour le moment.
+- **Mise à jour :** 2026-11-10 — préversion 0.6.0 publiée et téléchargements vérifiés ; 0.5.0 conservée.
 - **Dernier agent :** Codex ; vue SFTP graphique, arborescence/DND, anglais/français et AppImage portable ; laboratoires locaux uniquement.
 - **Phase :** P1 — terminal/SFTP natifs, MVP encore incomplet.
 - **État confirmé :** terminal SSH/série intégré VTE, SFTP natif ssh2/libssh2 ; RDP/VNC externes ; profils/import/export, dossiers et paramètres persistants.
@@ -446,7 +446,7 @@ Le dernier harnais avec focus explicite du dialogue a également passé les troi
 modes de tunnel sur l’AppImage. Les changements après le commit applicatif sont
 uniquement les traces de publication/validation dans la documentation.
 
-## Incrément 0.6.0 — 2026-11-09, publication en préparation
+## Incrément 0.6.0 — développé le 2026-11-09, publié le 2026-11-10
 
 Anglais par défaut, français dans Paramètres après redémarrage (`i18n.rs`, catalogue
 `assets/locales/en.tsv`, préférences migrées par défaut en anglais). Traduction des
@@ -494,11 +494,20 @@ un crash du harnais dans Debian ; retiré puis démarrage rejoué. Pour la captu
 SFTP attendre les lignes distantes après refresh, car le statut conserve le résultat
 du lot (il ne revient pas systématiquement à « Listing authentifié »).
 
-Prochaine action immédiate : terminer le dernier rejeu après complément du catalogue,
-versionner les cinq captures anglaises et le rapport, publier sources/préversion
-v0.6.0 et vérifier les téléchargements AppImage/SHA256/ABI/versions de paquets.
-v0.5.0 existe déjà et reste le retour arrière ; ne pas effacer de tag historique.
-
 Rejeu final après complément du catalogue : Debian 12 startup, Ubuntu X11 anglais/FR
 avec SFTP/DND, RDP NLA et Wayland/plein écran tous PASS sur le même artefact.
-SHA256 et limites conservés dans docs/validation/0.6.0.json. Publication encore à faire.
+SHA256 et limites conservés dans docs/validation/0.6.0.json.
+
+Publication du 2026-11-10 : sources et cinq captures anglaises sur main, tag v0.6.0
+sur 86615985090071be9a0d44227d5cb6f342d361b2, préversion publiée dans le dépôt privé
+https://github.com/aurelson101/rustremote/releases/tag/v0.6.0 . AppImage, SHA256,
+ABI.json et build-packages.txt retéléchargés et comparés aux quatre fichiers locaux.
+SHA256 AppImage : 3009d663af6bc29e93fb6009adf485fa43804f35ff2908ca4466d5cc8cb8a428.
+v0.5.0 reste le retour arrière ; aucun tag historique effacé. Le commit de relais
+suivant ne change que les statuts de publication dans la documentation.
+
+Prochaine tâche prioritaire : P1-04 reste PARTIAL (SQLite), mais corriger d’abord les
+diagnostics de focus GTK 4.8 avec un test ciblé de fermeture/réouverture avant tout
+nouveau changement fonctionnel. Qualifier ensuite KDE/Xfce/Cinnamon dans des bureaux
+complets et étudier des builds distincts pour ARM/musl/glibc<2.36 si demandés.
+Aucune qualification universelle Linux, Windows/AD ou d’endurance n’est acquise.

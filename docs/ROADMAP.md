@@ -242,3 +242,9 @@ Voir `VALIDATION-0.6.0.md` et `validation/0.6.0.json` pour résultats et limites
 PARTIAL (signature, CI, .deb et autres architectures). Les diagnostics de focus
 GTK 4.8 connus restent ouverts ; la nouvelle ergonomie n’implique pas une parité
 complète avec MobaXterm/FileZilla ni une qualification Windows/AD ou du matériel.
+
+Publication 0.6.0 du 2026-11-10 effectuée : tag sur le commit
+`86615985090071be9a0d44227d5cb6f342d361b2`, préversion GitHub privée disponible.
+Les quatre assets (AppImage, SHA256, ABI et versions des paquets) ont été
+retéléchargés puis comparés aux fichiers locaux. v0.5.0 conservée. P3-02 reste
+PARTIAL pour les critères encore ouverts ci-dessus.
