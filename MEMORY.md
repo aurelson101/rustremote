@@ -5,13 +5,13 @@
 
 ## 1. État de référence
 
-- **Mise à jour :** 2026-11-14 — correctif 0.8.1 découverte en validation ; 0.8.0 publiée.
+- **Mise à jour :** 2026-11-14 — préversion 0.8.1 corrective publiée et téléchargements vérifiés.
 - **Dernier agent :** Codex ; découverte TCP privée bornée, menus de création Apple/VNC et ajout de profils depuis les résultats.
 - **Phase :** P1 — terminal/SFTP natifs, MVP encore incomplet.
 - **État confirmé :** terminal SSH/série intégré VTE, SFTP natif ssh2/libssh2 ; RDP/VNC externes ; profils/import/export, dossiers et paramètres persistants.
 - **Code existant :** package Rust/GTK4, ui/dialogs/profiles/store/simulation/icons ; scripts AppImage, GTK et laboratoires réseau/PTY.
 - **Plateforme cible initiale :** Ubuntu Linux / GNOME. Debian ensuite.
-- **Dernière vérification réelle :** 45 tests Rust et contrôles Cargo réussis ; AppImage 0.8.0 et parcours complet GUI/discovery/SSH/SFTP/Wayland PASS. Voir `docs/VALIDATION-0.8.0.md` et `docs/validation/0.8.0.json`.
+- **Dernière vérification réelle :** 49 tests Rust et contrôles Cargo réussis ; AppImage 0.8.1, GUI découverte ciblé, SSH/SFTP protocolaires et startup Wayland PASS. Voir `docs/VALIDATION-0.8.1.md` et `docs/validation/0.8.1.json`.
 
 ## 2. Objectif immuable
 
@@ -621,5 +621,13 @@ Wayland PASS ; contrôles SSH/SFTP protocolaires du parent PASS. Aucun scan LAN 
 À vérifier ensuite : diagnostics focus GTK4.8 encore ouverts, file SFTP persistante
 et limites configurables ; noms DNS/mDNS optionnels et IPv6 avec scopes explicites.
 Ne pas annoncer ces suggestions comme déjà implémentées, ni un audit global de
-sécurité ou d’absence de fuite mémoire. Publication du correctif à finaliser après
-les vérifications de téléchargement et conservation des preuves dans VALIDATION-0.8.1.md.
+sécurité ou d’absence de fuite mémoire. Publication vérifiée ci-dessous ; preuves dans VALIDATION-0.8.1.md.
+
+Publication 0.8.1 vérifiée le 2026-11-14 : tag sur
+`ed08e9e420a75d13ad30bd31e0f422d06d87ca9d`,
+https://github.com/aurelson101/rustremote/releases/tag/v0.8.1 . Les quatre assets
+ont été retéléchargés et comparés aux locaux ; SHA256 AppImage :
+d0d5f763874f2093c9646284edd060122da5328bb317c25ea54105239f71146c.
+Les anciennes releases sont préservées ; aucun changement de visibilité du dépôt.
+Le commit de relais suivant ne modifie que les documents de publication.
+Prochaine priorité proposée : reproduire/corriger le focus GTK, puis file SFTP.

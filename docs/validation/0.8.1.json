@@ -75,7 +75,17 @@
     "Optional DNS/mDNS and explicitly scoped IPv6"
   ],
   "publication": {
-    "status": "pending",
-    "release": "https://github.com/aurelson101/rustremote/releases/tag/v0.8.1"
+    "status": "published",
+    "release": "https://github.com/aurelson101/rustremote/releases/tag/v0.8.1",
+    "source_commit": "ed08e9e420a75d13ad30bd31e0f422d06d87ca9d",
+    "downloaded_assets_match_local": true,
+    "prerelease": true,
+    "draft": false,
+    "assets": [
+      "RustRemote-0.8.1-preview-x86_64.AppImage",
+      "RustRemote-0.8.1-preview-x86_64.AppImage.sha256",
+      "RustRemote-0.8.1-ABI.json",
+      "build-packages.txt"
+    ]
   }
 }

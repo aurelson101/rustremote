@@ -291,3 +291,6 @@ avec progression traités/total. Modifier cible/mode efface les résultats et in
 les callbacks obsolètes. 49 tests Rust et contrôles Cargo réussis ; rejeu ciblé dans
 VALIDATION-0.8.1.md. P2-07 reste PARTIAL pour OS/IPv6/réseaux réels ; focus GTK et
 file de transferts SFTP restent des améliorations ouvertes.
+
+Préversion 0.8.1 publiée sur `ed08e9e420a75d13ad30bd31e0f422d06d87ca9d` ;
+quatre assets retéléchargés et comparés. Rejeu ciblé découverte et Wayland PASS.
