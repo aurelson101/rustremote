@@ -6,8 +6,8 @@ a graphical SFTP browser, saved sessions, and RDP, VNC and serial connections.
 **Preview software. English is the default; French is available in Settings
 (restart required).** Developed independently, without proprietary MobaXterm code.
 
-[Download v0.6.0](https://github.com/aurelson101/rustremote/releases/tag/v0.6.0) ·
-[Validation](docs/VALIDATION-0.6.0.md) · [Roadmap](docs/ROADMAP.md) ·
+[Download v0.7.0](https://github.com/aurelson101/rustremote/releases/tag/v0.7.0) ·
+[Validation](docs/VALIDATION-0.7.0.md) · [Roadmap](docs/ROADMAP.md) ·
 [Security](docs/SECURITY.md) · [License](LICENSE)
 
 ## Screenshots
@@ -43,7 +43,10 @@ and user-defined names retain their original language.
 - **SFTP:** local/remote panes, multiple files and recursive folders, upload/download
   buttons, drag local files into the remote pane, double-click navigation, context
   menus, remote UTF-8 editor, conflict detection, rename, permissions and deletion.
-  Progress, cancellation and verified file resume; HostName and ProxyJump support.
+  Search both panes, toggle hidden files, folders-first sorting. Changing a filter
+  clears selections to avoid transferring hidden rows; a local refresh preserves
+  the remote selection. Progress, cancellation and verified file resume;
+  HostName and ProxyJump support.
 - **Organization:** nested folders, drag sessions/folders to another folder or use
   **Move…** in the context menu. Folder moves retain their descendants. Import/export
   uses RustRemote JSON; optional age encryption protects profile metadata.
@@ -51,11 +54,38 @@ and user-defined names retain their original language.
   system Secret Service vault. Passwords and private keys are never exported.
 - **RDP:** system FreeRDP 3 client, domain, protected password input, certificate/NLA
   checks, sizing and monitor options, opt-in clipboard/audio/device redirection.
+- **macOS / Apple:** Apple preset and machine icon; TigerVNC DH / Apple ARD
+  account authentication (RFB type 30), restricted to SSH through the same Mac,
+  with no fallback to VNC password-only or unauthenticated access. The system viewer
+  prompts for the macOS account/password; these credentials are not saved by RustRemote.
 - **VNC / serial:** TigerVNC with an SSH tunnel option; integrated picocom terminal.
 - **Tools:** SSH local/remote/SOCKS tunnels, reviewed macros and Multi-Exec, Ping /
   Traceroute, public key fingerprints, desktop/client information, profile directory.
 - **View:** show/hide panels and bars, expand/collapse folders, session search,
   terminal focus mode, reset layout, fullscreen and zoom.
+
+## Connect to a Mac
+
+1. On the Mac, enable **Screen Sharing** or the appropriate **Remote Management**
+   permissions for your account, and **Remote Login** for SSH. See Apple's
+   [Screen Sharing / VNC documentation](https://support.apple.com/en-mz/guide/remote-desktop/apdbed09830/mac).
+2. Click **Apple**, enter the Mac host, account name and port **5900**. Keep the SSH
+   tunnel enabled and enter the **same Mac host**, its SSH port and SSH user in the
+   gateway fields below. SSH uses your agent/configuration and checks the host key.
+3. Install **TigerVNC 1.14+ with DH support** on Linux. Enter your macOS account and
+   password in its authentication window. RustRemote does not pass them in command
+   arguments or export them. Direct Apple ARD is refused because type 30 alone
+   does not authenticate the server or encrypt the entire desktop.
+4. For files and a terminal, create an **SSH** profile with machine type
+   **macOS / Apple**, then open SFTP. macOS Remote Login must allow that account.
+
+![Apple profile preset in English, with a simulated host](docs/screenshots/apple-settings.png)
+
+This is standard-mode Apple ARD account authentication through a system viewer,
+not Apple's high-performance/SRP mode or a native ARD management console. The
+Linux simulator checks the handshake, account rejection and pixels; **no physical
+Mac or macOS VM has been qualified**. The Apple handshake and SSH tunnel are tested
+in separate local labs; a complete real-Mac end-to-end test remains pending.
 
 ## Linux compatibility
 
@@ -76,10 +106,10 @@ system protocol clients are required. The `-ABI.json` release asset records the
 libraries used to build this version.
 
 ```bash
-chmod +x RustRemote-0.6.0-preview-x86_64.AppImage
-./RustRemote-0.6.0-preview-x86_64.AppImage
+chmod +x RustRemote-0.7.0-preview-x86_64.AppImage
+./RustRemote-0.7.0-preview-x86_64.AppImage
 # Without FUSE:
-APPIMAGE_EXTRACT_AND_RUN=1 ./RustRemote-0.6.0-preview-x86_64.AppImage
+APPIMAGE_EXTRACT_AND_RUN=1 ./RustRemote-0.7.0-preview-x86_64.AppImage
 ```
 
 Protocol clients: OpenSSH, **FreeRDP 3** (`xfreerdp3` or a verified version-3

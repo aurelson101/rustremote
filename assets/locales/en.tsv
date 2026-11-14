@@ -409,3 +409,10 @@ Presse-papiers simulé	Simulated clipboard
 Supprimer définitivement la sélection SFTP	Permanently delete SFTP selection
 Vérifier le fichier	Check file
 Éditer / transférer en simulation…	Edit / transfer in simulation…
+Configurer macOS / Apple…	Configure macOS / Apple…
+Apple ARD : compte macOS de 1 à 63 octets requis.	Apple ARD: a macOS account of 1 to 63 bytes is required.
+Apple ARD : tunnel SSH vers le même Mac obligatoire.	Apple ARD: an SSH tunnel to the same Mac is required.
+Rechercher dans les deux panneaux	Search both panes
+Filtre SFTP	SFTP filter
+Fichiers cachés	Hidden files
+macOS : choisir macOS / Apple, VNC et le même Mac comme passerelle SSH. Activez Partage d’écran et Connexion à distance sur le Mac. TigerVNC 1.14+ demande le compte macOS et son mot de passe dans sa fenêtre ; aucun repli VNC ni mot de passe exporté.	macOS: choose macOS / Apple, VNC and the same Mac as SSH gateway. Enable Screen Sharing and Remote Login on the Mac. TigerVNC 1.14+ prompts for the macOS account and password in its window; no VNC fallback or exported password.

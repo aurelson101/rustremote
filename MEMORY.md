@@ -5,8 +5,8 @@
 
 ## 1. État de référence
 
-- **Mise à jour :** 2026-11-10 — préversion 0.6.0 publiée et téléchargements vérifiés ; 0.5.0 conservée.
-- **Dernier agent :** Codex ; vue SFTP graphique, arborescence/DND, anglais/français et AppImage portable ; laboratoires locaux uniquement.
+- **Mise à jour :** 2026-11-14 — 0.7.0 Apple/SFTP en validation ; 0.6.0 reste publiée.
+- **Dernier agent :** Codex ; Apple ARD via TigerVNC DH/SSH, recherche SFTP et tests Apple locaux.
 - **Phase :** P1 — terminal/SFTP natifs, MVP encore incomplet.
 - **État confirmé :** terminal SSH/série intégré VTE, SFTP natif ssh2/libssh2 ; RDP/VNC externes ; profils/import/export, dossiers et paramètres persistants.
 - **Code existant :** package Rust/GTK4, ui/dialogs/profiles/store/simulation/icons ; scripts AppImage, GTK et laboratoires réseau/PTY.
@@ -511,3 +511,35 @@ diagnostics de focus GTK 4.8 avec un test ciblé de fermeture/réouverture avant
 nouveau changement fonctionnel. Qualifier ensuite KDE/Xfce/Cinnamon dans des bureaux
 complets et étudier des builds distincts pour ARM/musl/glibc<2.36 si demandés.
 Aucune qualification universelle Linux, Windows/AD ou d’endurance n’est acquise.
+
+## Incrément 0.7.0 — 2026-11-14
+
+Reprise propre sur main 34ba1f1, aucune modification préexistante. Inspection du
+comportement Apple actuel de MGRemote (README/code), aucun code MGRemote importé.
+TigerVNC installé 1.15 propose DH/type30. Plateforme MacOs, preset Apple, SVG original,
+validation du compte <64 octets et tunnel SSH obligatoire vers le même Mac. Destination
+VNC loopback vue du Mac ; StrictHostKeyChecking=ask, pas de repli VncAuth/None.
+TigerVNC demande lui-même compte/mot de passe ; pas de stockage VNC ni d’injection
+sur la ligne de commande. Authentification SRP/haute performance non intégrée.
+
+Fichiers : profiles.rs, dialogs.rs/connections.rs, ui.rs, icône/manifest/catalogue ;
+sftp_ui.rs/local.rs pour recherche, affichage cachés et tri. Changer le filtre vide
+la sélection des deux panneaux ; appliquer un filtre lors d’un rafraîchissement ne
+doit pas vider la sélection de l’autre panneau (corrigé avant le build final).
+
+Test indépendant scripts/test-apple-local.py : client TigerVNC réel, simulateur RFB
+Apple003.889/type30, identifiants éphémères, bureau X11 privé et framebuffer. Mauvais
+mot de passe, downgrade sansARD et clé trop longue refusés. Le transport de ce seul
+simulateur est loopback ; le tunnel SSH est rejoué séparément via le labo VNC existant.
+Mac physique/VM macOS non testé ; ne pas présenter ces résultats comme un Mac certifié.
+TigerVNC peut quitter avec code0 après refus : test fondé sur refus protocole et non
+sur code de sortie. XAUTHORITY privé requis également pour les appels Xlib/PIL.
+
+42 tests Rust et fmt/check/Clippy réussis. Premier harnais GUI sur GTK hôte arrêté
+au bouton Move (sélecteur/focus) ; le parcours de l’AppImage GTK4.8 réussit, y compris
+Apple, SFTP et français après redémarrage. Warnings/criticals de focus GTK4.8 toujours
+présents et documentés, pas de promesse zéro bug. Build portable Debian12/ABI2.36
+conservé. Dernier rejeu final AppImage SSH/SFTP/Apple et Wayland PASS ; captures Apple/SFTP inspectées et versionnées, résultats dans docs/validation/0.7.0.json. Publication encore à terminer.
+
+GitHub constaté PUBLIC le 2026-11-14 via gh repo view (contrairement à la visibilité
+privée historique) ; aucun changement de visibilité effectué. Préserver ce réglage.

@@ -2,4 +2,5 @@
 <file alias="folder.svg">icons/folder.svg</file><file alias="windows.svg">icons/windows.svg</file>
 <file alias="linux.svg">icons/linux.svg</file><file alias="ssh.svg">icons/ssh.svg</file><file alias="file.svg">icons/file.svg</file>
 <file alias="switch.svg">icons/switch.svg</file><file alias="vnc.svg">icons/vnc.svg</file>
+<file alias="macos.svg">icons/macos.svg</file>
 </gresource></gresources>

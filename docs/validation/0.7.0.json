@@ -1,0 +1,137 @@
+{
+  "version": "0.7.0",
+  "date": "2026-11-14",
+  "artifact": "RustRemote-0.7.0-preview-x86_64.AppImage",
+  "sha256": "683bc554341cbd1ead6b2989a6752123f000441546710895e8b907a3f5f3c6a5",
+  "abi": {
+    "architecture": "x86_64",
+    "minimum_glibc": "2.36",
+    "gtk": "4.8.3",
+    "vte": "0.70.6"
+  },
+  "cargo": {
+    "fmt": true,
+    "check": true,
+    "clippy_deny_warnings": true,
+    "tests_passed": 42
+  },
+  "portable_build": {
+    "debian12_startup_passed": true,
+    "artifact_written_and_verified": true,
+    "orchestration_session_exit": 143
+  },
+  "wayland": {
+    "startup": true,
+    "fullscreen_restore_compositor_confirmed": true
+  },
+  "local_results": {
+    "apple": [
+      {
+        "target": "127.0.0.1",
+        "real_mac_tested": false,
+        "personal_desktop_accessed": false,
+        "cases": {
+          "success": {
+            "type30_selected": true,
+            "account_authenticated": true
+          },
+          "wrong-password": {
+            "type30_selected": true,
+            "wrong_password_rejected": true
+          },
+          "downgrade": {
+            "downgrade_rejected": true
+          },
+          "invalid-key": {
+            "type30_selected": true,
+            "invalid_key_rejected": true
+          }
+        },
+        "success": true,
+        "services_stopped": true
+      }
+    ],
+    "vnc_serial": [
+      {
+        "target": "127.0.0.1",
+        "physical_serial_accessed": false,
+        "personal_desktop_accessed": false,
+        "vnc_loopback_only": true,
+        "vnc_authenticated_through_ssh": true,
+        "vnc_remote_pixels_verified": true,
+        "vnc_invalid_authentication_rejected": true,
+        "serial_115200_8n1_bidirectional": true,
+        "serial_clean_exit": true,
+        "log_review": {
+          "viewer_panics": 0,
+          "serial_stderr_bytes": 0,
+          "lab_warnings": "X display probing, XOpenIM/Fontconfig and non-post-quantum Paramiko key exchange may be logged; no system SSH service used"
+        },
+        "success": true,
+        "services_stopped": true
+      }
+    ],
+    "gui_sftp": [
+      {
+        "target": "127.0.0.1",
+        "personal_desktop_accessed": false,
+        "english_default_without_override": true,
+        "profile_context_move_and_nested_creation": true,
+        "folder_drag_moves_descendants_and_profiles": true,
+        "profile_drag_and_drop": true,
+        "view_actions": true,
+        "apple_profile_preset_and_simulation_saved": true,
+        "tools_system_information_and_public_key_fingerprint": true,
+        "sftp_graphical_multiple_files_folders_upload": true,
+        "sftp_filter_clears_hidden_selection": true,
+        "sftp_graphical_drag_and_drop_upload": true,
+        "sftp_graphical_edit_readback": true,
+        "sftp_graphical_multiple_files_folders_download": true,
+        "french_setting_persisted_after_restart": true,
+        "success": true,
+        "serial_received_bytes": 0,
+        "serial_commands": [],
+        "serial_replies": [],
+        "application_exit_before_cleanup": null
+      },
+      {
+        "target": "127.0.0.1",
+        "system_account_or_shell_used": false,
+        "openssh_utf8_exec": true,
+        "wrong_identity_rejected": true,
+        "changed_host_key_rejected": true,
+        "opensftp_bidirectional_files_folders": true,
+        "ssh_pty_and_resize": true,
+        "sftp_edit_readback": true,
+        "traversal_and_symlink_rejected": true,
+        "application_terminal_gui": true,
+        "success": true,
+        "services_stopped": true,
+        "events": {
+          "publickey_accepted": 9,
+          "publickey_rejected": 1,
+          "pty_requested": 2,
+          "resize_requested": 1,
+          "unsafe_path_rejected": 2,
+          "shell_commands": 0
+        }
+      }
+    ]
+  },
+  "limits": [
+    "No real Mac / macOS VM tested",
+    "Apple handshake uses loopback test transport; SSH VNC tunnel verified in separate lab",
+    "macOS account/password prompted by TigerVNC, not stored by RustRemote",
+    "Apple SRP/high-performance mode unsupported",
+    "Known GTK4.8 focus warnings/criticals remain",
+    "Native-host GUI harness failed on Move; cause not established, AppImage path passed",
+    "SFTP16MiB/128 entries/8 levels/30 seconds, editor1MiB, no persistent queue/folder resume",
+    "No new RDP/CLIPRDR/Windows/hardware qualification",
+    "x86_64/glibc>=2.36; other architectures and desktops not qualified"
+  ],
+  "publication": {
+    "status": "pending",
+    "repository_public_verified": true,
+    "release": "https://github.com/aurelson101/rustremote/releases/tag/v0.7.0"
+  }
+}

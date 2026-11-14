@@ -23,6 +23,13 @@ Les profils ne contiennent que des références UUID, retirées des exports et �
 SQLite, Russh et IronRDP restent des cibles, pas des dépendances implémentées. Les schémas suivants décrivent
 cette architecture cible. Tests réels de l’AppImage : voir VALIDATION-0.4.0.md.
 
+## Ajout implémenté — 0.7.0
+
+Les profils MacOs utilisent SSH/SFTP existants ou TigerVNC DH/type30 avec tunnel SSH
+vers le même Mac. Pas de moteur ARD propriétaire ni de copie de MGRemote. Le client
+système demande les identifiants macOS. La recherche SFTP agit sur les lignes déjà
+chargées, sans requête réseau ; les workers et limites du protocole sont conservés.
+
 ## Schéma modulaire (Mermaid, éditable)
 
 ```mermaid

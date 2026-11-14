@@ -13,7 +13,7 @@
 | P1-03 | SFTP | Haute | DONE | SFTP natif : listing, transferts, progression, reprise et édition validés ; vue locale/distante et DND rejoués en 0.6.0. File persistante/limites configurables restent des évolutions. |
 | P1-04 | Ergonomie | Haute | PARTIAL | Favoris, édition, recherche/raccourcis et dossiers hiérarchiques avec DND livrés ; migration SQLite reste ouverte. |
 | P2-01 | RDP | Haute | PARTIAL | PoC IronRDP sécurisée avec labo Windows, certificat, UI basique. |
-| P2-02 | VNC | Moyenne | PARTIAL | Lanceur TigerVNC avec tunnel SSH ; moteur intégré/redimensionnement à livrer. |
+| P2-02 | VNC | Moyenne | PARTIAL | Lanceur TigerVNC avec tunnel SSH ; Apple ARD type30 via DH ajouté en 0.7.0. Moteur intégré et qualification Mac réel restent ouverts. |
 | P2-06 | Série | Moyenne | PARTIAL | Profil picocom et switch simulé ; liaison PTY testée, matériel physique non testé. |
 | P2-03 | Réseau | Moyenne | PARTIAL | Tunnels local/distant/SOCKS et ProxyJump livrés ; X11 forwarding reste ouvert. |
 | P2-04 | Outils | Moyenne | DONE | Macros et Multi-Exec sur sessions SSH authentifiées avec prévisualisation, annulation et approbation testées en laboratoire. |
@@ -248,3 +248,15 @@ Publication 0.6.0 du 2026-11-10 effectuée : tag sur le commit
 Les quatre assets (AppImage, SHA256, ABI et versions des paquets) ont été
 retéléchargés puis comparés aux fichiers locaux. v0.5.0 conservée. P3-02 reste
 PARTIAL pour les critères encore ouverts ci-dessus.
+
+## Incrément 0.7.0 — 2026-11-14
+
+Demande utilisateur prioritaire : compatibilité Apple comme le mode compte macOS
+MGRemote et amélioration SFTP. Preset Apple, plateforme MacOs et icône originale ;
+VNC TigerVNC DH/type30 uniquement dans un tunnel SSH vers le même Mac, pas de repli.
+Le mot de passe macOS est demandé par TigerVNC, pas stocké dans le profil RustRemote.
+SFTP : recherche des deux panneaux, fichiers cachés, tri dossiers en premier et
+sélection vidée lors du filtrage ; rafraîchir le panneau local préserve le distant.
+42 tests Rust, laboratoire Apple positif/négatif et VNC-SSH/série locaux réussis.
+Voir VALIDATION-0.7.0.md pour le rejeu graphique sur AppImage et limites. P2-02 reste
+PARTIAL : pas de Mac réel, pas de moteur intégré ni de qualification SRP/haute performance.

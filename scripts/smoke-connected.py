@@ -440,6 +440,15 @@ with tempfile.TemporaryDirectory(prefix="rustremote-ssh-display-") as directory:
                 subprocess.run(["gapplication","action","com.rustremote.Preview",action],check=True,timeout=5)
             click("View");wait(lambda:find("Expand all folders"),"English View menu absent");click("Expand all folders")
             result["view_actions"]=True
+            click("Apple");wait(lambda:find("Connection settings"),"Apple profile absent")
+            text("Profile name","Mac simulation");text("Host / IP address","mac.example.invalid");text("Username","macadmin")
+            text("SSH gateway","mac.example.invalid");text("SSH gateway username","macadmin")
+            click("Local simulation (no network)");capture("apple","Connection settings");click("Save profile")
+            wait(lambda:any(p["name"]=="Mac simulation" for p in workspace()["profiles"]),"Apple profile was not saved")
+            mac=next(p for p in workspace()["profiles"] if p["name"]=="Mac simulation")
+            assert mac["platform"]=="MacOs" and mac["options"]["protocol"]=="Vnc" and mac["simulation"]
+            assert mac["port"]==5900 and mac["options"]["tunnel"]["host"]==mac["host"]
+            result["apple_profile_preset_and_simulation_saved"]=True
             click("RDP");wait(lambda:find("Connection settings"),"RDP form absent");text("Profile name","Windows lab");text("Host / IP address","windows.example.invalid");text("Username","Administrator");text("AD domain / realm","LAB");capture("rdp","Connection settings");click("Cancel")
             click("Tools");click("System information…")
             wait(lambda:find("System information"),"System information absent");capture("system","System information");close_window("System information")
@@ -468,6 +477,14 @@ with tempfile.TemporaryDirectory(prefix="rustremote-ssh-display-") as directory:
             assert (data/"docs/readme.txt").read_bytes()==(upload/"docs/readme.txt").read_bytes()
             wait(lambda: any(n.get_role()==Atspi.Role.LABEL and n.get_name().startswith("client-note.txt ·") for n in walk(find("Remote files"))),"Remote pane did not refresh")
             result["sftp_graphical_multiple_files_folders_upload"]=True
+            filtered_row=select_row("client-note.txt")
+            click("Refresh local folder");time.sleep(.4)
+            assert find("Remote files").get_selection_iface().get_n_selected_children()==1,"Local refresh cleared the remote selection"
+            text("SFTP filter","docs");time.sleep(.4)
+            assert not find("Remote files").get_selection_iface().get_n_selected_children(),"Hidden transfer selection retained"
+            text("SFTP filter","");time.sleep(.4)
+            result["sftp_filter_clears_hidden_selection"]=True
+
             (upload/"drag-note.txt").write_text("Transferred by graphical drag and drop")
             click("Refresh local folder")
             local_node=wait(lambda:next((n for n in walk(find("Local files")) if n.get_role()==Atspi.Role.LABEL and n.get_name().startswith("drag-note.txt ·")),None),"Local drag file absent")

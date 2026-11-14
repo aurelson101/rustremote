@@ -27,7 +27,7 @@ impl ConnectionsForm {
             entry.set_hexpand(true);
             entry.set_text(value);
             entry.set_max_length(256);
-            entry.update_property(&[gtk::accessible::Property::Label(title)]);
+            entry.update_property(&[gtk::accessible::Property::Label(&crate::i18n::text(title))]);
             row.append(&entry);
             body.append(&row);
             entry
@@ -48,6 +48,11 @@ impl ConnectionsForm {
         ));
         note.set_wrap(true);
         vnc.append(&note);
+        let apple = gtk::Label::new(Some(
+            "macOS : choisir macOS / Apple, VNC et le même Mac comme passerelle SSH. Activez Partage d’écran et Connexion à distance sur le Mac. TigerVNC 1.14+ demande le compte macOS et son mot de passe dans sa fenêtre ; aucun repli VNC ni mot de passe exporté.",
+        ));
+        apple.set_wrap(true);
+        vnc.append(&apple);
         let view_only = gtk::ToggleButton::with_label("VNC en lecture seule");
         vnc.append(&view_only);
         let serial = gtk::Box::new(gtk::Orientation::Vertical, 8);

@@ -1,4 +1,7 @@
 use super::*;
+pub(super) fn matches_name(name: &str, query: &str, show_hidden: bool) -> bool {
+    (show_hidden || !name.starts_with('.')) && name.to_lowercase().contains(query)
+}
 #[derive(Clone)]
 pub(super) struct LocalEntry {
     pub path: PathBuf,
@@ -33,6 +36,12 @@ fn listing(path: &std::path::Path) -> Result<Vec<LocalEntry>, String> {
     entries.sort_by(|a, b| {
         b.directory
             .cmp(&a.directory)
+            .then_with(|| {
+                a.path
+                    .to_string_lossy()
+                    .to_lowercase()
+                    .cmp(&b.path.to_string_lossy().to_lowercase())
+            })
             .then_with(|| a.path.cmp(&b.path))
     });
     Ok(entries)
@@ -107,6 +116,7 @@ impl Browser {
                             s.local_list.append(&row);
                         }
                         s.local_entries.replace(entries);
+                        s.filter_rows();
                     }
                     Err(e) => s.status.set_text(&e),
                 }
@@ -337,5 +347,29 @@ impl Browser {
             p.popup();
         });
         list.add_controller(gesture);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn search_and_hidden_files_do_not_mutate_names() {
+        assert!(matches_name("Résumé.TXT", "résumé", true));
+        assert!(!matches_name(".ssh", "", false));
+        assert!(matches_name(".ssh", "ssh", true));
+        assert!(!matches_name("Documents", "readme", true));
+    }
+    #[test]
+    fn bounded_listing_sorts_folders_first_and_preserves_symlink_type() {
+        let root = tempfile::tempdir().unwrap();
+        std::fs::write(root.path().join("Z.txt"), b"x").unwrap();
+        std::fs::create_dir(root.path().join("Documents")).unwrap();
+        std::os::unix::fs::symlink("Z.txt", root.path().join("link")).unwrap();
+        let entries = listing(root.path()).unwrap();
+        assert!(entries[0].directory);
+        let link = entries.iter().find(|e| e.path.ends_with("link")).unwrap();
+        assert!(!link.regular && !link.directory);
+        assert!(listing(std::path::Path::new("relative")).is_err());
     }
 }

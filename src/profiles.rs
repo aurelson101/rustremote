@@ -104,6 +104,7 @@ pub enum Platform {
     Unknown,
     Linux,
     Windows,
+    MacOs,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -265,6 +266,19 @@ impl SessionProfile {
         {
             return Err("Port (1–65535) et utilisateur valides requis.".into());
         }
+        if self.platform == Platform::MacOs
+            && let ProtocolOptions::Vnc { tunnel, .. } = &self.options
+        {
+            if self.username.is_empty() || self.username.len() >= 64 {
+                return Err("Apple ARD : compte macOS de 1 à 63 octets requis.".into());
+            }
+            if tunnel
+                .as_ref()
+                .is_none_or(|t| !t.host.eq_ignore_ascii_case(&self.host))
+            {
+                return Err("Apple ARD : tunnel SSH vers le même Mac obligatoire.".into());
+            }
+        }
         match &self.options {
             ProtocolOptions::Vnc {
                 tunnel: Some(tunnel),
@@ -359,7 +373,9 @@ impl SessionProfile {
             ProtocolOptions::Vnc { tunnel, view_only } => {
                 let mut args = vec![
                     "-SecurityTypes".into(),
-                    if tunnel.is_some() {
+                    if self.platform == Platform::MacOs {
+                        "DH".into()
+                    } else if tunnel.is_some() {
                         "VncAuth".into()
                     } else {
                         "X509Vnc".into()
@@ -381,7 +397,9 @@ impl SessionProfile {
                 if *view_only {
                     args.push("-ViewOnly=1".into());
                 }
-                let host = if self.host.contains(':') {
+                let host = if self.platform == Platform::MacOs {
+                    "127.0.0.1".to_string()
+                } else if self.host.contains(':') {
                     format!("[{}]", self.host)
                 } else {
                     self.host.clone()
@@ -602,6 +620,47 @@ mod tests {
         let imported = Workspace::default().merge(&data).unwrap();
         assert!(imported.profiles[0].credential_ref.is_none());
         assert!(data.profiles[0].credential_ref.is_some());
+    }
+    #[test]
+    fn apple_ard_requires_same_mac_tunnel_and_never_downgrades() {
+        let mut p = example();
+        p.platform = Platform::MacOs;
+        p.port = 5900;
+        p.options = ProtocolOptions::Vnc {
+            tunnel: None,
+            view_only: false,
+        };
+        assert!(p.validate().is_err());
+        p.options = ProtocolOptions::Vnc {
+            tunnel: Some(SshTunnel {
+                host: p.host.clone(),
+                port: 22,
+                username: "macadmin".into(),
+            }),
+            view_only: false,
+        };
+        let (_, args) = p.command().unwrap();
+        assert_eq!(args[1], "DH");
+        assert_eq!(args.last().unwrap(), "127.0.0.1::5900");
+        assert!(!args.iter().any(|a| a.contains("VncAuth") || a == "None"));
+        assert!(
+            p.vnc_tunnel_command()
+                .unwrap()
+                .unwrap()
+                .contains("StrictHostKeyChecking=ask")
+        );
+        let copy =
+            serde_json::from_str::<SessionProfile>(&serde_json::to_string(&p).unwrap()).unwrap();
+        assert_eq!(copy, p);
+        if let ProtocolOptions::Vnc {
+            tunnel: Some(t), ..
+        } = &mut p.options
+        {
+            t.host = "other.invalid".into();
+        }
+        assert!(p.validate().is_err());
+        p.simulation = true;
+        assert!(p.command().is_err());
     }
     #[test]
     fn serialization_and_options() {

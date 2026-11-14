@@ -1,0 +1,6 @@
+{
+  "architecture": "x86_64",
+  "minimum_glibc": "2.36",
+  "gtk": "4.8.3",
+  "vte": "0.70.6"
+}

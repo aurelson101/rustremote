@@ -15,6 +15,8 @@ use std::{
 
 mod local;
 struct Browser {
+    filter: gtk::SearchEntry,
+    show_hidden: gtk::CheckButton,
     local_path: gtk::Entry,
     local_list: gtk::ListBox,
     local_entries: RefCell<Vec<local::LocalEntry>>,
@@ -42,6 +44,36 @@ struct Browser {
     progress_bar: gtk::ProgressBar,
 }
 impl Browser {
+    fn change_filter(&self) {
+        self.local_list.unselect_all();
+        self.list.unselect_all();
+        self.selected.replace(None);
+        self.filter_rows();
+    }
+    fn filter_rows(&self) {
+        let query = self.filter.text().to_lowercase();
+        for list in [&self.local_list, &self.list] {
+            let mut child = list.first_child();
+            while let Some(row) = child {
+                child = row.next_sibling();
+                let name = if list == &self.local_list {
+                    row.widget_name()
+                        .parse::<usize>()
+                        .ok()
+                        .and_then(|i| self.local_entries.borrow().get(i).cloned())
+                        .and_then(|e| e.path.file_name().map(|n| n.to_string_lossy().into_owned()))
+                        .unwrap_or_default()
+                } else {
+                    row.widget_name().to_string()
+                };
+                row.set_visible(local::matches_name(
+                    &name,
+                    &query,
+                    self.show_hidden.is_active(),
+                ));
+            }
+        }
+    }
     fn invalidate_listing(&self) {
         self.selected.replace(None);
         self.entries.borrow_mut().clear();
@@ -150,7 +182,8 @@ impl Browser {
                 state.controls.set_sensitive(true);
                 state.refresh_local();
                 match result{
-                Ok(Output::Entries(entries))=>{
+                Ok(Output::Entries(mut entries))=>{
+                    entries.sort_by(|a,b| b.directory.cmp(&a.directory).then_with(||a.name.to_lowercase().cmp(&b.name.to_lowercase())).then_with(||a.name.cmp(&b.name)));
                     while let Some(child)=state.list.first_child(){state.list.remove(&child);}
                     state.selected.replace(None);
                     state.entries.replace(entries.clone());
@@ -161,6 +194,7 @@ impl Browser {
                         let weak=Rc::downgrade(&state);let copy=entry.clone();row.connect_activate(move |_|{if let Some(s)=weak.upgrade(){s.selected.replace(Some(copy.clone()));s.open_selected();}});
                         state.list.append(&row);
                     }
+                    state.filter_rows();
                     state.status.set_text(&state.refresh_after.borrow_mut().take().unwrap_or_else(||"Listing SFTP authentifié chargé · liens non transférables".into()));
                 }
                 Ok(Output::Text{path,bytes})=>{
@@ -546,6 +580,20 @@ pub fn open(
     }
     let toolbar = gtk::Box::new(gtk::Orientation::Horizontal, 6);
     controls.append(&toolbar);
+    let filters = gtk::Box::new(gtk::Orientation::Horizontal, 8);
+    let filter = gtk::SearchEntry::new();
+    filter.set_hexpand(true);
+    filter.set_placeholder_text(Some(&crate::i18n::text(
+        "Rechercher dans les deux panneaux",
+    )));
+    filter.update_property(&[gtk::accessible::Property::Label(&crate::i18n::text(
+        "Filtre SFTP",
+    ))]);
+    let show_hidden = gtk::CheckButton::with_label("Fichiers cachés");
+    show_hidden.set_active(true);
+    filters.append(&filter);
+    filters.append(&show_hidden);
+    controls.append(&filters);
     let panes = gtk::Paned::new(gtk::Orientation::Horizontal);
     panes.set_wide_handle(true);
     panes.set_position(530);
@@ -620,6 +668,8 @@ pub fn open(
     editor_expander.set_child(Some(&editor_body));
     controls.append(&editor_expander);
     let state = Rc::new(Browser {
+        filter,
+        show_hidden,
         local_path,
         local_list,
         local_entries: RefCell::new(Vec::new()),
@@ -645,6 +695,18 @@ pub fn open(
         status,
         progress: Arc::new(crate::sftp::Progress::default()),
         progress_bar,
+    });
+    let weak = Rc::downgrade(&state);
+    state.filter.connect_search_changed(move |_| {
+        if let Some(s) = weak.upgrade() {
+            s.change_filter();
+        }
+    });
+    let weak = Rc::downgrade(&state);
+    state.show_hidden.connect_toggled(move |_| {
+        if let Some(s) = weak.upgrade() {
+            s.change_filter();
+        }
     });
     let weak = Rc::downgrade(&state);
     state.path.connect_changed(move |_| {

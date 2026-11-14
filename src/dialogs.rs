@@ -480,10 +480,16 @@ impl Controller {
             let content = gtk::Box::new(gtk::Orientation::Horizontal, 8);
             content.append(&crate::icons::image(match profile.kind() {
                 crate::profiles::SessionKind::Serial => "switch",
+                crate::profiles::SessionKind::Vnc
+                    if profile.platform == crate::profiles::Platform::MacOs =>
+                {
+                    "macos"
+                }
                 crate::profiles::SessionKind::Vnc => "vnc",
                 _ => match profile.platform {
                     crate::profiles::Platform::Linux => "linux",
                     crate::profiles::Platform::Windows => "windows",
+                    crate::profiles::Platform::MacOs => "macos",
                     _ if profile.kind() == crate::profiles::SessionKind::Rdp => "windows",
                     _ => "ssh",
                 },
@@ -784,6 +790,8 @@ impl Controller {
         );
         let domain = entry(&grid, 4, "Domaine AD / realm", "");
         let domain_label = grid.child_at(0, 4).expect("libellé de domaine");
+        let macos_preset = default_protocol == 4;
+        let default_protocol = if macos_preset { 2 } else { default_protocol };
         let selected_protocol = original
             .as_ref()
             .map_or(default_protocol, |p| match p.options {
@@ -812,9 +820,12 @@ impl Controller {
                 .to_string(),
         );
         body.append(&grid);
-        let platform = crate::i18n::dropdown(&["Système non précisé", "Linux", "Windows"]);
+        let platform =
+            crate::i18n::dropdown(&["Système non précisé", "Linux", "Windows", "macOS / Apple"]);
         platform.set_selected(original.as_ref().map_or(
-            if selected_protocol == 0 {
+            if macos_preset {
+                3
+            } else if selected_protocol == 0 {
                 1
             } else if selected_protocol == 1 {
                 2
@@ -825,6 +836,7 @@ impl Controller {
                 crate::profiles::Platform::Unknown => 0,
                 crate::profiles::Platform::Linux => 1,
                 crate::profiles::Platform::Windows => 2,
+                crate::profiles::Platform::MacOs => 3,
             },
         ));
         platform.update_property(&[gtk::accessible::Property::Label(&crate::i18n::text(
@@ -1141,6 +1153,7 @@ impl Controller {
                 platform: match platform.selected() {
                     1 => crate::profiles::Platform::Linux,
                     2 => crate::profiles::Platform::Windows,
+                    3 => crate::profiles::Platform::MacOs,
                     _ => crate::profiles::Platform::Unknown,
                 },
                 folder: if !new_folder.text().trim().is_empty() {
