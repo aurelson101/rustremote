@@ -472,6 +472,11 @@ with tempfile.TemporaryDirectory(prefix="rustremote-ssh-display-") as directory:
             wait(lambda:find("Open profiles"),"Default English startup absent");click("Unlock / open")
             wait(lambda:find("Actions "+profile["name"]),"Profiles absent")
             result["english_default_without_override"]=True
+            subprocess.run(["gapplication","action","com.rustremote.Preview","about"],check=True)
+            wait(lambda:find("About RustRemote"),"About dialog missing")
+            wait(lambda:any("GPL-3.0-only" in n.get_name() and "No warranty; redistribution permitted under GPLv3." in n.get_name() and "Privacy: no telemetry sent to the project." in n.get_name() for n in walk(app())),"About licensing/privacy notice absent or untranslated")
+            click("Close")
+            result["about_gpl_and_privacy_notice_in_english"]=True
             if os.environ.get("RUSTREMOTE_DISCOVERY_ONLY")=="1":
                 exercise_discovery();result["success"]=True;raise SystemExit(0)
 

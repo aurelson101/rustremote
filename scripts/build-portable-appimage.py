@@ -86,7 +86,7 @@ def run():
     for name, checksum in LOCK['components'].items():
         download('https://static.rust-lang.org/dist/' + name, downloads / name, checksum)
     work = root / 'work'; work.mkdir(exist_ok=True)
-    for name in ['Cargo.toml', 'Cargo.lock', 'build.rs', 'LICENSE', 'NOTICE']:
+    for name in ['Cargo.toml', 'Cargo.lock', 'build.rs', 'LICENSE', 'NOTICE', 'PRIVACY.md']:
         shutil.copy2(ROOT / name, work / name)
     for name in ['src', 'assets', 'packaging', 'scripts']:
         shutil.copytree(ROOT / name, work / name, dirs_exist_ok=True)

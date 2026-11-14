@@ -131,7 +131,7 @@ metadata = json.loads(subprocess.check_output(['cargo', 'metadata', '--locked', 
 for package in metadata['packages']:
     manifest.append(f"{package['name']} {package['version']}: {package.get('license') or package.get('license_file') or 'licence non renseignée'}")
     if package['name'] == 'rustremote':
-        for notice in ('LICENSE', 'NOTICE'):
+        for notice in ('LICENSE', 'NOTICE', 'PRIVACY.md'):
             shutil.copy2(notice, appdir / 'usr/share/licenses' / ('RustRemote-' + notice))
         continue
     folder = Path(package['manifest_path']).parent

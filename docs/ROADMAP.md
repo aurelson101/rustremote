@@ -318,3 +318,11 @@ DONE : politique bilingue PRIVACY.md, licence des nouvelles révisions GPL-3.0-o
 Anciens artefacts et licences tierces inchangés. fmt/check/Clippy et55tests PASS.
 OPEN : admission SignPath, version/CI Windows et qualification de sa découverte ;
 le changement de licence ne constitue pas une acceptation ni une signature.
+
+## Distribution 0.9.1 — 2026-11-14
+
+DONE : rapport SignPath HTML local exclu du dépôt ; notices GPL/confidentialité dans
+À propos et dans l'AppImage, liste de copie du builder isolé corrigée. 55tests et
+contrôles Cargo PASS ; GUI anglais SSH/SFTP/About PASS. Vérification du rapport dans
+Brave headless isolé. Voir VALIDATION-0.9.1.md. Publication/nettoyage après backup et
+comparaison des nouveaux assets ; tags historiques conservés. SignPath non acquis.

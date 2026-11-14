@@ -281,7 +281,11 @@ Les accès actuels utilisent les clients système OpenSSH / FreeRDP 3 ; aucune c
             _ => controller.information("À propos de RustRemote", &format!("RustRemote {} · Linux / Rust / GTK4 / VTE
 Client indépendant, sans code propriétaire MobaXterm.
 Gestion des profils SSH/RDP, chiffrement age optionnel.
-SSH et série dans les onglets ; navigateur SFTP natif. RDP/VNC restent externes.", env!("CARGO_PKG_VERSION"))),
+SSH et série dans les onglets ; navigateur SFTP natif. RDP/VNC restent externes.
+GPL-3.0-only · © 2026 aurelson101 et contributeurs.
+Aucune garantie ; redistribution autorisée selon la GPLv3.
+Confidentialité : aucune télémétrie vers le projet.
+https://github.com/aurelson101/rustremote/blob/main/PRIVACY.md", env!("CARGO_PKG_VERSION"))),
         });
         app.add_action(&action);
     }

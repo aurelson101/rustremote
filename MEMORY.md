@@ -5,13 +5,13 @@
 
 ## 1. État de référence
 
-- **Mise à jour :** 2026-11-14 — préversion 0.8.1 corrective publiée et téléchargements vérifiés.
-- **Dernier agent :** Codex ; découverte TCP privée bornée, menus de création Apple/VNC et ajout de profils depuis les résultats.
+- **Mise à jour :** 2026-11-14 — 0.9.1 préparée, rapport SignPath local et anciennes releases sauvegardées.
+- **Dernier agent :** Codex ; confidentialité/GPL, notices et build portable, vérification GUI SSH/SFTP.
 - **Phase :** P1 — terminal/SFTP natifs, MVP encore incomplet.
 - **État confirmé :** terminal SSH/série intégré VTE, SFTP natif ssh2/libssh2 ; RDP/VNC externes ; profils/import/export, dossiers et paramètres persistants.
 - **Code existant :** package Rust/GTK4, ui/dialogs/profiles/store/simulation/icons ; scripts AppImage, GTK et laboratoires réseau/PTY.
 - **Plateforme cible initiale :** Ubuntu Linux / GNOME. Debian ensuite.
-- **Dernière vérification réelle :** 49 tests Rust et contrôles Cargo réussis ; AppImage 0.8.1, GUI découverte ciblé, SSH/SFTP protocolaires et startup Wayland PASS. Voir `docs/VALIDATION-0.8.1.md` et `docs/validation/0.8.1.json`.
+- **Dernière vérification réelle :** 55 tests Rust et contrôles Cargo réussis ; AppImage 0.9.1 construite, contenu licence/confidentialité vérifié, GUI anglais SSH/SFTP PASS. Voir `docs/VALIDATION-0.9.1.md` et `docs/validation/0.9.1.json`.
 
 ## 2. Objectif immuable
 
@@ -697,3 +697,28 @@ Vérification : GPL copiée à l'identique depuis /usr/share/common-licenses/GPL
 Cargo metadata GPL-3.0-only, fmt/check/Clippy -D warnings et55tests PASS.
 Prochaine tâche : candidature SignPath à compléter avec URL PRIVACY.md après push ;
 portage/CI Windows et examen SignPath restent ouverts. Aucun formulaire soumis ici.
+
+## Rapport local et release 0.9.1 — 2026-11-14
+
+Demande : rapport HTML SignPath non publié, vérifications bugs/améliorations,
+nouvelle release puis suppression des anciennes. Dépôt propre au départ1250357.
+Rapport autonome dans dist, ignoré par Git et absent de l'AppImage : 19 champs,
+copie avec gestion d'échec et impression. Brave headless isolé : affichage bureau/
+mobile, logique copie succès/refus (clipboard simulé), impression et absence de
+ressources distantes PASS. Aucun formulaire soumis. Coordonnées uniquement dans
+le rapport local, pas de fichier de candidature personnel ajouté au dépôt.
+
+0.9.1 : À propos ajoute GPL/copyright/non-garantie/confidentialité avec anglais ;
+packager et builder isolé embarquent PRIVACY.md avec LICENSE/NOTICE. Premier build
+échoué car PRIVACY absent de la liste de copie isolée ; correction et rebuild PASS.
+Octets des trois notices et manifeste SPDX vérifiés après extraction. 55tests,
+fmt/check/Clippy et syntaxe scripts PASS. Rejeu GUI anglais avec criticals GTK
+bloquants PASS : About, SSH/SFTP, transferts multiples/dossiers/DND/édition,
+navigation souris, file persistante, limites et langue. Warning GtkText connu reste.
+Pas de nouvelle qualification LAN, Windows/macOS, périphériques ou endurance.
+
+Six releases GitHub v0.5.0 à v0.9.0 sauvegardées avec métadonnées, tous les assets,
+SHA256 et vérification des sidecars. Archive dans dist/release-backups, hors Git.
+À terminer : publier/vérifier 0.9.1, puis retirer seulement ces anciennes releases
+si leurs IDs/métadonnées n'ont pas changé, en conservant leurs tags et le rollback.
+Archiver les anciens artefacts locaux, préserver le rapport HTML et la nouvelle image.
