@@ -451,3 +451,30 @@ Scan terminé	Scan complete
 Scan annulé · résultats partiels	Scan cancelled · partial results
 Délai atteint · résultats partiels	Time limit reached · partial results
 Paramètres modifiés · relancez la découverte	Settings changed · run discovery again
+Limites des transferts SFTP	SFTP transfer limits
+Limite SFTP (Mio)	SFTP limit (MiB)
+Entrées par transfert	Entries per transfer
+Profondeur SFTP	SFTP depth
+Durée SFTP (secondes)	SFTP duration (seconds)
+File de transferts persistante	Persistent transfer queue
+File de transferts SFTP	SFTP transfer queue
+Ajouter des fichiers…	Add files…
+Ajouter des dossiers…	Add folders…
+Démarrer la file	Start queue
+Pause après le transfert	Pause after transfer
+Réessayer les interrompus	Retry interrupted transfers
+Effacer les terminés	Clear completed
+SFTP en cours · annulation disponible	SFTP in progress · cancellation available
+File privée par profil, chiffrée comme les profils. Après réouverture, vérifiez les chemins puis démarrez explicitement. Une destination partielle peut nécessiter une reprise manuelle.	Private queue per profile, encrypted with the profiles. After reopening, check paths and start explicitly. Partial destinations may require manual resume.
+Résoudre les noms DNS/mDNS (requêtes système supplémentaires)	Resolve DNS/mDNS names (additional system queries)
+TCP 22/3389/5900/445 · IPv4 privé /24 ou IPv6 ULA /120 maximum · 8 workers · 30 s. Noms optionnels : DNS/mDNS selon NSS système, 32 équipements maximum. Aucune authentification. Le système reste à confirmer.	TCP 22/3389/5900/445 · Private IPv4 /24 or IPv6 ULA /120 maximum · 8 workers · 30 s. Optional names: DNS/mDNS via system NSS, up to 32 devices. No authentication. Confirm the operating system.
+IPv6 : /120 à /128 requis (256 adresses maximum)	IPv6: /120 to /128 required (up to 256 addresses)
+IPv6 : loopback ou ULA uniquement ; lien local sans interface refusé	IPv6: loopback or ULA only; link-local without an interface is refused
+En attente	Pending
+Transfert en cours	Transferring
+Terminé	Completed
+Échec	Failed
+Interrompu	Interrupted
+Attendez l’ouverture de la file persistante	Wait for the persistent queue to open
+File de transferts terminée	Transfer queue complete
+Plage IPv4/IPv6 autorisée	Authorized IPv4/IPv6 range

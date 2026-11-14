@@ -29,6 +29,9 @@ impl Store {
         self.password.is_some()
     }
     pub fn load(&self) -> Result<Workspace, String> {
+        Workspace::decode(&self.read_bytes()?)
+    }
+    pub(crate) fn read_bytes(&self) -> Result<Vec<u8>, String> {
         let mut file = std::fs::OpenOptions::new()
             .read(true)
             .custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK)
@@ -67,10 +70,30 @@ impl Store {
         } else {
             bytes
         };
-        Workspace::decode(&data)
+        if data.len() as u64 > MAX_SIZE {
+            return Err("Données déchiffrées trop volumineuses".into());
+        }
+        Ok(data)
     }
     pub fn save(&self, workspace: &Workspace, create: bool) -> Result<(), String> {
         workspace.validate()?;
+        let bytes = serde_json::to_vec(workspace).map_err(|_| "Sérialisation impossible")?;
+        self.write_bytes(&bytes, create)
+    }
+    pub(crate) fn transfer_store(&self, name: &str) -> Self {
+        let mut hash = gtk::glib::Checksum::new(gtk::glib::ChecksumType::Sha256)
+            .expect("SHA256 disponible dans GLib");
+        hash.update(name.as_bytes());
+        let key = hash.string().expect("SHA256 disponible dans GLib");
+        Self::new(
+            self.path.with_file_name(format!(
+                "transfers-{key}.{}",
+                if self.encrypted() { "age" } else { "json" }
+            )),
+            self.password.clone(),
+        )
+    }
+    pub(crate) fn write_bytes(&self, plain: &[u8], create: bool) -> Result<(), String> {
         let dir = self.path.parent().ok_or("Chemin invalide")?;
         std::fs::create_dir_all(dir).map_err(|_| "Création du dossier impossible")?;
         if std::fs::symlink_metadata(dir)
@@ -82,7 +105,6 @@ impl Store {
         }
         std::fs::set_permissions(dir, std::fs::Permissions::from_mode(0o700))
             .map_err(|_| "Permissions du dossier impossibles")?;
-        let plain = serde_json::to_vec(workspace).map_err(|_| "Sérialisation impossible")?;
         if plain.len() as u64 > MAX_SIZE {
             return Err("Trop de profils".into());
         }
@@ -93,14 +115,12 @@ impl Store {
             let mut writer = encryptor
                 .wrap_output(tmp.as_file_mut())
                 .map_err(|_| "Chiffrement impossible")?;
-            writer
-                .write_all(&plain)
-                .map_err(|_| "Écriture impossible")?;
+            writer.write_all(plain).map_err(|_| "Écriture impossible")?;
             writer
                 .finish()
                 .map_err(|_| "Finalisation du chiffrement impossible")?;
         } else {
-            tmp.write_all(&plain).map_err(|_| "Écriture impossible")?;
+            tmp.write_all(plain).map_err(|_| "Écriture impossible")?;
         }
         tmp.as_file()
             .sync_all()

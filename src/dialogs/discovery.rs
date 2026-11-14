@@ -94,7 +94,7 @@ impl Controller {
         let body = gtk::Box::new(gtk::Orientation::Vertical, 10);
         body.add_css_class("dialog-content");
         let info = gtk::Label::new(Some(
-            "TCP 22/3389/5900/445 · IPv4 privé /24 maximum · 8 workers · 30 s. Aucune authentification. Le système reste à confirmer.",
+            "TCP 22/3389/5900/445 · IPv4 privé /24 ou IPv6 ULA /120 maximum · 8 workers · 30 s. Noms optionnels : DNS/mDNS selon NSS système, 32 équipements maximum. Aucune authentification. Le système reste à confirmer.",
         ));
         info.set_wrap(true);
         body.append(&info);
@@ -102,12 +102,16 @@ impl Controller {
         scope.set_text("127.0.0.1");
         scope.set_max_length(64);
         scope.update_property(&[gtk::accessible::Property::Label(&crate::i18n::text(
-            "Plage IPv4 autorisée",
+            "Plage IPv4/IPv6 autorisée",
         ))]);
         body.append(&scope);
         let simulated = gtk::CheckButton::with_label("Simulation locale — aucun paquet réseau");
         simulated.set_active(true);
         body.append(&simulated);
+        let names = gtk::CheckButton::with_label(
+            "Résoudre les noms DNS/mDNS (requêtes système supplémentaires)",
+        );
+        body.append(&names);
         let consent =
             gtk::CheckButton::with_label("Je suis autorisé à analyser cette plage réseau");
         body.append(&consent);
@@ -144,6 +148,7 @@ impl Controller {
         for field in [
             scope.clone().upcast::<gtk::Widget>(),
             simulated.clone().upcast(),
+            names.clone().upcast(),
         ] {
             let consent = consent.clone();
             let list = list.clone();
@@ -169,6 +174,7 @@ impl Controller {
         let weak_window = window.downgrade();
         run.connect_clicked(move |button| {
             let fake=simulated.is_active();
+            let resolve=names.is_active();
             let parsed=match Scope::parse(&scope.text()) {Ok(s)=>s,Err(e)=>{status.set_text(&e);return;}};
             if !fake && (!consent.is_active() || c.0.offline.get()) {
                 status.set_text("Scan réel bloqué : autorisation de la plage requise et mode hors ligne désactivé.");return;
@@ -179,7 +185,7 @@ impl Controller {
             stop.store(false,Ordering::Relaxed);
             let version=generation.get();let generation=generation.clone();
             let flag=stop.clone();let controller=c.clone();let list=list.clone();let status=status.clone();let run=button.clone();let cancel=cancel.clone();let scope=scope.clone();let simulated=simulated.clone();let consent=consent.clone();let weak_window=weak_window.clone();
-            io(move ||if fake {Ok(crate::discovery::Report::simulation())}else{crate::discovery::scan(parsed,&flag)},move |result| {
+            io(move ||if fake {Ok(crate::discovery::Report::simulation())}else{crate::discovery::scan(parsed,&flag,resolve)},move |result| {
                 if weak_window.upgrade().is_none_or(|w|!w.is_visible()){return;}
                 run.set_sensitive(true);scope.set_sensitive(true);simulated.set_sensitive(true);consent.set_sensitive(true);cancel.set_sensitive(false);
                 if generation.get()!=version {return;}
@@ -189,7 +195,7 @@ impl Controller {
                         status.set_text(&format!("{} · {}/{} · {} · {}",crate::i18n::text(report.label()),report.checked,report.total,report.devices.len(),crate::i18n::text("Clic droit pour créer un profil ; système à confirmer")));
                         for device in report.devices {
                             let row=gtk::Box::new(gtk::Orientation::Horizontal,8);
-                            let label=gtk::Label::new(Some(&format!("{} · {:?} · {}",device.address,device.ports,crate::i18n::text(device.hint()))));
+                            let label=gtk::Label::new(Some(&format!("{} · {:?} · {}",device.name.as_ref().map_or_else(||device.address.to_string(),|n|format!("{} ({n})", device.address)),device.ports,crate::i18n::text(device.hint()))));
                             label.set_wrap(true);label.set_xalign(0.0);label.set_hexpand(true);label.add_css_class("user-content");row.append(&label);
                             let add=gtk::Button::with_label(&crate::i18n::text("Ajouter comme connexion…"));row.append(&add);
                             let controller=controller.clone();let anchor=row.downgrade();

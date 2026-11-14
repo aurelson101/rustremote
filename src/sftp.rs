@@ -12,8 +12,40 @@ use std::{
     time::{Duration, Instant},
 };
 
-const MAX_BYTES: u64 = 16 * 1024 * 1024;
-const MAX_ENTRIES: usize = 128;
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct Limits {
+    pub mib: u32,
+    pub entries: usize,
+    pub depth: usize,
+    pub seconds: u64,
+}
+impl Default for Limits {
+    fn default() -> Self {
+        Self {
+            mib: 16,
+            entries: 128,
+            depth: 8,
+            seconds: 30,
+        }
+    }
+}
+impl Limits {
+    pub fn validate(&self) -> Result<(), String> {
+        if !(1..=1024).contains(&self.mib)
+            || !(1..=4096).contains(&self.entries)
+            || !(1..=32).contains(&self.depth)
+            || !(5..=3600).contains(&self.seconds)
+        {
+            Err("Limites SFTP : 1–1024 Mio, 1–4096 entrées, 1–32 niveaux, 5–3600 secondes".into())
+        } else {
+            Ok(())
+        }
+    }
+    fn bytes(&self) -> u64 {
+        u64::from(self.mib) * 1024 * 1024
+    }
+}
 pub struct Connection {
     _session: ssh2::Session,
     sftp: ssh2::Sftp,
@@ -61,7 +93,7 @@ pub enum Operation {
     },
 }
 pub enum Output {
-    Entries(Vec<Entry>),
+    Entries { path: PathBuf, entries: Vec<Entry> },
     Text { path: PathBuf, bytes: Vec<u8> },
     Done(String),
 }
@@ -83,6 +115,7 @@ impl Progress {
     }
 }
 pub struct Budget {
+    limits: Limits,
     bytes: u64,
     entries: usize,
     start: Instant,
@@ -92,12 +125,18 @@ pub struct Budget {
 impl Budget {
     pub fn new(cancel: Arc<AtomicBool>) -> Self {
         Self {
+            limits: Limits::default(),
             bytes: 0,
             entries: 0,
             start: Instant::now(),
             cancel,
             progress: None,
         }
+    }
+    pub fn with_limits(mut self, limits: Limits) -> Result<Self, String> {
+        limits.validate()?;
+        self.limits = limits;
+        Ok(self)
     }
     pub fn track(mut self, progress: Arc<Progress>) -> Self {
         self.progress = Some(progress);
@@ -106,8 +145,8 @@ impl Budget {
     fn check(&self) -> Result<(), String> {
         if self.cancel.load(Ordering::Relaxed) {
             Err("Opération SFTP annulée".into())
-        } else if self.start.elapsed() > Duration::from_secs(30) {
-            Err("Limite SFTP de 30 secondes atteinte".into())
+        } else if self.start.elapsed() > Duration::from_secs(self.limits.seconds) {
+            Err(format!("Limite SFTP : {} secondes", self.limits.seconds))
         } else {
             Ok(())
         }
@@ -118,8 +157,11 @@ impl Budget {
         if let Some(p) = &self.progress {
             p.entries.store(self.entries, Ordering::Relaxed);
         }
-        if depth > 8 || self.entries > MAX_ENTRIES {
-            Err("Transfert limité à 128 entrées et 8 niveaux".into())
+        if depth > self.limits.depth || self.entries > self.limits.entries {
+            Err(format!(
+                "Limite SFTP : {} entrées / {} niveaux",
+                self.limits.entries, self.limits.depth
+            ))
         } else {
             Ok(())
         }
@@ -130,8 +172,8 @@ impl Budget {
         if let Some(p) = &self.progress {
             p.bytes.store(self.bytes, Ordering::Relaxed);
         }
-        if self.bytes > MAX_BYTES {
-            Err("Transfert limité à 16 Mio".into())
+        if self.bytes > self.limits.bytes() {
+            Err(format!("Limite SFTP : {} Mio", self.limits.mib))
         } else {
             Ok(())
         }
@@ -455,7 +497,7 @@ impl Connection {
         match operation {
             Operation::Batch(operations) => {
                 if operations.is_empty()
-                    || operations.len() > MAX_ENTRIES
+                    || operations.len() > budget.limits.entries
                     || operations.iter().any(|o| matches!(o, Operation::Batch(_)))
                 {
                     return Err("Lot SFTP limité à 128 opérations sans imbrication".into());
@@ -473,7 +515,13 @@ impl Connection {
                     budget.bytes
                 )))
             }
-            Operation::List(path) => Ok(Output::Entries(self.entries(&path, budget)?)),
+            Operation::List(path) => {
+                path_ok(&path)?;
+                let path = self.sftp.realpath(&path).map_err(error)?;
+                path_ok(&path)?;
+                let entries = self.entries(&path, budget)?;
+                Ok(Output::Entries { path, entries })
+            }
             Operation::Read(path) => {
                 let bytes = self.read(&path, 1024 * 1024, budget)?;
                 std::str::from_utf8(&bytes)
@@ -701,9 +749,10 @@ impl Connection {
         } else {
             (remote_size, local_size)
         };
-        if source_size > MAX_BYTES || prefix > source_size {
+        if source_size > budget.limits.bytes() || prefix > source_size {
             return Err(
-                "Reprise refusée : limite 16 Mio ou destination plus longue que la source".into(),
+                "Reprise refusée : limite de taille ou destination plus longue que la source"
+                    .into(),
             );
         }
         let mut left = prefix;
@@ -748,7 +797,7 @@ impl Connection {
         }
         let after = remote_file.stat().map_err(error)?;
         let local_after = local_file.metadata().map_err(error)?;
-        if budget.bytes > MAX_BYTES
+        if budget.bytes > budget.limits.bytes()
             || if upload {
                 after.size != Some(source_size)
                     || local_after.len() != source_size
@@ -788,8 +837,8 @@ impl Connection {
                 self.upload(&entry.path(), &remote.join(name), depth + 1, budget)?;
             }
         } else if metadata.is_file() {
-            if metadata.len() > MAX_BYTES - budget.bytes {
-                return Err("Transfert limité à 16 Mio".into());
+            if metadata.len() > budget.limits.bytes().saturating_sub(budget.bytes) {
+                return Err(format!("Limite SFTP : {} Mio", budget.limits.mib));
             }
             use std::os::unix::fs::OpenOptionsExt;
             let mut input = fs::OpenOptions::new()
@@ -900,6 +949,30 @@ mod tests {
         cancel.store(true, Ordering::Relaxed);
         assert!(budget.bytes(1).is_err());
         assert_eq!(progress.snapshot(), (123, 1));
+    }
+    #[test]
+    fn configurable_limits_enforce_bounds_bytes_entries_and_depth() {
+        let mut limits = Limits {
+            mib: 1,
+            entries: 1,
+            depth: 1,
+            seconds: 5,
+        };
+        let mut budget = Budget::new(Arc::new(AtomicBool::new(false)))
+            .with_limits(limits.clone())
+            .unwrap();
+        budget.bytes(1024 * 1024).unwrap();
+        assert!(budget.bytes(1).is_err());
+        let mut budget = Budget::new(Arc::new(AtomicBool::new(false)))
+            .with_limits(limits.clone())
+            .unwrap();
+        budget.entry(1).unwrap();
+        assert!(budget.entry(1).is_err());
+        limits.seconds = 0;
+        assert!(limits.validate().is_err());
+        limits.seconds = 5;
+        limits.mib = 1025;
+        assert!(limits.validate().is_err());
     }
     #[test]
     fn transfer_names_and_limits() {

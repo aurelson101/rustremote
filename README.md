@@ -6,8 +6,8 @@ a graphical SFTP browser, saved sessions, and RDP, VNC and serial connections.
 **Preview software. English is the default; French is available in Settings
 (restart required).** Developed independently, without proprietary MobaXterm code.
 
-[Download v0.8.1](https://github.com/aurelson101/rustremote/releases/tag/v0.8.1) ·
-[Validation](docs/VALIDATION-0.8.1.md) · [Roadmap](docs/ROADMAP.md) ·
+[Download v0.9.0](https://github.com/aurelson101/rustremote/releases/tag/v0.9.0) ·
+[Validation](docs/VALIDATION-0.9.0.md) · [Roadmap](docs/ROADMAP.md) ·
 [Security](docs/SECURITY.md) · [License](LICENSE)
 
 ## Screenshots
@@ -22,7 +22,7 @@ and user-defined names retain their original language.
 
 ### Graphical SFTP transfers and remote editing
 
-![English local and remote SFTP panes with remote editor](docs/screenshots/navigateur-sftp.png)
+![English SFTP local and remote panes with persistent transfer queue](docs/screenshots/navigateur-sftp.png)
 
 ### Windows / RDP session settings
 
@@ -46,7 +46,8 @@ and user-defined names retain their original language.
   Search both panes, toggle hidden files, folders-first sorting. Changing a filter
   clears selections to avoid transferring hidden rows; a local refresh preserves
   the remote selection. Progress, cancellation and verified file resume;
-  HostName and ProxyJump support.
+  HostName and ProxyJump support. Single-click folders to enter; Ctrl/Shift retain
+  multiple selection. The context menu and keyboard activation remain available.
 - **Organization:** nested folders, drag sessions/folders to another folder or use
   **Move…** in the context menu. Folder moves retain their descendants. Import/export
   uses RustRemote JSON; optional age encryption protects profile metadata.
@@ -59,7 +60,7 @@ and user-defined names retain their original language.
   with no fallback to VNC password-only or unauthenticated access. The system viewer
   prompts for the macOS account/password; these credentials are not saved by RustRemote.
 - **VNC / serial:** TigerVNC with an SSH tunnel option; integrated picocom terminal.
-- **Discovery:** opt-in private IPv4 TCP discovery (up to a /24), cancellable and
+- **Discovery:** opt-in private IPv4 (/24) and IPv6 ULA (/120) TCP discovery, cancellable and
   bounded to 8 workers per process / about 30s. Start with its offline simulation, then right-click
   a device to create an SSH/Linux, Windows/RDP, Apple/ARD or VNC profile. Choose
   an existing folder or create a nested folder, then enter your account and options
@@ -72,15 +73,22 @@ and user-defined names retain their original language.
 ## Discover devices and save connections
 
 Use **Tools → Discover devices…**. Simulation is enabled initially and sends no
-packets. For a real scan, enter an IPv4 address or private CIDR (maximum /24),
+packets. For a real scan, enter a private IPv4 CIDR (maximum /24), an IPv6 ULA range
+(maximum /120), or a loopback address,
 leave offline mode, and explicitly confirm authorization for that range. Editing
 that range clears the authorization. Changing the range or simulation mode also
 clears old results and cancels/discards an obsolete job. Public/link-local targets
-and IPv6 are refused. Only one real discovery scan runs at a time. The final status
+are refused. IPv6 link-local addresses requiring an interface are refused. Only one real discovery scan runs at a time. The final status
 distinguishes completion, cancellation and timeout, with checked/total host counts.
 Ports 22/3389/5900/445 are probed; an RFB security advertisement can identify an
 Apple ARD service. No credentials, remote commands or operating-system exploits
 are used. SSH alone does not distinguish Linux, macOS and Windows.
+
+Optional **Resolve DNS/mDNS names** uses `/usr/bin/getent` and the host NSS
+configuration (including mDNS when configured). It can send additional resolver
+queries: opt in explicitly. Up to 32 discovered devices are resolved, at most 800 ms
+each within the scan budget. Names are untrusted display hints; profiles retain
+the scanned IP address. It is not a DNS-SD inventory of all services.
 
 Right-click a result or click **Add as connection…**, choose the connection type,
 and fill in the account, domain/key/password options and session folder. The normal
@@ -133,10 +141,10 @@ system protocol clients are required. The `-ABI.json` release asset records the
 libraries used to build this version.
 
 ```bash
-chmod +x RustRemote-0.8.1-preview-x86_64.AppImage
-./RustRemote-0.8.1-preview-x86_64.AppImage
+chmod +x RustRemote-0.9.0-preview-x86_64.AppImage
+./RustRemote-0.9.0-preview-x86_64.AppImage
 # Without FUSE:
-APPIMAGE_EXTRACT_AND_RUN=1 ./RustRemote-0.8.1-preview-x86_64.AppImage
+APPIMAGE_EXTRACT_AND_RUN=1 ./RustRemote-0.9.0-preview-x86_64.AppImage
 ```
 
 Protocol clients: OpenSSH, **FreeRDP 3** (`xfreerdp3` or a verified version-3
@@ -173,16 +181,21 @@ Keep the `rustremote-askpass` helper beside a manually installed executable.
 
 ## Current limits
 
-SFTP operations are bounded to **16 MiB, 128 entries, 8 levels and 30 seconds**;
+SFTP operations default to **16 MiB, 128 entries, 8 levels and 30 seconds**;
+Settings offers bounded per-transfer limits (up to 1024 MiB, 4096 entries, 32 levels,
+3600 seconds). Directory listings and the text editor retain their own safety limits.
 text editing is UTF-8, up to 1 MiB. File resume verifies the existing prefix;
-recursive folder resume and a persistent transfer queue are not implemented.
+recursive folder resume is not implemented. The persistent per-profile queue offers
+pause, retry, clear completed and explicit restart after reopening. Queue metadata
+is private and follows the active profile store encryption; no passwords are stored
+in it. Profile renames or encryption changes do not migrate old queue files.
 Interrupted uploads may leave a partial remote file. Deletion is permanent and
 requires confirmation. Custom ProxyCommand is refused; bastions require a
 key/agent and an already approved host key.
 
 RDP/VNC use external clients. Windows/AD, physical printers/audio/multiple monitors,
 serial hardware and long-duration memory behaviour are not fully qualified.
-Known nonfatal GTK 4.8 focus warnings are recorded in the validation report.
+GTK diagnostics and tested paths are recorded in the validation report.
 RustRemote is not a complete reimplementation of MobaXterm or FileZilla.
 
 ## License

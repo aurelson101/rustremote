@@ -103,7 +103,14 @@ impl RdpForm {
         note.set_wrap(true);
         security.attach(&note, 0, 1, 2, 1);
         widget.append_page(&security, Some(&gtk::Label::new(Some("Sécurité RDP"))));
-        widget.set_current_page(Some(2));
+        // GTK 4.8 consults the root focus when switching pages. Wait until the
+        // notebook is mapped; switching during construction has no GtkRoot yet.
+        let first_map = std::cell::Cell::new(true);
+        widget.connect_map(move |notebook| {
+            if first_map.replace(false) {
+                notebook.set_current_page(Some(2));
+            }
+        });
         let result = Self {
             widget,
             domain,

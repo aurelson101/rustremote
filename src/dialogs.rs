@@ -53,7 +53,6 @@ pub(crate) fn defer_unparent(widget: &impl IsA<gtk::Widget>) {
 pub(crate) fn clear_window_later(window: &gtk::Window) {
     let window = window.clone();
     gtk::glib::idle_add_local_once(move || {
-        gtk::prelude::GtkWindowExt::set_focus(&window, None::<&gtk::Widget>);
         window.set_child(None::<&gtk::Widget>);
     });
 }
@@ -1535,7 +1534,7 @@ impl Controller {
                 if matches!(profile.options,ProtocolOptions::Ssh{..}|ProtocolOptions::Serial{..}){
                     if let Some(tabs)=c.0.tabs.upgrade(){
                         match crate::terminal::open(&tabs,&profile,&c.0.status,&c.0.preferences.borrow(),secret){
-                            Ok(session)=>{c.0.terminals.borrow_mut().retain(|_,s|s.active());c.0.terminals.borrow_mut().insert(profile.name.clone(),session.clone());w.close();session.present(&tabs);c.sync_view_actions();}
+                            Ok(session)=>{session.transfer_store(c.0.store.borrow().clone());c.0.terminals.borrow_mut().retain(|_,s|s.active());c.0.terminals.borrow_mut().insert(profile.name.clone(),session.clone());w.close();session.present(&tabs);c.sync_view_actions();}
                             Err(message)=>e.set_text(&message),
                         }
                     }

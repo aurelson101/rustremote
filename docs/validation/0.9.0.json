@@ -1,0 +1,86 @@
+{
+  "version": "0.9.0",
+  "date": "2026-11-14",
+  "artifact": "RustRemote-0.9.0-preview-x86_64.AppImage",
+  "sha256": "ecc4576883aca2613acd70584a494e3d068659cf920d8d15de2cb7894121bcd8",
+  "abi": {
+    "architecture": "x86_64",
+    "minimum_glibc": "2.36",
+    "gtk": "4.8.3",
+    "vte": "0.70.6"
+  },
+  "cargo": {
+    "fmt": true,
+    "check": true,
+    "clippy_deny_warnings": true,
+    "tests_passed": 55
+  },
+  "debian12_startup_passed": true,
+  "wayland_startup_fullscreen_passed": true,
+  "real_lan_scanned": false,
+  "gtk_critical_root_focus_fixed": true,
+  "gtk_text_focus_warning_remaining": true,
+  "limits": [
+    "mDNS follows host NSS configuration; no real mDNS network qualification",
+    "No real LAN/Windows/AD/Mac/hardware or memory endurance qualification",
+    "Profile rename/encryption changes do not migrate old queues",
+    "Partial recursive folder resume remains manual"
+  ],
+  "publication": {
+    "status": "not_published"
+  },
+  "targeted_gui_and_protocol_results": [
+    {
+      "target": "127.0.0.1",
+      "personal_desktop_accessed": false,
+      "english_default_without_override": true,
+      "profile_context_move_and_nested_creation": true,
+      "folder_drag_moves_descendants_and_profiles": true,
+      "profile_drag_and_drop": true,
+      "view_actions": true,
+      "apple_profile_preset_and_simulation_saved": true,
+      "folder_right_click_apple_and_gateway_defaults": true,
+      "discovery_results_invalidated_on_scope_and_mode_change": true,
+      "discovery_simulated_context_profiles_accounts_folders": true,
+      "discovery_simulated_results_stay_offline": true,
+      "discovery_real_scan_consent_and_public_scope_blocked": true,
+      "tools_system_information_and_public_key_fingerprint": true,
+      "sftp_graphical_multiple_files_folders_upload": true,
+      "sftp_single_click_directory_navigation_repeated": true,
+      "sftp_filter_clears_hidden_selection": true,
+      "sftp_graphical_drag_and_drop_upload": true,
+      "sftp_graphical_edit_readback": true,
+      "sftp_graphical_multiple_files_folders_download": true,
+      "sftp_persistent_queue_manual_restart_after_browser_close": true,
+      "sftp_limits_configured_and_persisted_in_settings": true,
+      "french_setting_persisted_after_restart": true,
+      "success": true,
+      "serial_received_bytes": 0,
+      "serial_commands": [],
+      "serial_replies": [],
+      "application_exit_before_cleanup": null
+    },
+    {
+      "target": "127.0.0.1",
+      "system_account_or_shell_used": false,
+      "openssh_utf8_exec": true,
+      "wrong_identity_rejected": true,
+      "changed_host_key_rejected": true,
+      "opensftp_bidirectional_files_folders": true,
+      "ssh_pty_and_resize": true,
+      "sftp_edit_readback": true,
+      "traversal_and_symlink_rejected": true,
+      "application_terminal_gui": true,
+      "success": true,
+      "services_stopped": true,
+      "events": {
+        "publickey_accepted": 11,
+        "publickey_rejected": 1,
+        "pty_requested": 2,
+        "resize_requested": 1,
+        "unsafe_path_rejected": 2,
+        "shell_commands": 0
+      }
+    }
+  ]
+}

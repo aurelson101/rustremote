@@ -100,19 +100,22 @@ impl Browser {
                             label.set_ellipsize(gtk::pango::EllipsizeMode::End);
                             line.append(&label);
                             row.set_child(Some(&line));
-                            let weak = Rc::downgrade(&s);
-                            let path = item.path.clone();
-                            let directory = item.directory;
-                            row.connect_activate(move |_| {
-                                if let Some(s) = weak.upgrade() {
-                                    if directory {
-                                        s.local_path.set_text(&path.to_string_lossy());
-                                        s.refresh_local();
-                                    } else {
-                                        s.upload_paths(vec![path.clone()]);
+                            if item.directory {
+                                let gesture = gtk::GestureClick::new();
+                                gesture.set_button(1);
+                                let weak = Rc::downgrade(&s);
+                                let path = item.path.clone();
+                                gesture.connect_released(move |g, _, _, _| {
+                                    if !g.current_event_state().intersects(
+                                        gtk::gdk::ModifierType::CONTROL_MASK
+                                            | gtk::gdk::ModifierType::SHIFT_MASK,
+                                    ) && let Some(s) = weak.upgrade()
+                                    {
+                                        s.open_local_later(path.clone(), true);
                                     }
-                                }
-                            });
+                                });
+                                row.add_controller(gesture);
+                            }
                             s.local_list.append(&row);
                         }
                         s.local_entries.replace(entries);
@@ -122,6 +125,23 @@ impl Browser {
                 }
             },
         );
+    }
+    pub(super) fn open_local_later(self: &Rc<Self>, path: PathBuf, directory: bool) {
+        let base = self.local_path.text().to_string();
+        let weak = Rc::downgrade(self);
+        gtk::glib::idle_add_local_once(move || {
+            if let Some(s) = weak.upgrade() {
+                if s.local_path.text() != base {
+                    return;
+                }
+                if directory {
+                    s.local_path.set_text(&path.to_string_lossy());
+                    s.refresh_local();
+                } else {
+                    s.upload_paths(vec![path]);
+                }
+            }
+        });
     }
     fn local_selection(&self) -> Vec<PathBuf> {
         self.local_list
@@ -156,7 +176,7 @@ impl Browser {
                 local,
             });
         }
-        self.submit(Operation::Batch(ops));
+        self.enqueue_transfers(ops);
     }
     pub(super) fn upload_selection(self: &Rc<Self>) {
         self.upload_paths(self.local_selection());
@@ -170,7 +190,7 @@ impl Browser {
         }
         let local = PathBuf::from(self.local_path.text().as_str());
         let remote = PathBuf::from(self.path.text().as_str());
-        self.submit(Operation::Batch(
+        self.enqueue_transfers(
             entries
                 .into_iter()
                 .map(|e| Operation::Download {
@@ -178,7 +198,7 @@ impl Browser {
                     local: local.join(e.name),
                 })
                 .collect(),
-        ));
+        );
     }
     pub(super) fn graphical_actions(self: &Rc<Self>, toolbar: &gtk::Box) {
         button(toolbar, "Envoyer →", self, |s| s.upload_selection())

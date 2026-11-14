@@ -10,6 +10,7 @@ use std::{
 #[serde(default, deny_unknown_fields)]
 pub struct Preferences {
     pub version: u8,
+    pub sftp: crate::sftp::Limits,
     pub language: String,
     pub font_size: u8,
     pub scrollback: u32,
@@ -21,6 +22,7 @@ impl Default for Preferences {
     fn default() -> Self {
         Self {
             version: 1,
+            sftp: Default::default(),
             language: "en".into(),
             font_size: 11,
             scrollback: 5000,
@@ -32,6 +34,7 @@ impl Default for Preferences {
 }
 impl Preferences {
     pub fn validate(&self) -> Result<(), String> {
+        self.sftp.validate()?;
         if !matches!(self.language.as_str(), "en" | "fr")
             || self.version != 1
             || !(8..=24).contains(&self.font_size)
@@ -126,6 +129,12 @@ mod tests {
         let preferences = Preferences {
             font_size: 14,
             scrollback: 1000,
+            sftp: crate::sftp::Limits {
+                mib: 32,
+                entries: 256,
+                depth: 12,
+                seconds: 60,
+            },
             ..Preferences::default()
         };
         preferences.save(&path).unwrap();

@@ -14,7 +14,23 @@ use std::{
 };
 
 mod local;
+mod queue;
+struct Completion {
+    result: Result<Output, String>,
+    queue: Option<crate::transfers::Queue>,
+    refresh: bool,
+}
 struct Browser {
+    preferences: Rc<RefCell<crate::preferences::Preferences>>,
+    queue_store: Option<crate::store::Store>,
+    queue: Arc<Mutex<Option<crate::transfers::Engine>>>,
+    queue_loading: Cell<bool>,
+    queue_ready: Cell<bool>,
+    queue_pending: Cell<bool>,
+    queue_auto: Cell<bool>,
+    queue_paused: Cell<bool>,
+    queue_revision: Cell<u64>,
+    queue_view: gtk::TextView,
     filter: gtk::SearchEntry,
     show_hidden: gtk::CheckButton,
     local_path: gtk::Entry,
@@ -82,6 +98,9 @@ impl Browser {
         }
     }
     fn submit(self: &Rc<Self>, operation: Operation) {
+        self.execute(Some(operation));
+    }
+    fn execute(self: &Rc<Self>, operation: Option<Operation>) {
         if self
             .path
             .root()
@@ -96,7 +115,7 @@ impl Browser {
         }
         self.cancel.store(false, Ordering::Relaxed);
         let automatic_listing =
-            matches!(&operation, Operation::List(_)) && self.refresh_after.borrow().is_some();
+            matches!(&operation, Some(Operation::List(_))) && self.refresh_after.borrow().is_some();
         if !automatic_listing {
             self.progress.reset();
             self.progress_bar.set_fraction(0.0);
@@ -126,22 +145,19 @@ impl Browser {
             state.progress_bar.pulse();
             gtk::glib::ControlFlow::Continue
         });
-        if matches!(&operation, Operation::List(_)) {
+        if matches!(&operation, Some(Operation::List(_))) {
             self.invalidate_listing();
         }
         self.controls.set_sensitive(false);
-        self.status
-            .set_text("SFTP en cours · annulation disponible · limite 30 s / 16 Mio");
-        let refresh_remote = matches!(
-            &operation,
-            Operation::Upload { .. }
-                | Operation::Batch(_)
-                | Operation::Mkdir(_)
-                | Operation::Rename { .. }
-                | Operation::Delete(_)
-                | Operation::Permissions { .. }
-                | Operation::Resume { upload: true, .. }
-        );
+        let configured = self.preferences.borrow().sftp.clone();
+        self.status.set_text(&format!(
+            "{} · {} s / {} MiB",
+            crate::i18n::text("SFTP en cours · annulation disponible"),
+            configured.seconds,
+            configured.mib
+        ));
+        let queue = self.queue.clone();
+        let limits = self.preferences.borrow().sftp.clone();
         let connection = self.connection.clone();
         let profile = self.profile.clone();
         let credential = self.credential.clone();
@@ -150,30 +166,94 @@ impl Browser {
         let state = Rc::downgrade(self);
         crate::dialogs::io(
             move || {
-                let mut guard = connection.lock().map_err(|_| "Session SFTP interrompue")?;
-                if guard.is_none() {
-                    *guard = Some(Connection::connect(
-                        &profile,
-                        credential.as_deref().map(|s| s.as_str()),
-                    )?);
-                }
-                let mut budget = Budget::new(cancel).track(progress);
-                let result = guard
-                    .as_ref()
-                    .ok_or("Session SFTP absente")?
-                    .run(operation, &mut budget);
-                if result.is_err()
-                    && let Some(c) = guard.take()
-                {
-                    c.abort();
-                }
-                result
+                let (operation, id) = if let Some(op) = operation {
+                    (op, None)
+                } else {
+                    let mut queue = queue.lock().map_err(|_| "File interrompue")?;
+                    let engine = queue.as_mut().ok_or("File non ouverte")?;
+                    let Some(job) = engine.claim()? else {
+                        return Ok(Completion {
+                            result: Ok(Output::Done("File de transferts terminée".into())),
+                            queue: Some(engine.queue.clone()),
+                            refresh: false,
+                        });
+                    };
+                    (job.operation(), Some(job.id))
+                };
+                let refresh = matches!(
+                    &operation,
+                    Operation::Upload { .. }
+                        | Operation::Batch(_)
+                        | Operation::Mkdir(_)
+                        | Operation::Rename { .. }
+                        | Operation::Delete(_)
+                        | Operation::Permissions { .. }
+                        | Operation::Resume { upload: true, .. }
+                        | Operation::Download { .. }
+                );
+                let result = (|| {
+                    let mut guard = connection.lock().map_err(|_| "Session SFTP interrompue")?;
+                    if guard.is_none() {
+                        *guard = Some(Connection::connect(
+                            &profile,
+                            credential.as_deref().map(|s| s.as_str()),
+                        )?);
+                    }
+                    let mut budget = Budget::new(cancel.clone())
+                        .with_limits(limits)?
+                        .track(progress);
+                    let result = guard
+                        .as_ref()
+                        .ok_or("Session SFTP absente")?
+                        .run(operation, &mut budget);
+                    if result.is_err()
+                        && let Some(c) = guard.take()
+                    {
+                        c.abort();
+                    }
+                    result
+                })();
+                let snapshot = if let Some(id) = id {
+                    Some(
+                        queue
+                            .lock()
+                            .map_err(|_| "File interrompue")?
+                            .as_mut()
+                            .ok_or("File non ouverte")?
+                            .finish(id, result.is_ok(), cancel.load(Ordering::Relaxed))?,
+                    )
+                } else {
+                    None
+                };
+                Ok(Completion {
+                    result,
+                    queue: snapshot,
+                    refresh,
+                })
             },
             move |result| {
                 let Some(state) = state.upgrade() else {
                     return;
                 };
                 state.busy.set(false);
+                let completion = match result {
+                    Ok(c) => c,
+                    Err(e) => Completion {
+                        result: Err(e),
+                        queue: None,
+                        refresh: false,
+                    },
+                };
+                if let Some(snapshot) = completion.queue {
+                    state.show_queue(snapshot);
+                }
+                let refresh_remote = completion.refresh;
+                let result = completion.result;
+                if result.is_err() {
+                    state.queue_auto.set(false);
+                    state.queue_paused.set(true);
+                }
+
                 let (bytes, entries) = state.progress.snapshot();
                 state.progress_bar.set_fraction(0.0);
                 state
@@ -182,7 +262,8 @@ impl Browser {
                 state.controls.set_sensitive(true);
                 state.refresh_local();
                 match result{
-                Ok(Output::Entries(mut entries))=>{
+                Ok(Output::Entries{path,mut entries})=>{
+                    state.path.set_text(&path.to_string_lossy());
                     entries.sort_by(|a,b| b.directory.cmp(&a.directory).then_with(||a.name.to_lowercase().cmp(&b.name.to_lowercase())).then_with(||a.name.cmp(&b.name)));
                     while let Some(child)=state.list.first_child(){state.list.remove(&child);}
                     state.selected.replace(None);
@@ -191,7 +272,14 @@ impl Browser {
                         let row=gtk::ListBoxRow::new();row.set_widget_name(&entry.name);
                         let line=gtk::Box::new(gtk::Orientation::Horizontal,8);line.append(&crate::icons::image(if entry.directory{"folder"}else{"file"}));
                         let name=gtk::Label::new(Some(&format!("{}{} · {} B",entry.name,if !entry.directory && !entry.regular{crate::i18n::text(" (lien/spécial)")}else{String::new()},entry.size)));name.set_xalign(0.0);name.set_ellipsize(gtk::pango::EllipsizeMode::End);line.append(&name);row.set_child(Some(&line));
-                        let weak=Rc::downgrade(&state);let copy=entry.clone();row.connect_activate(move |_|{if let Some(s)=weak.upgrade(){s.selected.replace(Some(copy.clone()));s.open_selected();}});
+                        if entry.directory {
+                            let gesture=gtk::GestureClick::new();gesture.set_button(1);
+                            let weak=Rc::downgrade(&state);let entry=entry.clone();
+                            gesture.connect_released(move |g,_,_,_| {
+                                if !g.current_event_state().intersects(gtk::gdk::ModifierType::CONTROL_MASK | gtk::gdk::ModifierType::SHIFT_MASK)
+                                    && let Some(s)=weak.upgrade() {s.open_entry_later(entry.clone());}
+                            });row.add_controller(gesture);
+                        }
                         state.list.append(&row);
                     }
                     state.filter_rows();
@@ -203,24 +291,39 @@ impl Browser {
                 Ok(Output::Done(message))=>{state.status.set_text(&message);if refresh_remote{state.refresh_after.replace(Some(message));let path=PathBuf::from(state.path.text().as_str());state.submit(Operation::List(path));}},
                 Err(message)=>state.status.set_text(&format!("{message}. Un envoi interrompu peut laisser une destination partielle ; aucun fichier existant n’a été écrasé par un transfert.")),
             }
+                state.pump_queue();
             },
         );
     }
     fn open_selected(self: &Rc<Self>) {
-        let Some(entry) = self.selected.borrow().clone() else {
+        let entry = self.selected.borrow().clone();
+        if let Some(entry) = entry {
+            self.open_entry_later(entry);
+        } else {
             self.status
                 .set_text("Sélectionnez un fichier ou dossier distant");
-            return;
-        };
-        let path = PathBuf::from(self.path.text().as_str()).join(entry.name);
-        if entry.directory {
-            self.path.set_text(&path.to_string_lossy());
-            self.submit(Operation::List(path));
-        } else if entry.regular {
-            self.submit(Operation::Read(path));
-        } else {
-            self.status.set_text("Liens et fichiers spéciaux refusés");
         }
+    }
+    fn open_entry_later(self: &Rc<Self>, entry: Entry) {
+        let base = self.path.text().to_string();
+        let weak = Rc::downgrade(self);
+        gtk::glib::idle_add_local_once(move || {
+            let Some(s) = weak.upgrade() else {
+                return;
+            };
+            if s.busy.get() || s.path.text() != base {
+                return;
+            }
+            let path = PathBuf::from(&base).join(&entry.name);
+            if entry.directory {
+                s.path.set_text(&path.to_string_lossy());
+                s.submit(Operation::List(path));
+            } else if entry.regular {
+                s.submit(Operation::Read(path));
+            } else {
+                s.status.set_text("Liens et fichiers spéciaux refusés");
+            }
+        });
     }
     fn selected_entries(&self) -> Vec<Entry> {
         let entries = self.entries.borrow();
@@ -429,7 +532,7 @@ impl Browser {
                     let remote = PathBuf::from(state.path.text().as_str()).join(name);
                     operations.push(Operation::Upload { local, remote });
                 }
-                state.submit(Operation::Batch(operations));
+                state.enqueue_transfers(operations);
             }
             chooser.destroy();
         });
@@ -500,6 +603,8 @@ impl Browser {
         dialog.present();
     }
     fn stop(&self) {
+        self.queue_auto.set(false);
+        self.queue_paused.set(true);
         self.cancel.store(true, Ordering::Relaxed);
         if let Ok(mut guard) = self.connection.try_lock()
             && let Some(connection) = guard.take()
@@ -531,6 +636,8 @@ pub fn open(
     parent: &gtk::Window,
     profile: &SessionProfile,
     credential: Option<Arc<crate::credentials::Secret>>,
+    queue_store: Option<crate::store::Store>,
+    preferences: Rc<RefCell<crate::preferences::Preferences>>,
 ) -> gtk::Window {
     let window = gtk::Window::builder()
         .title(format!("SFTP — {}", profile.name))
@@ -667,7 +774,22 @@ pub fn open(
     );
     editor_expander.set_child(Some(&editor_body));
     controls.append(&editor_expander);
+    let queue_view = gtk::TextView::new();
+    queue_view.set_editable(false);
+    queue_view.set_monospace(true);
+    queue_view.add_css_class("user-content");
     let state = Rc::new(Browser {
+        preferences,
+        queue_store,
+        queue: Arc::new(Mutex::new(None)),
+        queue_loading: Cell::new(false),
+        queue_ready: Cell::new(false),
+        queue_pending: Cell::new(false),
+        queue_auto: Cell::new(false),
+        queue_paused: Cell::new(true),
+        queue_revision: Cell::new(0),
+        queue_view,
+
         filter,
         show_hidden,
         local_path,
@@ -728,6 +850,33 @@ pub fn open(
                     .cloned()
             });
             s.selected.replace(item);
+        }
+    });
+    let weak = Rc::downgrade(&state);
+    state.list.connect_row_activated(move |_, row| {
+        if let Some(s) = weak.upgrade() {
+            let entry = s
+                .entries
+                .borrow()
+                .iter()
+                .find(|e| e.name == row.widget_name())
+                .cloned();
+            if let Some(entry) = entry {
+                s.open_entry_later(entry);
+            }
+        }
+    });
+    let weak = Rc::downgrade(&state);
+    state.local_list.connect_row_activated(move |_, row| {
+        if let Some(s) = weak.upgrade() {
+            let entry = row
+                .widget_name()
+                .parse::<usize>()
+                .ok()
+                .and_then(|i| s.local_entries.borrow().get(i).cloned());
+            if let Some(e) = entry {
+                s.open_local_later(e.path, e.directory);
+            }
         }
     });
     state.graphical_actions(&toolbar);
@@ -954,6 +1103,7 @@ pub fn open(
     controls.append(&more);
     controls.set_vexpand(true);
     body.append(&controls);
+    state.queue_panel(&body);
     let cancel = gtk::Button::with_label("Déconnecter / Annuler SFTP");
     let weak = Rc::downgrade(&state);
     cancel.connect_clicked(move |_| {
@@ -979,8 +1129,15 @@ pub fn open(
         s.stop();
         crate::dialogs::clear_window_later(w);
     });
-    window.set_child(Some(&body));
+    window.set_child(Some(
+        &gtk::ScrolledWindow::builder()
+            .hscrollbar_policy(gtk::PolicyType::Never)
+            .min_content_height(320)
+            .child(&body)
+            .build(),
+    ));
     state.refresh_local();
+    state.load_queue();
     crate::i18n::present(&window);
     window
 }

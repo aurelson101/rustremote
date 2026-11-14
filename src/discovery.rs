@@ -1,7 +1,7 @@
-//! Bounded, opt-in LAN TCP discovery. No DNS, authentication or remote commands.
+//! Bounded, opt-in LAN TCP discovery. Optional system reverse resolution; no authentication or remote commands.
 use std::{
     io::{Read, Write},
-    net::{Ipv4Addr, SocketAddr, TcpStream},
+    net::{IpAddr, Ipv4Addr, SocketAddr, TcpStream},
     sync::{
         Mutex,
         atomic::{AtomicBool, AtomicUsize, Ordering},
@@ -10,14 +10,34 @@ use std::{
 };
 #[derive(Clone, Debug)]
 pub struct Scope {
-    addresses: Vec<Ipv4Addr>,
+    addresses: Vec<IpAddr>,
 }
 impl Scope {
     pub fn parse(value: &str) -> Result<Self, String> {
-        let (ip, prefix) = value
-            .trim()
-            .split_once('/')
-            .map_or((value.trim(), "32"), |p| p);
+        let (ip, prefix) = value.trim().split_once('/').map_or(
+            (value.trim(), if value.contains(':') { "128" } else { "32" }),
+            |p| p,
+        );
+        if let Ok(IpAddr::V6(ip)) = ip.parse::<IpAddr>() {
+            let prefix = prefix.parse::<u32>().map_err(|_| "Préfixe CIDR invalide")?;
+            if !(120..=128).contains(&prefix) {
+                return Err("IPv6 : /120 à /128 requis (256 adresses maximum)".into());
+            }
+            let size = 1u128 << (128 - prefix);
+            let base = u128::from(ip) & !(size - 1);
+            let addresses = (0..size)
+                .map(|i| IpAddr::V6((base + i).into()))
+                .collect::<Vec<_>>();
+            if addresses.iter().any(|ip| match ip {
+                IpAddr::V6(v) => !v.is_loopback() && (v.segments()[0] & 0xfe00 != 0xfc00),
+                _ => true,
+            }) {
+                return Err(
+                    "IPv6 : loopback ou ULA uniquement ; lien local sans interface refusé".into(),
+                );
+            }
+            return Ok(Self { addresses });
+        }
         let ip = ip
             .parse::<Ipv4Addr>()
             .map_err(|_| "Adresse IPv4 ou CIDR privé requis")?;
@@ -37,7 +57,9 @@ impl Scope {
         {
             return Err("Seules les adresses privées et loopback sont autorisées".into());
         }
-        Ok(Self { addresses })
+        Ok(Self {
+            addresses: addresses.into_iter().map(IpAddr::V4).collect(),
+        })
     }
     pub fn description(&self) -> String {
         format!(
@@ -50,9 +72,10 @@ impl Scope {
 }
 #[derive(Clone, Debug)]
 pub struct Device {
-    pub address: Ipv4Addr,
+    pub address: IpAddr,
     pub ports: Vec<u16>,
     pub apple_ard: bool,
+    pub name: Option<String>,
 }
 impl Device {
     pub fn hint(&self) -> &'static str {
@@ -108,9 +131,10 @@ pub fn simulated() -> Vec<Device> {
     ]
     .into_iter()
     .map(|(last, ports, apple_ard)| Device {
-        address: Ipv4Addr::new(192, 0, 2, last),
+        address: Ipv4Addr::new(192, 0, 2, last).into(),
         ports,
         apple_ard,
+        name: None,
     })
     .collect()
 }
@@ -161,15 +185,108 @@ impl Drop for ScanPermit {
         SCAN_ACTIVE.store(false, Ordering::Release);
     }
 }
-pub fn scan(scope: Scope, cancel: &AtomicBool) -> Result<Report, String> {
+pub fn scan(scope: Scope, cancel: &AtomicBool, names: bool) -> Result<Report, String> {
     let _permit = ScanPermit::acquire()?;
-    Ok(scan_ports(
+    let deadline = Instant::now() + Duration::from_secs(30);
+    let mut report = scan_ports(
         scope,
         &[22, 3389, 5900, 445],
         cancel,
         Duration::from_secs(30),
-    ))
+    );
+    if names {
+        for device in report.devices.iter_mut().take(32) {
+            if cancel.load(Ordering::Relaxed) || Instant::now() >= deadline {
+                break;
+            }
+            device.name = reverse_name(device.address, cancel, deadline);
+        }
+    }
+    if cancel.load(Ordering::Relaxed) {
+        report.status = ScanStatus::Cancelled;
+    }
+    Ok(report)
 }
+// NSS follows the host's configured DNS/mDNS policy. Names are untrusted display
+// hints only; connection profiles always retain the explicitly scanned address.
+fn reverse_name(address: IpAddr, cancel: &AtomicBool, deadline: Instant) -> Option<String> {
+    use std::{
+        os::fd::AsRawFd,
+        process::{Command, Stdio},
+    };
+    if cancel.load(Ordering::Relaxed) || Instant::now() >= deadline {
+        return None;
+    }
+    let mut command = Command::new("/usr/bin/getent");
+    command
+        .args(["hosts", &address.to_string()])
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null());
+    for variable in [
+        "LD_LIBRARY_PATH",
+        "LD_PRELOAD",
+        "GIO_MODULE_DIR",
+        "GTK_PATH",
+    ] {
+        command.env_remove(variable);
+    }
+    let mut child = command.spawn().ok()?;
+    let mut output = child.stdout.take()?;
+    let fd = output.as_raw_fd();
+    if unsafe { libc::fcntl(fd, libc::F_SETFL, libc::O_NONBLOCK) } < 0 {
+        let _ = child.kill();
+        let _ = child.wait();
+        return None;
+    }
+    let deadline = deadline.min(Instant::now() + Duration::from_millis(800));
+    let mut bytes = Vec::new();
+    let mut successful = false;
+    loop {
+        let mut buffer = [0u8; 512];
+        match output.read(&mut buffer) {
+            Ok(n) => bytes.extend_from_slice(&buffer[..n]),
+            Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {}
+            Err(_) => break,
+        }
+        if bytes.len() > 1024 || cancel.load(Ordering::Relaxed) || Instant::now() >= deadline {
+            break;
+        }
+        match child.try_wait() {
+            Ok(Some(status)) => {
+                // Drain the small final pipe tail after the process has exited.
+                let _ = output
+                    .take(1025 - bytes.len() as u64)
+                    .read_to_end(&mut bytes);
+                successful = status.success();
+                break;
+            }
+            Ok(None) => std::thread::sleep(Duration::from_millis(10)),
+            Err(_) => break,
+        }
+    }
+    let _ = child.kill();
+    let _ = child.wait();
+    if !successful || bytes.len() > 1024 {
+        return None;
+    }
+    parse_name(address, &bytes)
+}
+fn parse_name(address: IpAddr, bytes: &[u8]) -> Option<String> {
+    let text = std::str::from_utf8(bytes).ok()?;
+    let mut fields = text.split_whitespace();
+    if fields.next()?.parse::<IpAddr>().ok()? != address {
+        return None;
+    }
+    let name = fields.next()?;
+    (name.len() <= 253
+        && !name.is_empty()
+        && name
+            .bytes()
+            .all(|c| c.is_ascii_alphanumeric() || c == b'-' || c == b'.'))
+    .then(|| name.to_owned())
+}
+
 fn scan_ports(scope: Scope, ports: &[u16], cancel: &AtomicBool, budget: Duration) -> Report {
     let index = AtomicUsize::new(0);
     let results = Mutex::new(Vec::new());
@@ -190,6 +307,7 @@ fn scan_ports(scope: Scope, ports: &[u16], cancel: &AtomicBool, budget: Duration
                         address,
                         ports: Vec::new(),
                         apple_ard: false,
+                        name: None,
                     };
                     let mut complete = true;
                     for port in ports {
@@ -245,14 +363,16 @@ mod tests {
         );
         assert_eq!(
             Scope::parse("127.0.0.1").unwrap().addresses,
-            vec![Ipv4Addr::LOCALHOST]
+            vec![IpAddr::V4(Ipv4Addr::LOCALHOST)]
         );
         for bad in [
             "8.8.8.8",
             "192.168.1.0/23",
             "localhost",
             "169.254.169.254",
-            "::1",
+            "2001:4860::1",
+            "fe80::1",
+            "fd00::/64",
             "0.0.0.0",
             "192.168.1.1/33",
         ] {
@@ -285,6 +405,46 @@ mod tests {
         assert!(!result.devices[0].apple_ard);
     }
     #[test]
+    fn reverse_names_are_bounded_validated_and_cancellable() {
+        let ip = IpAddr::V4(Ipv4Addr::LOCALHOST);
+        assert_eq!(
+            parse_name(ip, b"127.0.0.1 localhost\n"),
+            Some("localhost".into())
+        );
+        assert!(parse_name(ip, b"127.0.0.2 forged.local").is_none());
+        assert!(parse_name(ip, b"127.0.0.1 <markup>").is_none());
+        assert!(
+            reverse_name(
+                ip,
+                &AtomicBool::new(true),
+                Instant::now() + Duration::from_secs(1)
+            )
+            .is_none()
+        );
+        assert!(
+            reverse_name(
+                ip,
+                &AtomicBool::new(false),
+                Instant::now() + Duration::from_secs(1)
+            )
+            .is_some()
+        );
+    }
+    #[test]
+    fn ipv6_ula_scopes_and_loopback_transport() {
+        assert_eq!(Scope::parse("fd12::/120").unwrap().addresses.len(), 256);
+        assert_eq!(Scope::parse("::1").unwrap().addresses.len(), 1);
+        let listener = std::net::TcpListener::bind((std::net::Ipv6Addr::LOCALHOST, 0)).unwrap();
+        let report = scan_ports(
+            Scope::parse("::1").unwrap(),
+            &[listener.local_addr().unwrap().port()],
+            &AtomicBool::new(false),
+            Duration::from_secs(1),
+        );
+        assert_eq!(report.status, ScanStatus::Complete);
+        assert_eq!(report.devices.len(), 1);
+    }
+    #[test]
     fn apple_advertisement_is_read_without_selecting_authentication() {
         let listener = std::net::TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).unwrap();
         let address = listener.local_addr().unwrap();
@@ -307,7 +467,14 @@ mod tests {
     #[test]
     fn simultaneous_scans_are_refused_and_permit_is_released() {
         let permit = ScanPermit::acquire().unwrap();
-        assert!(scan(Scope::parse("127.0.0.1").unwrap(), &AtomicBool::new(false)).is_err());
+        assert!(
+            scan(
+                Scope::parse("127.0.0.1").unwrap(),
+                &AtomicBool::new(false),
+                false
+            )
+            .is_err()
+        );
         drop(permit);
         assert!(ScanPermit::acquire().is_ok());
     }

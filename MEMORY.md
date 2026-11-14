@@ -631,3 +631,41 @@ d0d5f763874f2093c9646284edd060122da5328bb317c25ea54105239f71146c.
 Les anciennes releases sont préservées ; aucun changement de visibilité du dépôt.
 Le commit de relais suivant ne modifie que les documents de publication.
 Prochaine priorité proposée : reproduire/corriger le focus GTK, puis file SFTP.
+
+## Reprise 0.9.0 — 2026-11-14
+
+Demande : blocage/navigation souris SFTP puis points « à poursuivre ». Dépôt propre
+au départ 00ea399. Changements : sftp_ui/local/queue, backend sftp, Store, nouveau
+transfers.rs, preferences/settings, terminal, discovery/UI, RdpForm, catalogue EN,
+harnais connecté et README. Pas de connexion réelle au serveur IA ni scan LAN.
+
+Cause souris : ListBoxRow::activate est un signal clavier ; écoute maintenant de
+ListBox::row-activated et geste clic simple dossier (Ctrl/Shift préservés), ouverture
+différée hors callback GTK. List canonicalisé via realpath. File max256, écritures
+atomiques hors UI, flock, reprise explicite après réouverture, Running récupéré en
+Interrupted, chiffrement age identique au magasin actif sans identifiants dans la
+file. Nom de sidecar SHA256 du nom du profil. Renommage/changement chiffrement des
+profils ne migre pas les anciennes files ; documenté. Limites bornées en paramètres.
+
+54 tests applicatifs +1 askpass, fmt/check/Clippy passent. Premier lab GUI arrêté sur
+une assertion de sélection devenue fausse après nouveaux clics ; test rectifié par
+sélection explicite préalable. Rejeu GUI anglais PASS : cinq entrées/sorties souris
+par panneau, uploads/downloads récursifs multiples, DND, édition, fermeture/réouverture
+et démarrage explicite de file persistante. Le test GUI des réglages a trouvé les SpinButton non validés avant sauvegarde :
+update() ajouté aux six champs numériques. Rejeu final anglais avec
+G_DEBUG=fatal-criticals PASS, dont limites enregistrées32/256/12/60 et langue
+française après redémarrage. Fenêtre SFTP défilante pour la file dépliée.
+
+GDB GTK4.8 : gtk_root_get_focus venait de RdpForm::new qui appelait set_current_page
+avant GtkRoot. Déplacement au premier map ; startup sous G_DEBUG=fatal-criticals
+PASS. Un GtkText focus-out nonfatal reste reproductible sous fatal-warnings : trace
+sur blink_cb, sans frame applicative ; ne pas annoncer tous les diagnostics éliminés.
+DNS/mDNS : /usr/bin/getent hosts, NSS hôte, timeout800ms/nom,32hôtes, budget30s,
+annulation, sortie1Kio et nom ASCII validé, affichage seulement. Test localhost et
+IPv6 loopback PASS ; pas de qualification mDNS réel/AD/macOS/LAN/mémoire longue.
+
+Build portable final et startup Debian12 PASS. Contrôles Cargo et55tests PASS.
+Preuves : VALIDATION-0.9.0.md et validation/0.9.0.json. Publication0.9.0 en préparation.
+À poursuivre après livraison : diagnostic GtkText focus-out nonfatal et qualification
+mDNS/LAN/matériels sur cibles précisément autorisées ; migration des anciennes
+files lors de renommage/changement de chiffrement, reprise récursive partielle.

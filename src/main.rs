@@ -17,6 +17,7 @@ mod ssh_route;
 mod store;
 mod terminal;
 mod tools;
+mod transfers;
 mod ui;
 
 use gtk::prelude::*;

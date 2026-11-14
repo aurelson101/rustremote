@@ -575,7 +575,7 @@ pub enum SessionState {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
     pub fn example() -> SessionProfile {
         SessionProfile {

@@ -19,6 +19,8 @@ struct SessionInner {
     sftp_windows: RefCell<Vec<gtk::glib::WeakRef<gtk::Window>>>,
     profile: SessionProfile,
     forward: bool,
+    transfer_store: RefCell<Option<crate::store::Store>>,
+    preferences: Rc<RefCell<crate::preferences::Preferences>>,
     control: Option<tempfile::TempDir>,
     credential: RefCell<Option<std::sync::Arc<crate::credentials::Secret>>>,
     auth: RefCell<Option<crate::ssh_auth::Bridge>>,
@@ -34,7 +36,11 @@ impl Session {
         terminal.set_font_scale(scale);
         Some(scale)
     }
+    pub fn transfer_store(&self, store: Option<crate::store::Store>) {
+        self.0.transfer_store.replace(store);
+    }
     pub fn configure(&self, preferences: &crate::preferences::Preferences) {
+        self.0.preferences.replace(preferences.clone());
         if let Some(t) = self.0.terminal.upgrade() {
             configure(&t, preferences);
         }
@@ -101,8 +107,13 @@ impl Session {
         if let Some(t) = self.0.terminal.upgrade()
             && let Some(parent) = t.root().and_downcast::<gtk::Window>()
         {
-            let w =
-                crate::sftp_ui::open(&parent, &self.0.profile, self.0.credential.borrow().clone());
+            let w = crate::sftp_ui::open(
+                &parent,
+                &self.0.profile,
+                self.0.credential.borrow().clone(),
+                self.0.transfer_store.borrow().clone(),
+                self.0.preferences.clone(),
+            );
             self.0
                 .sftp_windows
                 .borrow_mut()
@@ -124,6 +135,7 @@ impl Session {
         }
     }
     pub fn disconnect(&self) {
+        self.0.transfer_store.take();
         self.0.auth.borrow_mut().take();
         self.0.credential.borrow_mut().take();
         self.0.cancelled.set(true);
@@ -296,6 +308,8 @@ fn open_internal(
         sftp_windows: RefCell::new(Vec::new()),
         profile: profile.clone(),
         forward: forward.is_some(),
+        transfer_store: RefCell::new(None),
+        preferences: Rc::new(RefCell::new(preferences.clone())),
         control,
         credential: RefCell::new(credential),
         auth: RefCell::new(auth),

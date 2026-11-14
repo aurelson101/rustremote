@@ -430,11 +430,11 @@ with tempfile.TemporaryDirectory(prefix="rustremote-ssh-display-") as directory:
                 click("Find devices")
                 wait(lambda:any("Real scan blocked" in n.get_name() for n in walk(app())),"Unapproved real scan was not blocked")
                 pointer_click(wait(lambda:find("I am authorized to scan this network range"),"Consent checkbox absent"),1)
-                text("Authorized IPv4 range","8.8.8.8")
+                text("Authorized IPv4/IPv6 range","8.8.8.8")
                 assert not find("I am authorized to scan this network range").get_state_set().contains(Atspi.StateType.CHECKED),"Consent was retained for a changed scope"
                 click("Find devices")
                 wait(lambda:any("Only private and loopback" in n.get_name() for n in walk(app())),"Public scan was not refused")
-                text("Authorized IPv4 range","127.0.0.1")
+                text("Authorized IPv4/IPv6 range","127.0.0.1")
                 pointer_click(wait(lambda:find("Local simulation — no network packets"),"Simulation checkbox absent"),1);click("Find devices")
                 wait(lambda:any(n.get_name().startswith("192.0.2.11 ·") for n in walk(app())),"Discovery fixtures missing")
                 capture("discovery","Network discovery")
@@ -443,7 +443,7 @@ with tempfile.TemporaryDirectory(prefix="rustremote-ssh-display-") as directory:
                 pointer_click(wait(lambda:find("Local simulation — no network packets"),"Simulation checkbox absent"),1)
                 click("Find devices")
                 wait(lambda:any(n.get_name().startswith("192.0.2.11 ·") for n in walk(app())),"Fresh simulation absent")
-                text("Authorized IPv4 range","127.0.0.2")
+                text("Authorized IPv4/IPv6 range","127.0.0.2")
                 wait(lambda:not any(n.get_name().startswith("192.0.2.") for n in walk(find("Discovered devices"))),"Old results survived a scope change")
                 click("Find devices")
                 wait(lambda:any(n.get_name().startswith("192.0.2.11 ·") for n in walk(app())),"Discovery not restartable after invalidation")
@@ -536,6 +536,20 @@ with tempfile.TemporaryDirectory(prefix="rustremote-ssh-display-") as directory:
             assert (data/"docs/readme.txt").read_bytes()==(upload/"docs/readme.txt").read_bytes()
             wait(lambda: any(n.get_role()==Atspi.Role.LABEL and n.get_name().startswith("client-note.txt ·") for n in walk(find("Remote files"))),"Remote pane did not refresh")
             result["sftp_graphical_multiple_files_folders_upload"]=True
+            # Physical single clicks must navigate without the context menu or Return.
+            for _ in range(5):
+                remote_row=wait(lambda:next((n for n in walk(find("Remote files")) if n.get_role()==Atspi.Role.LABEL and n.get_name().startswith("docs ·")),None),"Remote docs absent")
+                pointer_click(remote_row,1)
+                wait(lambda:any(n.get_role()==Atspi.Role.LABEL and n.get_name().startswith("readme.txt ·") for n in walk(find("Remote files"))),"Single click did not enter remote folder")
+                click("Remote parent folder")
+                wait(lambda:any(n.get_role()==Atspi.Role.LABEL and n.get_name().startswith("docs ·") for n in walk(find("Remote files"))),"Remote parent navigation failed")
+                local_row=wait(lambda:next((n for n in walk(find("Local files")) if n.get_role()==Atspi.Role.LABEL and n.get_name().startswith("docs ·")),None),"Local docs absent")
+                pointer_click(local_row,1)
+                wait(lambda:any(n.get_role()==Atspi.Role.LABEL and n.get_name().startswith("readme.txt ·") for n in walk(find("Local files"))),"Single click did not enter local folder")
+                click("Local parent folder")
+                wait(lambda:any(n.get_role()==Atspi.Role.LABEL and n.get_name().startswith("docs ·") for n in walk(find("Local files"))),"Local parent navigation failed")
+            result["sftp_single_click_directory_navigation_repeated"]=True
+            Atspi.Selection.clear_selection(find("Remote files"))
             filtered_row=select_row("client-note.txt")
             click("Refresh local folder");time.sleep(.4)
             assert find("Remote files").get_selection_iface().get_n_selected_children()==1,"Local refresh cleared the remote selection"
@@ -569,10 +583,33 @@ with tempfile.TemporaryDirectory(prefix="rustremote-ssh-display-") as directory:
             result["sftp_graphical_multiple_files_folders_download"]=True
             wait(lambda:any(n.get_role()==Atspi.Role.LABEL and n.get_name().startswith("docs ·") for n in walk(find("Remote files"))),"Final SFTP refresh incomplete")
             wait(lambda:any(n.get_role()==Atspi.Role.LABEL and n.get_name().startswith("docs ·") for n in walk(find("Local files"))),"Downloaded local folder absent from pane")
+            click("Persistent transfer queue");click("Pause after transfer")
+            queued=download/"queued-after-reopen.txt";queued.write_text("Persistent local queue replay")
+            click("Refresh local folder")
+            local=wait(lambda:find("Local files"),"Local list absent")
+            row=wait(lambda:next((n for n in walk(local) if n.get_role()==Atspi.Role.LABEL and n.get_name().startswith("queued-after-reopen.txt ·")),None),"Queued file absent")
+            while row.get_role()!=Atspi.Role.LIST_ITEM:row=row.get_parent()
+            Atspi.Selection.clear_selection(local);assert Atspi.Selection.select_child(local,row.get_index_in_parent());click("Upload →")
+            def persisted_pending():
+                return any(any(j["state"]=="Pending" and j["local"]==str(queued) for j in json.loads(p.read_text())["jobs"]) for p in (config/"rustremote").glob("transfers-*.json"))
+            wait(persisted_pending,"Pending queue was not persisted")
+            assert not (data/queued.name).exists()
+            click("Close SFTP browser");click("SFTP");click("Connect / Refresh SFTP")
+            wait(lambda:"Authenticated SFTP listing" in field("SFTP status"),"Reopened SFTP absent")
+            assert not (data/queued.name).exists(),"Pending queue restarted without explicit approval"
+            click("Persistent transfer queue");click("Start queue")
+            wait(lambda:(data/queued.name).exists(),"Persistent queue did not restart")
+            assert (data/queued.name).read_bytes()==queued.read_bytes()
+            result["sftp_persistent_queue_manual_restart_after_browser_close"]=True
             time.sleep(.3);capture("sftp","SFTP — Linux lab");click("Close SFTP browser")
             click("Settings");wait(lambda:find("Settings and security"),"Settings absent");capture("settings","Settings and security")
+            click("SFTP transfer limits")
+            text("SFTP limit (MiB)","32");text("Entries per transfer","256");text("SFTP depth","12");text("SFTP duration (seconds)","60")
+            click("SFTP transfer limits")
             select_combo("Settings and security",1);click("Save settings")
             settings=config/"rustremote/settings.json";wait(lambda:settings.exists() and json.loads(settings.read_text())["language"]=="fr","French preference not saved")
+            assert json.loads(settings.read_text())["sftp"]=={"mib":32,"entries":256,"depth":12,"seconds":60},json.loads(settings.read_text())["sftp"]
+            result["sftp_limits_configured_and_persisted_in_settings"]=True
             subprocess.run(["gapplication","action","com.rustremote.Preview","quit"],check=True);process.wait(timeout=10)
             process=subprocess.Popen(launch,env=app_env)
             wait(lambda:find("Ouvrir les profils"),"French setting did not apply after restart");click("Déverrouiller / ouvrir")

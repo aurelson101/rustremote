@@ -103,6 +103,38 @@ impl Controller {
             20000.,
             preferences.scrollback as f64,
         );
+        let limits = gtk::Box::new(gtk::Orientation::Vertical, 8);
+        let mib = number(
+            &limits,
+            "Limite SFTP (Mio)",
+            1.,
+            1024.,
+            preferences.sftp.mib as f64,
+        );
+        let entries = number(
+            &limits,
+            "Entrées par transfert",
+            1.,
+            4096.,
+            preferences.sftp.entries as f64,
+        );
+        let depth = number(
+            &limits,
+            "Profondeur SFTP",
+            1.,
+            32.,
+            preferences.sftp.depth as f64,
+        );
+        let seconds = number(
+            &limits,
+            "Durée SFTP (secondes)",
+            5.,
+            3600.,
+            preferences.sftp.seconds as f64,
+        );
+        let expander = gtk::Expander::new(Some("Limites des transferts SFTP"));
+        expander.set_child(Some(&limits));
+        body.append(&expander);
         let black = gtk::ToggleButton::with_label("Fond noir du terminal");
         black.set_active(preferences.black_terminal);
         body.append(&black);
@@ -125,9 +157,16 @@ impl Controller {
             if controller.0.busy.get() {
                 return;
             }
-            font.update();
-            history.update();
+            for field in [&font, &history, &mib, &entries, &depth, &seconds] {
+                field.update();
+            }
             let preferences = Preferences {
+                sftp: crate::sftp::Limits {
+                    mib: mib.value_as_int() as u32,
+                    entries: entries.value_as_int() as usize,
+                    depth: depth.value_as_int() as usize,
+                    seconds: seconds.value_as_int() as u64,
+                },
                 language: if language.selected() == 1 { "fr" } else { "en" }.into(),
                 font_size: font.value_as_int() as u8,
                 scrollback: history.value_as_int() as u32,
@@ -197,7 +236,13 @@ impl Controller {
             }
         });
         body.append(&close);
-        window.set_child(Some(&body));
+        window.set_default_height(680);
+        window.set_child(Some(
+            &gtk::ScrolledWindow::builder()
+                .child(&body)
+                .min_content_height(250)
+                .build(),
+        ));
         crate::i18n::present(&window);
     }
     pub fn exit_demo(&self, after: impl Fn() + 'static) {

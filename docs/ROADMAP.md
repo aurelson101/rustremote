@@ -10,7 +10,7 @@
 | P0-04 | Modèle | Critique | DONE | Types de profils sans secrets, sérialisation, tests unitaires. |
 | P1-01 | SSH | Critique | DONE | Connexion à laboratoire, vérification clé hôte, SSH Agent, gestion des refus ; tests. |
 | P1-02 | Terminal | Critique | DONE | PTY interactif, resize, ANSI, UTF-8, copie/collage, fermeture propre. |
-| P1-03 | SFTP | Haute | DONE | SFTP natif : listing, transferts, progression, reprise et édition validés ; vue locale/distante et DND rejoués en 0.6.0. File persistante/limites configurables restent des évolutions. |
+| P1-03 | SFTP | Haute | DONE | SFTP natif : listing, transferts, progression, reprise et édition validés ; vue locale/distante et DND rejoués en 0.6.0. File persistante et limites configurables ajoutées en 0.9.0. |
 | P1-04 | Ergonomie | Haute | PARTIAL | Favoris, édition, recherche/raccourcis et dossiers hiérarchiques avec DND livrés ; migration SQLite reste ouverte. |
 | P2-01 | RDP | Haute | PARTIAL | PoC IronRDP sécurisée avec labo Windows, certificat, UI basique. |
 | P2-02 | VNC | Moyenne | PARTIAL | Lanceur TigerVNC avec tunnel SSH ; Apple ARD type30 via DH ajouté en 0.7.0. Moteur intégré et qualification Mac réel restent ouverts. |
@@ -294,3 +294,16 @@ file de transferts SFTP restent des améliorations ouvertes.
 
 Préversion 0.8.1 publiée sur `ed08e9e420a75d13ad30bd31e0f422d06d87ca9d` ;
 quatre assets retéléchargés et comparés. Rejeu ciblé découverte et Wayland PASS.
+
+## Incrément 0.9.0 — 2026-11-14
+
+SFTP : clic simple sur dossiers locaux/distants, activation souris/clavier via le
+signal du ListBox, navigation différée hors événement GTK et chemins distants
+canoniques. File privée par profil, verrouillée et chiffrée comme le magasin actif ;
+reprise explicite, pause et réessai, sans écrasement implicite. Limites par transfert
+configurables dans Paramètres. Le changement d'onglet RDP attend son attachement
+à la fenêtre : diagnostic critique GTK4.8 reproduit sous GDB puis corrigé.
+Découverte : IPv6 ULA /120–/128 et loopback ; résolution inverse DNS/mDNS optionnelle
+via NSS système, sans utiliser les noms pour les connexions. mDNS dépend du système
+hôte ; pas d'inventaire DNS-SD. P2-07 reste PARTIAL pour qualification LAN/OS réels.
+Tests et état de publication : voir VALIDATION-0.9.0.md.
