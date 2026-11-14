@@ -673,3 +673,27 @@ Le commit de relais suivant ne change que les statuts de publication.
 À poursuivre après livraison : diagnostic GtkText focus-out nonfatal et qualification
 mDNS/LAN/matériels sur cibles précisément autorisées ; migration des anciennes
 files lors de renommage/changement de chiffrement, reprise récursive partielle.
+
+## Confidentialité et licence — 2026-11-14
+
+Demande explicite : politique sans collecte automatique, licence compatible avec
+la condition OSI de SignPath, publication GitHub. Dépôt propre au départ a80d3d9.
+Ajouts/modifications : PRIVACY.md bilingue, LICENSE texte standard GPLv3 intégral,
+NOTICE et README grant GPL-3.0-only pour le matériau original, Cargo.toml SPDX.
+La revente est désormais permise sous conditions GPL ; source correspondante et
+libertés des destinataires doivent être préservées. Anciens tags/binaires inchangés,
+licences tierces conservées. Aucun changement de code applicatif ni nouvelle image.
+
+Politique : aucune télémétrie/analytics/publicité/crash upload vers le mainteneur ;
+traitement local, secrets dans trousseau selon choix, transferts/diagnostics/DNS/mDNS
+vers destinations demandées, plateformes tierces et demandes support volontaires
+explicitement distingués. Contact public fourni par l'utilisateur. Pas de promesse
+mensongère d'absence de toute donnée traitée ou de toute connexion réseau.
+
+README inclut une politique de signature au statut non inscrit/non signé, avec
+prérequis provenance/MFA/validation manuelle. Aucune admission SignPath revendiquée ;
+version Windows publiée et admissibilité découverte réseau restent à examiner.
+Vérification : GPL copiée à l'identique depuis /usr/share/common-licenses/GPL-3 ;
+Cargo metadata GPL-3.0-only, fmt/check/Clippy -D warnings et55tests PASS.
+Prochaine tâche : candidature SignPath à compléter avec URL PRIVACY.md après push ;
+portage/CI Windows et examen SignPath restent ouverts. Aucun formulaire soumis ici.

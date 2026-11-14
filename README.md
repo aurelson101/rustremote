@@ -198,10 +198,36 @@ serial hardware and long-duration memory behaviour are not fully qualified.
 GTK diagnostics and tested paths are recorded in the validation report.
 RustRemote is not a complete reimplementation of MobaXterm or FileZilla.
 
+## Privacy
+
+**No telemetry, advertising tracking or automatic crash uploads to the maintainer.**
+Profiles, credentials and transfers are processed locally or sent to the endpoints
+chosen by the user. Read the [Privacy Policy / Politique de confidentialité](PRIVACY.md)
+for local storage, network operations, support requests and deletion information.
+
+## Code signing policy
+
+RustRemote is not currently enrolled in SignPath Foundation and does not claim
+SignPath-signed releases or sponsorship. No Windows artifact is released yet.
+The project maintainer is [@aurelson101](https://github.com/aurelson101), responsible
+for original-code changes and reviews and designated to approve any future signing
+requests. No signing pipeline is active. A future SignPath workflow must verify
+source/build provenance, require MFA for participants and manual release approval,
+and must not sign third-party programs as RustRemote's own code. Acceptance remains
+subject to SignPath review, including its policy on network discovery features.
+
 ## License
 
-**Personal and professional use is allowed; resale is prohibited.**
-Original code uses the custom [RustRemote No-Resale License](LICENSE).
-Separate support, training and integration services may be charged for; the
-software copy and its use rights must remain free of charge. Third-party components
-retain their own licenses; see [NOTICE](NOTICE) and the notices inside the AppImage.
+Copyright (c) 2026 aurelson101 and the RustRemote contributors.
+
+Original RustRemote material is licensed under the **GNU General Public License,
+version 3 only (GPL-3.0-only)**; see [LICENSE](LICENSE). Personal and professional use,
+modification and redistribution, including sale, are permitted under that license.
+Distribution must preserve recipients' GPL rights and provide the corresponding
+source as required by the GPL. There is no warranty.
+
+This replaces the custom no-resale license for the current source revision onward;
+already published tags and binaries retain their included licensing terms. No old
+release is silently relicensed or rebuilt. Third-party components retain their own
+licenses; see [NOTICE](NOTICE) and the notices inside the AppImage. This license
+change does not by itself establish eligibility for SignPath.

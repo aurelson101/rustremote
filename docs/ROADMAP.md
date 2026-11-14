@@ -310,3 +310,11 @@ Tests et état de publication : voir VALIDATION-0.9.0.md.
 
 Préversion0.9.0 publiée sur `ed643426f7f86f701ff4bc1c52d6fea73ece8f27` ; quatre assets
 retéléchargés et comparés avant publication. Rejeu final SSH/SFTP GUI et Wayland PASS.
+
+## Confidentialité / licence — 2026-11-14
+
+DONE : politique bilingue PRIVACY.md, licence des nouvelles révisions GPL-3.0-only
+(texte intégral, NOTICE/Cargo/README cohérents), politique de signature préparatoire.
+Anciens artefacts et licences tierces inchangés. fmt/check/Clippy et55tests PASS.
+OPEN : admission SignPath, version/CI Windows et qualification de sa découverte ;
+le changement de licence ne constitue pas une acceptation ni une signature.

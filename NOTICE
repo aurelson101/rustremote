@@ -1,7 +1,11 @@
 RustRemote — notices de distribution
 
-Le code et les ressources originaux de RustRemote sont proposés selon LICENSE :
-usage personnel et professionnel autorisé, redistribution gratuite, revente interdite.
+Copyright (c) 2026 aurelson101 et les contributeurs de RustRemote.
+
+Le code et les ressources originaux de RustRemote sont proposés sous GNU General
+Public License, version 3 uniquement (SPDX : GPL-3.0-only), voir LICENSE. Vous pouvez
+les redistribuer et les modifier selon cette licence, y compris contre paiement.
+RustRemote est fourni sans garantie ; voir les conditions complètes dans LICENSE.
 Cette licence ne remplace pas les licences des composants tiers.
 
 RustRemote est un projet indépendant. Aucun code propriétaire de MobaXterm ou de
