@@ -307,3 +307,6 @@ Découverte : IPv6 ULA /120–/128 et loopback ; résolution inverse DNS/mDNS op
 via NSS système, sans utiliser les noms pour les connexions. mDNS dépend du système
 hôte ; pas d'inventaire DNS-SD. P2-07 reste PARTIAL pour qualification LAN/OS réels.
 Tests et état de publication : voir VALIDATION-0.9.0.md.
+
+Préversion0.9.0 publiée sur `ed643426f7f86f701ff4bc1c52d6fea73ece8f27` ; quatre assets
+retéléchargés et comparés avant publication. Rejeu final SSH/SFTP GUI et Wayland PASS.

@@ -27,7 +27,18 @@
     "Partial recursive folder resume remains manual"
   ],
   "publication": {
-    "status": "not_published"
+    "status": "published",
+    "release": "https://github.com/aurelson101/rustremote/releases/tag/v0.9.0",
+    "source_commit": "ed643426f7f86f701ff4bc1c52d6fea73ece8f27",
+    "downloaded_assets_match_local": true,
+    "prerelease": true,
+    "draft": false,
+    "assets": [
+      "RustRemote-0.9.0-preview-x86_64.AppImage",
+      "RustRemote-0.9.0-preview-x86_64.AppImage.sha256",
+      "RustRemote-0.9.0-ABI.json",
+      "build-packages.txt"
+    ]
   },
   "targeted_gui_and_protocol_results": [
     {

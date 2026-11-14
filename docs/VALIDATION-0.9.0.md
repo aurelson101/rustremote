@@ -78,6 +78,8 @@ privées sur disque. Reprise récursive partielle des dossiers encore manuelle,
 destination existante jamais écrasée automatiquement. Aucun audit global de sécurité
 ni garantie d'absence de fuite n'est revendiqué.
 
-Publication : en préparation, pas encore publiée au moment de cette rédaction.
+[Préversion 0.9.0 publiée](https://github.com/aurelson101/rustremote/releases/tag/v0.9.0) sur `ed643426f7f86f701ff4bc1c52d6fea73ece8f27`.
+Les quatre assets AppImage/SHA256/ABI/paquets ont été retéléchargés et comparés aux
+fichiers locaux avant publication ; SHA256 vérifié. Anciennes releases conservées.
 
 SHA256 de l’AppImage validée : `ecc4576883aca2613acd70584a494e3d068659cf920d8d15de2cb7894121bcd8`.

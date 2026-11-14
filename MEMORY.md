@@ -665,7 +665,11 @@ annulation, sortie1Kio et nom ASCII validé, affichage seulement. Test localhost
 IPv6 loopback PASS ; pas de qualification mDNS réel/AD/macOS/LAN/mémoire longue.
 
 Build portable final et startup Debian12 PASS. Contrôles Cargo et55tests PASS.
-Preuves : VALIDATION-0.9.0.md et validation/0.9.0.json. Publication0.9.0 en préparation.
+Preuves : VALIDATION-0.9.0.md et validation/0.9.0.json. Publication0.9.0 effectuée sur `ed643426f7f86f701ff4bc1c52d6fea73ece8f27`.
+https://github.com/aurelson101/rustremote/releases/tag/v0.9.0 ; quatre assets retéléchargés et identiques aux locaux, SHA256
+AppImage : `ecc4576883aca2613acd70584a494e3d068659cf920d8d15de2cb7894121bcd8`. Anciennes releases préservées.
+Rejeu Wayland final avec G_DEBUG=fatal-criticals PASS (startup/plein écran).
+Le commit de relais suivant ne change que les statuts de publication.
 À poursuivre après livraison : diagnostic GtkText focus-out nonfatal et qualification
 mDNS/LAN/matériels sur cibles précisément autorisées ; migration des anciennes
 files lors de renommage/changement de chiffrement, reprise récursive partielle.
