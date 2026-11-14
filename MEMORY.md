@@ -5,13 +5,13 @@
 
 ## 1. État de référence
 
-- **Mise à jour :** 2026-11-14 — 0.7.0 Apple/SFTP en validation ; 0.6.0 reste publiée.
+- **Mise à jour :** 2026-11-14 — préversion 0.7.0 Apple/SFTP publiée et téléchargements vérifiés.
 - **Dernier agent :** Codex ; Apple ARD via TigerVNC DH/SSH, recherche SFTP et tests Apple locaux.
 - **Phase :** P1 — terminal/SFTP natifs, MVP encore incomplet.
 - **État confirmé :** terminal SSH/série intégré VTE, SFTP natif ssh2/libssh2 ; RDP/VNC externes ; profils/import/export, dossiers et paramètres persistants.
 - **Code existant :** package Rust/GTK4, ui/dialogs/profiles/store/simulation/icons ; scripts AppImage, GTK et laboratoires réseau/PTY.
 - **Plateforme cible initiale :** Ubuntu Linux / GNOME. Debian ensuite.
-- **Dernière vérification réelle :** 39 tests Rust et contrôles Cargo réussis ; AppImage portable 0.6.0 construite. Voir `docs/VALIDATION-0.6.0.md` et `docs/validation/0.6.0.json` pour les parcours et limites.
+- **Dernière vérification réelle :** 42 tests Rust et contrôles Cargo réussis ; AppImage portable 0.7.0 publiée. Voir `docs/VALIDATION-0.7.0.md` et `docs/validation/0.7.0.json` pour les parcours et limites.
 
 ## 2. Objectif immuable
 
@@ -539,7 +539,21 @@ sur code de sortie. XAUTHORITY privé requis également pour les appels Xlib/PIL
 au bouton Move (sélecteur/focus) ; le parcours de l’AppImage GTK4.8 réussit, y compris
 Apple, SFTP et français après redémarrage. Warnings/criticals de focus GTK4.8 toujours
 présents et documentés, pas de promesse zéro bug. Build portable Debian12/ABI2.36
-conservé. Dernier rejeu final AppImage SSH/SFTP/Apple et Wayland PASS ; captures Apple/SFTP inspectées et versionnées, résultats dans docs/validation/0.7.0.json. Publication encore à terminer.
+conservé. Dernier rejeu final AppImage SSH/SFTP/Apple et Wayland PASS ; captures Apple/SFTP inspectées et versionnées, résultats dans docs/validation/0.7.0.json. Publication effectuée et vérifiée ci-dessous.
 
 GitHub constaté PUBLIC le 2026-11-14 via gh repo view (contrairement à la visibilité
 privée historique) ; aucun changement de visibilité effectué. Préserver ce réglage.
+
+Publication 0.7.0 effectuée le 2026-11-14 : tag sur
+`a132fbb72e2f8df8fe4a42b30815cef1a1e3f7f5`, préversion disponible :
+https://github.com/aurelson101/rustremote/releases/tag/v0.7.0 . Quatre assets
+AppImage/SHA256/ABI/versions de paquets retéléchargés puis comparés aux locaux.
+SHA256 : 683bc554341cbd1ead6b2989a6752123f000441546710895e8b907a3f5f3c6a5.
+Dépôt public conservé, anciennes releases préservées. Le commit suivant n’actualise
+que les documents de publication et le lien officiel Apple du README.
+
+Prochaine tâche : qualifier un Mac réel de bout en bout (tunnel/compte/écran et SFTP
+APFS) uniquement avec autorisation de sa cible ; sinon poursuivre les laboratoires.
+Corriger ensuite les diagnostics de focus GTK et examiner le sélecteur Move sous
+GTK natif de l’hôte. P1-04/SQLite et P2-02 moteur intégré restent ouverts. Ne pas
+annoncer de parité ARD haute performance ni de stockage du mot de passe VNC.

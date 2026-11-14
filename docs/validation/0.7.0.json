@@ -130,8 +130,18 @@
     "x86_64/glibc>=2.36; other architectures and desktops not qualified"
   ],
   "publication": {
-    "status": "pending",
+    "status": "published",
     "repository_public_verified": true,
-    "release": "https://github.com/aurelson101/rustremote/releases/tag/v0.7.0"
+    "release": "https://github.com/aurelson101/rustremote/releases/tag/v0.7.0",
+    "source_commit": "a132fbb72e2f8df8fe4a42b30815cef1a1e3f7f5",
+    "downloaded_assets_match_local": true,
+    "prerelease": true,
+    "draft": false,
+    "assets": [
+      "RustRemote-0.7.0-preview-x86_64.AppImage",
+      "RustRemote-0.7.0-preview-x86_64.AppImage.sha256",
+      "RustRemote-0.7.0-ABI.json",
+      "build-packages.txt"
+    ]
   }
 }

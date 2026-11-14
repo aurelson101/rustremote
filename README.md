@@ -68,7 +68,7 @@ and user-defined names retain their original language.
 
 1. On the Mac, enable **Screen Sharing** or the appropriate **Remote Management**
    permissions for your account, and **Remote Login** for SSH. See Apple's
-   [Screen Sharing / VNC documentation](https://support.apple.com/en-mz/guide/remote-desktop/apdbed09830/mac).
+   [Screen Sharing documentation](https://support.apple.com/en-ca/guide/mac-help/mh11848/mac).
 2. Click **Apple**, enter the Mac host, account name and port **5900**. Keep the SSH
    tunnel enabled and enter the **same Mac host**, its SSH port and SSH user in the
    gateway fields below. SSH uses your agent/configuration and checks the host key.

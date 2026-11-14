@@ -80,4 +80,7 @@ Artefact validé — SHA256 :
 683bc554341cbd1ead6b2989a6752123f000441546710895e8b907a3f5f3c6a5
 ```
 
-Publication GitHub en préparation.
+[Préversion v0.7.0 publiée](https://github.com/aurelson101/rustremote/releases/tag/v0.7.0)
+le 2026-11-14 sur le commit `a132fbb72e2f8df8fe4a42b30815cef1a1e3f7f5`.
+Les quatre assets ont été retéléchargés et comparés aux fichiers locaux ; SHA256
+AppImage vérifié. Visibilité publique existante conservée, anciennes releases préservées.

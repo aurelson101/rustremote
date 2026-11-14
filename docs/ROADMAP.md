@@ -260,3 +260,8 @@ sélection vidée lors du filtrage ; rafraîchir le panneau local préserve le d
 42 tests Rust, laboratoire Apple positif/négatif et VNC-SSH/série locaux réussis.
 Voir VALIDATION-0.7.0.md pour le rejeu graphique sur AppImage et limites. P2-02 reste
 PARTIAL : pas de Mac réel, pas de moteur intégré ni de qualification SRP/haute performance.
+
+Publication 0.7.0 effectuée : sources/README/captures sur GitHub, tag
+`a132fbb72e2f8df8fe4a42b30815cef1a1e3f7f5`, AppImage et trois fichiers annexes
+retéléchargés et comparés. Rejeu final AppImage SSH/SFTP/Apple et Wayland PASS.
+Le dépôt est public au moment de cette livraison ; visibilité inchangée.
