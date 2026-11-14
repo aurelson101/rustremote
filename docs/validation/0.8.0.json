@@ -81,8 +81,18 @@
     "SFTP and external VNC limits from0.7 unchanged"
   ],
   "publication": {
-    "status": "pending",
+    "status": "published",
     "release": "https://github.com/aurelson101/rustremote/releases/tag/v0.8.0",
-    "repository_public_verified": true
+    "repository_public_verified": true,
+    "source_commit": "7b6492f390b18f1832841abcfec20826c622065e",
+    "downloaded_assets_match_local": true,
+    "prerelease": true,
+    "draft": false,
+    "assets": [
+      "RustRemote-0.8.0-preview-x86_64.AppImage",
+      "RustRemote-0.8.0-preview-x86_64.AppImage.sha256",
+      "RustRemote-0.8.0-ABI.json",
+      "build-packages.txt"
+    ]
   }
 }

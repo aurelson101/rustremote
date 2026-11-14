@@ -278,3 +278,8 @@ certifiés à partir de ports. Clic droit d’un résultat : éditeur prérempli
 dossier existant/nouveau, compte et options SSH/RDP/Apple/VNC ; pas de connexion
 automatique, simulations conservées. 45 tests Rust et contrôles Cargo réussis.
 La qualification GUI finale et la publication sont décrites dans VALIDATION-0.8.0.md.
+
+Publication 0.8.0 vérifiée sur le commit
+`7b6492f390b18f1832841abcfec20826c622065e` : AppImage et trois fichiers annexes
+retéléchargés et comparés. Rejeu complet GUI/discovery/SSH/SFTP et Wayland PASS.
+P2-07 reste PARTIAL pour l’identification OS et la qualification de réseaux réels.

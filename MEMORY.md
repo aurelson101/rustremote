@@ -5,8 +5,8 @@
 
 ## 1. État de référence
 
-- **Mise à jour :** 2026-11-14 — 0.8.0 découverte réseau et menus de dossiers en validation ; 0.7.0 publiée.
-- **Dernier agent :** Codex ; Apple ARD via TigerVNC DH/SSH, recherche SFTP et tests Apple locaux.
+- **Mise à jour :** 2026-11-14 — préversion 0.8.0 découverte réseau publiée et téléchargements vérifiés.
+- **Dernier agent :** Codex ; découverte TCP privée bornée, menus de création Apple/VNC et ajout de profils depuis les résultats.
 - **Phase :** P1 — terminal/SFTP natifs, MVP encore incomplet.
 - **État confirmé :** terminal SSH/série intégré VTE, SFTP natif ssh2/libssh2 ; RDP/VNC externes ; profils/import/export, dossiers et paramètres persistants.
 - **Code existant :** package Rust/GTK4, ui/dialogs/profiles/store/simulation/icons ; scripts AppImage, GTK et laboratoires réseau/PTY.
@@ -584,5 +584,18 @@ au lieu d’affirmer que le terminal GUI a été testé dans ce mode.
 
 Parcours ciblé et complet de l’artefact final PASS ; bouton dynamique traduit après
 revue de capture, simulation reste hors ligne après bascule du contrôle. Capture
-inspectée, README/rapport prêts. Prochaine action : publier et vérifier les assets.
+inspectée, README/rapport à jour. Publication vérifiée ci-dessous.
 Ne pas scanner un réseau réel pour qualifier le produit sans cible autorisée.
+
+Publication 0.8.0 effectuée le 2026-11-14 : tag sur
+`7b6492f390b18f1832841abcfec20826c622065e`, release
+https://github.com/aurelson101/rustremote/releases/tag/v0.8.0 . Les quatre assets
+AppImage/SHA256/ABI/versions de paquets ont été retéléchargés et comparés aux locaux.
+SHA256 : 6499c7effff769a214bb832a551fb8b1345d277c902d6c24d5cfa5894c34bede.
+Dépôt public conservé, anciennes releases préservées. Le commit de relais suivant
+ne change que les statuts de publication des documents.
+
+Prochaine tâche : qualifier une plage LAN explicitement autorisée si demandée ;
+sinon poursuivre les labs. Identification OS exhaustive/IPv6 et diagnostics de focus
+GTK restent ouverts. Les ports n’identifient pas un OS de façon certaine. Ne pas
+retirer la simulation des profils créés depuis les équipements fictifs.
