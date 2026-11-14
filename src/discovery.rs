@@ -114,13 +114,67 @@ pub fn simulated() -> Vec<Device> {
     })
     .collect()
 }
-pub fn scan(scope: Scope, cancel: &AtomicBool) -> Vec<Device> {
-    scan_ports(scope, &[22, 3389, 5900, 445], cancel)
+#[derive(Debug, PartialEq)]
+pub enum ScanStatus {
+    Simulated,
+    Complete,
+    Cancelled,
+    TimedOut,
 }
-fn scan_ports(scope: Scope, ports: &[u16], cancel: &AtomicBool) -> Vec<Device> {
+pub struct Report {
+    pub devices: Vec<Device>,
+    pub checked: usize,
+    pub total: usize,
+    pub status: ScanStatus,
+}
+impl Report {
+    pub fn simulation() -> Self {
+        let devices = simulated();
+        Self {
+            checked: devices.len(),
+            total: devices.len(),
+            devices,
+            status: ScanStatus::Simulated,
+        }
+    }
+    pub fn label(&self) -> &'static str {
+        match self.status {
+            ScanStatus::Simulated => "Simulation locale — aucun paquet réseau",
+            ScanStatus::Complete => "Scan terminé",
+            ScanStatus::Cancelled => "Scan annulé · résultats partiels",
+            ScanStatus::TimedOut => "Délai atteint · résultats partiels",
+        }
+    }
+}
+static SCAN_ACTIVE: AtomicBool = AtomicBool::new(false);
+struct ScanPermit;
+impl ScanPermit {
+    fn acquire() -> Result<Self, String> {
+        SCAN_ACTIVE
+            .compare_exchange(false, true, Ordering::Acquire, Ordering::Relaxed)
+            .map(|_| Self)
+            .map_err(|_| "Un scan est déjà en cours ; attendez ou annulez-le.".into())
+    }
+}
+impl Drop for ScanPermit {
+    fn drop(&mut self) {
+        SCAN_ACTIVE.store(false, Ordering::Release);
+    }
+}
+pub fn scan(scope: Scope, cancel: &AtomicBool) -> Result<Report, String> {
+    let _permit = ScanPermit::acquire()?;
+    Ok(scan_ports(
+        scope,
+        &[22, 3389, 5900, 445],
+        cancel,
+        Duration::from_secs(30),
+    ))
+}
+fn scan_ports(scope: Scope, ports: &[u16], cancel: &AtomicBool, budget: Duration) -> Report {
     let index = AtomicUsize::new(0);
     let results = Mutex::new(Vec::new());
-    let deadline = Instant::now() + Duration::from_secs(30);
+    let deadline = Instant::now() + budget;
+    let checked = AtomicUsize::new(0);
     std::thread::scope(|threads| {
         for _ in 0..8.min(scope.addresses.len()) {
             threads.spawn(|| {
@@ -137,8 +191,10 @@ fn scan_ports(scope: Scope, ports: &[u16], cancel: &AtomicBool) -> Vec<Device> {
                         ports: Vec::new(),
                         apple_ard: false,
                     };
+                    let mut complete = true;
                     for port in ports {
                         if cancel.load(Ordering::Relaxed) || Instant::now() >= deadline {
+                            complete = false;
                             break;
                         }
                         if let Ok(mut socket) = TcpStream::connect_timeout(
@@ -151,6 +207,9 @@ fn scan_ports(scope: Scope, ports: &[u16], cancel: &AtomicBool) -> Vec<Device> {
                             }
                         }
                     }
+                    if complete {
+                        checked.fetch_add(1, Ordering::Relaxed);
+                    }
                     if !device.ports.is_empty() {
                         results.lock().expect("discovery result lock").push(device);
                     }
@@ -160,7 +219,20 @@ fn scan_ports(scope: Scope, ports: &[u16], cancel: &AtomicBool) -> Vec<Device> {
     });
     let mut results = results.into_inner().expect("discovery results");
     results.sort_by_key(|d| d.address);
-    results
+    let checked = checked.into_inner();
+    let status = if cancel.load(Ordering::Relaxed) {
+        ScanStatus::Cancelled
+    } else if checked == scope.addresses.len() {
+        ScanStatus::Complete
+    } else {
+        ScanStatus::TimedOut
+    };
+    Report {
+        devices: results,
+        checked,
+        total: scope.addresses.len(),
+        status,
+    }
 }
 #[cfg(test)]
 mod tests {
@@ -192,10 +264,25 @@ mod tests {
         let listener = std::net::TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).unwrap();
         let port = listener.local_addr().unwrap().port();
         let scope = Scope::parse("127.0.0.1").unwrap();
-        assert!(scan_ports(scope.clone(), &[port], &AtomicBool::new(true)).is_empty());
-        let result = scan_ports(scope, &[port], &AtomicBool::new(false));
-        assert_eq!(result[0].ports, vec![port]);
-        assert!(!result[0].apple_ard);
+        let cancelled = scan_ports(
+            scope.clone(),
+            &[port],
+            &AtomicBool::new(true),
+            Duration::from_secs(1),
+        );
+        assert_eq!(cancelled.status, ScanStatus::Cancelled);
+        assert_eq!(cancelled.checked, 0);
+        assert!(cancelled.devices.is_empty());
+        let result = scan_ports(
+            scope,
+            &[port],
+            &AtomicBool::new(false),
+            Duration::from_secs(1),
+        );
+        assert_eq!(result.status, ScanStatus::Complete);
+        assert_eq!(result.checked, 1);
+        assert_eq!(result.devices[0].ports, vec![port]);
+        assert!(!result.devices[0].apple_ard);
     }
     #[test]
     fn apple_advertisement_is_read_without_selecting_authentication() {
@@ -215,6 +302,59 @@ mod tests {
         let mut client = TcpStream::connect(address).unwrap();
         assert!(advertises_ard(&mut client));
         drop(client);
+        server.join().unwrap();
+    }
+    #[test]
+    fn simultaneous_scans_are_refused_and_permit_is_released() {
+        let permit = ScanPermit::acquire().unwrap();
+        assert!(scan(Scope::parse("127.0.0.1").unwrap(), &AtomicBool::new(false)).is_err());
+        drop(permit);
+        assert!(ScanPermit::acquire().is_ok());
+    }
+    #[test]
+    fn deadline_is_reported_without_claiming_a_complete_inventory() {
+        let result = scan_ports(
+            Scope::parse("127.0.0.1").unwrap(),
+            &[22],
+            &AtomicBool::new(false),
+            Duration::ZERO,
+        );
+        assert_eq!(result.status, ScanStatus::TimedOut);
+        assert_eq!(result.checked, 0);
+        assert_eq!(result.total, 1);
+        assert!(result.devices.is_empty());
+    }
+    #[test]
+    fn incomplete_rfb_banner_cannot_hold_the_probe_open() {
+        let listener = std::net::TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).unwrap();
+        let address = listener.local_addr().unwrap();
+        let server = std::thread::spawn(move || {
+            let (mut socket, _) = listener.accept().unwrap();
+            socket.write_all(b"RFB").unwrap();
+            std::thread::sleep(Duration::from_millis(400));
+        });
+        let mut client = TcpStream::connect(address).unwrap();
+        let started = Instant::now();
+        assert!(!advertises_ard(&mut client));
+        assert!(started.elapsed() < Duration::from_secs(1));
+        server.join().unwrap();
+    }
+    #[test]
+    fn excessive_rfb_security_count_is_refused() {
+        let listener = std::net::TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).unwrap();
+        let address = listener.local_addr().unwrap();
+        let server = std::thread::spawn(move || {
+            let (mut socket, _) = listener.accept().unwrap();
+            socket
+                .set_read_timeout(Some(Duration::from_secs(2)))
+                .unwrap();
+            socket.write_all(b"RFB 003.008\n").unwrap();
+            let mut greeting = [0; 12];
+            socket.read_exact(&mut greeting).unwrap();
+            socket.write_all(&[255]).unwrap();
+        });
+        let mut client = TcpStream::connect(address).unwrap();
+        assert!(!advertises_ard(&mut client));
         server.join().unwrap();
     }
 }

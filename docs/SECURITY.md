@@ -175,3 +175,11 @@ existant. Les résultats ne contiennent aucun mot de passe. Les profils issus du
 simulateur conservent simulation=true. Les limites de scope IPv4 sont contrôlées
 avant tout réseau, y compris lors des tests de refus. IPv6/public/link-local et
 identification OS exhaustive ne sont pas pris en charge dans cet incrément.
+
+### Durcissement 0.8.1
+
+Le permis global de découverte limite à un scan réel par processus. Il est libéré
+à la fin ou lors du déroulement d’une panique ; simulation sans sondes indépendante.
+Les résultats sont invalidés lors des changements de cible/mode, le job est annulé
+et une réponse de génération obsolète est ignorée. Fin normale, annulation et
+expiration sont distinguées pour ne pas présenter un inventaire partiel comme complet.

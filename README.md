@@ -6,8 +6,8 @@ a graphical SFTP browser, saved sessions, and RDP, VNC and serial connections.
 **Preview software. English is the default; French is available in Settings
 (restart required).** Developed independently, without proprietary MobaXterm code.
 
-[Download v0.8.0](https://github.com/aurelson101/rustremote/releases/tag/v0.8.0) ·
-[Validation](docs/VALIDATION-0.8.0.md) · [Roadmap](docs/ROADMAP.md) ·
+[Download v0.8.1](https://github.com/aurelson101/rustremote/releases/tag/v0.8.1) ·
+[Validation](docs/VALIDATION-0.8.1.md) · [Roadmap](docs/ROADMAP.md) ·
 [Security](docs/SECURITY.md) · [License](LICENSE)
 
 ## Screenshots
@@ -60,7 +60,7 @@ and user-defined names retain their original language.
   prompts for the macOS account/password; these credentials are not saved by RustRemote.
 - **VNC / serial:** TigerVNC with an SSH tunnel option; integrated picocom terminal.
 - **Discovery:** opt-in private IPv4 TCP discovery (up to a /24), cancellable and
-  bounded to 8 workers / about 30s. Start with its offline simulation, then right-click
+  bounded to 8 workers per process / about 30s. Start with its offline simulation, then right-click
   a device to create an SSH/Linux, Windows/RDP, Apple/ARD or VNC profile. Choose
   an existing folder or create a nested folder, then enter your account and options
   in the regular editor. Service hints are **not confirmed OS identification**.
@@ -74,7 +74,10 @@ and user-defined names retain their original language.
 Use **Tools → Discover devices…**. Simulation is enabled initially and sends no
 packets. For a real scan, enter an IPv4 address or private CIDR (maximum /24),
 leave offline mode, and explicitly confirm authorization for that range. Editing
-that range clears the authorization. Public/link-local targets and IPv6 are refused.
+that range clears the authorization. Changing the range or simulation mode also
+clears old results and cancels/discards an obsolete job. Public/link-local targets
+and IPv6 are refused. Only one real discovery scan runs at a time. The final status
+distinguishes completion, cancellation and timeout, with checked/total host counts.
 Ports 22/3389/5900/445 are probed; an RFB security advertisement can identify an
 Apple ARD service. No credentials, remote commands or operating-system exploits
 are used. SSH alone does not distinguish Linux, macOS and Windows.
@@ -130,10 +133,10 @@ system protocol clients are required. The `-ABI.json` release asset records the
 libraries used to build this version.
 
 ```bash
-chmod +x RustRemote-0.8.0-preview-x86_64.AppImage
-./RustRemote-0.8.0-preview-x86_64.AppImage
+chmod +x RustRemote-0.8.1-preview-x86_64.AppImage
+./RustRemote-0.8.1-preview-x86_64.AppImage
 # Without FUSE:
-APPIMAGE_EXTRACT_AND_RUN=1 ./RustRemote-0.8.0-preview-x86_64.AppImage
+APPIMAGE_EXTRACT_AND_RUN=1 ./RustRemote-0.8.1-preview-x86_64.AppImage
 ```
 
 Protocol clients: OpenSSH, **FreeRDP 3** (`xfreerdp3` or a verified version-3

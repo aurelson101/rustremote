@@ -5,7 +5,7 @@
 
 ## 1. État de référence
 
-- **Mise à jour :** 2026-11-14 — préversion 0.8.0 découverte réseau publiée et téléchargements vérifiés.
+- **Mise à jour :** 2026-11-14 — correctif 0.8.1 découverte en validation ; 0.8.0 publiée.
 - **Dernier agent :** Codex ; découverte TCP privée bornée, menus de création Apple/VNC et ajout de profils depuis les résultats.
 - **Phase :** P1 — terminal/SFTP natifs, MVP encore incomplet.
 - **État confirmé :** terminal SSH/série intégré VTE, SFTP natif ssh2/libssh2 ; RDP/VNC externes ; profils/import/export, dossiers et paramètres persistants.
@@ -599,3 +599,27 @@ Prochaine tâche : qualifier une plage LAN explicitement autorisée si demandée
 sinon poursuivre les labs. Identification OS exhaustive/IPv6 et diagnostics de focus
 GTK restent ouverts. Les ports n’identifient pas un OS de façon certaine. Ne pas
 retirer la simulation des profils créés depuis les équipements fictifs.
+
+## Correctif 0.8.1 — 2026-11-14
+
+Demande de vérification bugs/failles/améliorations, limitée à la nouvelle découverte.
+Reprise propre sur c37547d. Défauts confirmés par inspection/tests : limite huit
+workers seulement par fenêtre (scans cumulables), résultat final indifférencié
+terminé/annulé/timeout, lignes conservées après changement de cible/mode.
+
+`discovery.rs` : permis global AtomicBool/Drop, refus du scan concurrent, rapport
+typé Complete/Cancelled/TimedOut/Simulated, hôtes traités/total et résultats partiels.
+`dialogs/discovery.rs` : invalidation des lignes et consentement, annulation de job
+obsolète, compteur de génération pour ignorer sa réponse tardive ; champ IPv4 limité
+à 64 caractères. Catalogue anglais et harnais GUI actualisés pour cette politique.
+
+49 tests Rust et fmt/check/Clippy réussis, dont refus concurrence/libération permis,
+expiration avant réseau, réponse RFB lente/incomplète et compteurs excessifs.
+AppImage 0.8.1 portable construite et startup Debian 12 PASS. Rejeu GUI ciblé discovery et
+Wayland PASS ; contrôles SSH/SFTP protocolaires du parent PASS. Aucun scan LAN réel ni autre connexion serveur.
+
+À vérifier ensuite : diagnostics focus GTK4.8 encore ouverts, file SFTP persistante
+et limites configurables ; noms DNS/mDNS optionnels et IPv6 avec scopes explicites.
+Ne pas annoncer ces suggestions comme déjà implémentées, ni un audit global de
+sécurité ou d’absence de fuite mémoire. Publication du correctif à finaliser après
+les vérifications de téléchargement et conservation des preuves dans VALIDATION-0.8.1.md.

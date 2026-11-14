@@ -100,6 +100,7 @@ impl Controller {
         body.append(&info);
         let scope = gtk::Entry::new();
         scope.set_text("127.0.0.1");
+        scope.set_max_length(64);
         scope.update_property(&[gtk::accessible::Property::Label(&crate::i18n::text(
             "Plage IPv4 autorisée",
         ))]);
@@ -131,6 +132,7 @@ impl Controller {
         cancel.set_sensitive(false);
         body.append(&cancel);
         let stop = Arc::new(AtomicBool::new(false));
+        let generation = Rc::new(Cell::new(0u64));
         let flag = stop.clone();
         cancel.connect_clicked(move |_| {
             flag.store(true, Ordering::Relaxed);
@@ -139,10 +141,30 @@ impl Controller {
         window.connect_hide(move |_| {
             flag.store(true, Ordering::Relaxed);
         });
-        let reset = consent.clone();
-        scope.connect_changed(move |_| reset.set_active(false));
-        let reset = consent.clone();
-        simulated.connect_toggled(move |_| reset.set_active(false));
+        for field in [
+            scope.clone().upcast::<gtk::Widget>(),
+            simulated.clone().upcast(),
+        ] {
+            let consent = consent.clone();
+            let list = list.clone();
+            let status = status.clone();
+            let generation = generation.clone();
+            let stop = stop.clone();
+            let reset = move || {
+                generation.set(generation.get().wrapping_add(1));
+                stop.store(true, Ordering::Relaxed);
+                consent.set_active(false);
+                while let Some(row) = list.first_child() {
+                    list.remove(&row);
+                }
+                status.set_text("Paramètres modifiés · relancez la découverte");
+            };
+            if let Some(entry) = field.downcast_ref::<gtk::Entry>() {
+                entry.connect_changed(move |_| reset());
+            } else if let Some(toggle) = field.downcast_ref::<gtk::CheckButton>() {
+                toggle.connect_toggled(move |_| reset());
+            }
+        }
         let c = self.clone();
         let weak_window = window.downgrade();
         run.connect_clicked(move |button| {
@@ -155,15 +177,17 @@ impl Controller {
             status.set_text(&format!("{} · {}",crate::i18n::text("Plage"),parsed.description()));
             button.set_sensitive(false);scope.set_sensitive(false);simulated.set_sensitive(false);consent.set_sensitive(false);cancel.set_sensitive(true);
             stop.store(false,Ordering::Relaxed);
+            let version=generation.get();let generation=generation.clone();
             let flag=stop.clone();let controller=c.clone();let list=list.clone();let status=status.clone();let run=button.clone();let cancel=cancel.clone();let scope=scope.clone();let simulated=simulated.clone();let consent=consent.clone();let weak_window=weak_window.clone();
-            io(move ||Ok(if fake {crate::discovery::simulated()}else{crate::discovery::scan(parsed,&flag)}),move |result| {
+            io(move ||if fake {Ok(crate::discovery::Report::simulation())}else{crate::discovery::scan(parsed,&flag)},move |result| {
                 if weak_window.upgrade().is_none_or(|w|!w.is_visible()){return;}
                 run.set_sensitive(true);scope.set_sensitive(true);simulated.set_sensitive(true);consent.set_sensitive(true);cancel.set_sensitive(false);
+                if generation.get()!=version {return;}
                 match result {
                     Err(e)=>status.set_text(&e),
-                    Ok(devices)=> {
-                        status.set_text(&format!("{} · {} · {}",if fake {crate::i18n::text("Simulation locale — aucun paquet réseau")}else{crate::i18n::text("Scan terminé ou arrêté (limite 30 s)")},devices.len(),crate::i18n::text("Clic droit pour créer un profil ; système à confirmer")));
-                        for device in devices {
+                    Ok(report)=> {
+                        status.set_text(&format!("{} · {}/{} · {} · {}",crate::i18n::text(report.label()),report.checked,report.total,report.devices.len(),crate::i18n::text("Clic droit pour créer un profil ; système à confirmer")));
+                        for device in report.devices {
                             let row=gtk::Box::new(gtk::Orientation::Horizontal,8);
                             let label=gtk::Label::new(Some(&format!("{} · {:?} · {}",device.address,device.ports,crate::i18n::text(device.hint()))));
                             label.set_wrap(true);label.set_xalign(0.0);label.set_hexpand(true);label.add_css_class("user-content");row.append(&label);

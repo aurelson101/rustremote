@@ -1,0 +1,81 @@
+{
+  "version": "0.8.1",
+  "date": "2026-11-14",
+  "artifact": "RustRemote-0.8.1-preview-x86_64.AppImage",
+  "sha256": "d0d5f763874f2093c9646284edd060122da5328bb317c25ea54105239f71146c",
+  "abi": {
+    "architecture": "x86_64",
+    "minimum_glibc": "2.36",
+    "gtk": "4.8.3",
+    "vte": "0.70.6"
+  },
+  "cargo": {
+    "fmt": true,
+    "check": true,
+    "clippy_deny_warnings": true,
+    "tests_passed": 49
+  },
+  "debian12_startup_passed": true,
+  "wayland_startup_fullscreen_passed": true,
+  "real_lan_scanned": false,
+  "new_regression_tests": [
+    "global scan exclusion and permit release",
+    "deadline expiry with no network probe",
+    "incomplete slow RFB greeting has a bounded read",
+    "excessive security-type count is refused"
+  ],
+  "targeted_gui_and_protocol_results": [
+    {
+      "target": "127.0.0.1",
+      "personal_desktop_accessed": false,
+      "english_default_without_override": true,
+      "folder_right_click_apple_and_gateway_defaults": true,
+      "discovery_results_invalidated_on_scope_and_mode_change": true,
+      "discovery_simulated_context_profiles_accounts_folders": true,
+      "discovery_simulated_results_stay_offline": true,
+      "discovery_real_scan_consent_and_public_scope_blocked": true,
+      "success": true,
+      "serial_received_bytes": 0,
+      "serial_commands": [],
+      "serial_replies": [],
+      "application_exit_before_cleanup": null
+    },
+    {
+      "target": "127.0.0.1",
+      "system_account_or_shell_used": false,
+      "openssh_utf8_exec": true,
+      "wrong_identity_rejected": true,
+      "changed_host_key_rejected": true,
+      "opensftp_bidirectional_files_folders": true,
+      "ssh_pty_and_resize": true,
+      "sftp_edit_readback": true,
+      "traversal_and_symlink_rejected": true,
+      "application_discovery_gui": true,
+      "success": true,
+      "services_stopped": true,
+      "events": {
+        "publickey_accepted": 5,
+        "publickey_rejected": 1,
+        "pty_requested": 1,
+        "resize_requested": 1,
+        "unsafe_path_rejected": 2,
+        "shell_commands": 0
+      }
+    }
+  ],
+  "limits": [
+    "Targeted discovery GUI replay, not a new full terminal/SFTP GUI replay",
+    "No real LAN/Windows/AD/Mac/hardware or endurance qualification",
+    "Known GTK4.8 focus warnings and criticals remain",
+    "Discovery OS hints, IPv4 and SFTP limits unchanged"
+  ],
+  "proposed_not_implemented": [
+    "GTK focus lifecycle fix after targeted reproduction",
+    "Persistent SFTP transfer queue and configurable limits",
+    "Optional DNS/mDNS and explicitly scoped IPv6"
+  ],
+  "publication": {
+    "status": "pending",
+    "release": "https://github.com/aurelson101/rustremote/releases/tag/v0.8.1"
+  }
+}

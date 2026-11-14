@@ -439,6 +439,15 @@ with tempfile.TemporaryDirectory(prefix="rustremote-ssh-display-") as directory:
                 wait(lambda:any(n.get_name().startswith("192.0.2.11 ·") for n in walk(app())),"Discovery fixtures missing")
                 capture("discovery","Network discovery")
                 pointer_click(wait(lambda:find("Local simulation — no network packets"),"Simulation checkbox absent"),1)
+                wait(lambda:not any(n.get_name().startswith("192.0.2.") for n in walk(find("Discovered devices"))),"Old results survived a mode change")
+                pointer_click(wait(lambda:find("Local simulation — no network packets"),"Simulation checkbox absent"),1)
+                click("Find devices")
+                wait(lambda:any(n.get_name().startswith("192.0.2.11 ·") for n in walk(app())),"Fresh simulation absent")
+                text("Authorized IPv4 range","127.0.0.2")
+                wait(lambda:not any(n.get_name().startswith("192.0.2.") for n in walk(find("Discovered devices"))),"Old results survived a scope change")
+                click("Find devices")
+                wait(lambda:any(n.get_name().startswith("192.0.2.11 ·") for n in walk(app())),"Discovery not restartable after invalidation")
+                result["discovery_results_invalidated_on_scope_and_mode_change"]=True
                 for address,choice,name,user in [("192.0.2.11","Add as Apple / ARD…","Discovered Mac","macscan"),("192.0.2.10","Add as Windows / RDP…","Discovered Windows","Administrator"),("192.0.2.12","Add as Linux / SSH…","Discovered Linux","linuxscan")]:
                     node=wait(lambda:next((n for n in walk(app()) if n.get_name().startswith(address+" ·")),None),"Device row missing")
                     if name=="Discovered Linux":click("Add as connection…")

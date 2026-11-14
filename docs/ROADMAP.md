@@ -283,3 +283,11 @@ Publication 0.8.0 vérifiée sur le commit
 `7b6492f390b18f1832841abcfec20826c622065e` : AppImage et trois fichiers annexes
 retéléchargés et comparés. Rejeu complet GUI/discovery/SSH/SFTP et Wayland PASS.
 P2-07 reste PARTIAL pour l’identification OS et la qualification de réseaux réels.
+
+## Correctif 0.8.1 — 2026-11-14
+
+Découverte : un seul scan réel par processus, états terminés/annulés/expirés distincts
+avec progression traités/total. Modifier cible/mode efface les résultats et invalide
+les callbacks obsolètes. 49 tests Rust et contrôles Cargo réussis ; rejeu ciblé dans
+VALIDATION-0.8.1.md. P2-07 reste PARTIAL pour OS/IPv6/réseaux réels ; focus GTK et
+file de transferts SFTP restent des améliorations ouvertes.

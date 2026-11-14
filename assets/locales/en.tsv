@@ -446,3 +446,8 @@ Limite : un réseau /24 maximum (254 hôtes)	Limit: at most a /24 network (254 h
 Seules les adresses privées et loopback sont autorisées	Only private and loopback addresses are allowed
 Passerelle Apple vide : adresse et compte du Mac utilisés.	Blank Apple gateway: use the Mac address and account.
 Ajouter en Linux / SSH…	Add as Linux / SSH…
+Un scan est déjà en cours ; attendez ou annulez-le.	A scan is already running; wait or cancel it.
+Scan terminé	Scan complete
+Scan annulé · résultats partiels	Scan cancelled · partial results
+Délai atteint · résultats partiels	Time limit reached · partial results
+Paramètres modifiés · relancez la découverte	Settings changed · run discovery again
