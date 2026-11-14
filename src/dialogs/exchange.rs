@@ -302,6 +302,8 @@ impl Controller {
         for (title, operation) in [
             ("Nouvelle connexion SSH dans ce dossier", 0),
             ("Nouvelle connexion RDP dans ce dossier", 1),
+            ("Nouvelle connexion Apple dans ce dossier", 6),
+            ("Nouvelle connexion VNC dans ce dossier", 7),
             ("Nouveau sous-dossier", 2),
             ("Déplacer ce dossier…", 5),
             ("Renommer ce dossier", 3),
@@ -328,6 +330,8 @@ impl Controller {
                 }
                 match operation {
                     0 | 1 => c.editor_details(None, operation, Some(&folder)),
+                    6 => c.editor_details(None, 4, Some(&folder)),
+                    7 => c.editor_details(None, 2, Some(&folder)),
                     2 => c.new_subfolder(&folder),
                     5 => c.move_dialog(&format!("folder:{folder}"), None),
                     _ => c.edit_folder(&folder, operation == 4),

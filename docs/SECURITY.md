@@ -158,3 +158,20 @@ Références : https://docs.rs/age/0.11.5/age/ et manuel local `xfreerdp3 /help`
 - Essais d’identifiants : serveur éphémère loopback et coffre privé dans un HOME/data
   temporaire, bus de session séparé ; aucun accès au trousseau personnel. Le domaine
   RDP de laboratoire utilise une configuration Kerberos éphémère sans recherche DNS.
+
+## Découverte réseau — 0.8.0
+
+Aucun scan au démarrage. La fenêtre démarre en simulation sans réseau. Un scan
+réel exige une IPv4 privée/loopback explicite ou un CIDR /24 au maximum, avec
+confirmation d’autorisation de cette plage ; changer la plage efface ce choix.
+Le mode --offline bloque le scan réel. Pas de DNS, d’authentification, de commande
+distante ni de fingerprinting par exploitation. Ports TCP 22/3389/5900/445 seulement,
+huit workers par scan, délai de connexion 180ms, annonce RFB bornée 250ms et 32 types,
+budget global 30s puis fin de la sonde courte déjà engagée. Annulation à la fermeture.
+
+Les indices de service/OS sont indicatifs et éditables. L’ajout crée un formulaire,
+pas une connexion automatique ; comptes, clés et domaines relèvent de l’éditeur
+existant. Les résultats ne contiennent aucun mot de passe. Les profils issus du
+simulateur conservent simulation=true. Les limites de scope IPv4 sont contrôlées
+avant tout réseau, y compris lors des tests de refus. IPv6/public/link-local et
+identification OS exhaustive ne sont pas pris en charge dans cet incrément.

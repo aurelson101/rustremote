@@ -4,6 +4,7 @@ mod connections;
 mod credentials;
 mod desktop;
 mod diagnostics;
+mod discovery;
 mod exchange;
 mod rdp;
 mod settings;
@@ -744,11 +745,22 @@ impl Controller {
         default_protocol: u32,
         default_folder: Option<&str>,
     ) {
+        self.editor_prefilled(index, default_protocol, default_folder, None);
+    }
+    fn editor_prefilled(
+        &self,
+        index: Option<usize>,
+        default_protocol: u32,
+        default_folder: Option<&str>,
+        seed: Option<SessionProfile>,
+    ) {
         if self.0.store.borrow().is_none() {
             self.startup();
             return;
         }
-        let original = index.and_then(|i| self.0.profiles.borrow().get(i).cloned());
+        let original = index
+            .and_then(|i| self.0.profiles.borrow().get(i).cloned())
+            .or(seed);
         let window = self.window("Configuration de connexion", 580);
         window.set_default_height(640);
         let body = gtk::Box::new(gtk::Orientation::Vertical, 10);
@@ -1109,7 +1121,7 @@ impl Controller {
         let original_name = original.as_ref().map(|p| p.name.clone());
         let original_profile = original.clone();
         save.connect_clicked(move |button| {
-            let options = if protocol.selected() == 1 {
+            let mut options = if protocol.selected() == 1 {
                 match rdp_form.options() {
                     Ok(options) => options,
                     Err(e) => {
@@ -1133,6 +1145,18 @@ impl Controller {
                         .then(|| config_file.text().trim().to_string()),
                 }
             };
+            if platform.selected() == 3
+                && let ProtocolOptions::Vnc {
+                    tunnel: Some(t), ..
+                } = &mut options
+            {
+                if t.host.is_empty() {
+                    t.host = host.text().trim().into();
+                }
+                if t.username.is_empty() {
+                    t.username = user.text().trim().into();
+                }
+            }
             let mut profile = SessionProfile {
                 name: name.text().trim().into(),
                 host: host.text().trim().into(),

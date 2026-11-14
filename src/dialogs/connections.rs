@@ -53,6 +53,11 @@ impl ConnectionsForm {
         ));
         apple.set_wrap(true);
         vnc.append(&apple);
+        let defaults = gtk::Label::new(Some(
+            "Passerelle Apple vide : adresse et compte du Mac utilisés.",
+        ));
+        defaults.set_wrap(true);
+        vnc.append(&defaults);
         let view_only = gtk::ToggleButton::with_label("VNC en lecture seule");
         vnc.append(&view_only);
         let serial = gtk::Box::new(gtk::Orientation::Vertical, 8);

@@ -2,6 +2,7 @@ mod askpass_wire;
 mod clipboard;
 mod credentials;
 mod dialogs;
+mod discovery;
 mod external;
 mod i18n;
 mod icons;

@@ -5,13 +5,13 @@
 
 ## 1. État de référence
 
-- **Mise à jour :** 2026-11-14 — préversion 0.7.0 Apple/SFTP publiée et téléchargements vérifiés.
+- **Mise à jour :** 2026-11-14 — 0.8.0 découverte réseau et menus de dossiers en validation ; 0.7.0 publiée.
 - **Dernier agent :** Codex ; Apple ARD via TigerVNC DH/SSH, recherche SFTP et tests Apple locaux.
 - **Phase :** P1 — terminal/SFTP natifs, MVP encore incomplet.
 - **État confirmé :** terminal SSH/série intégré VTE, SFTP natif ssh2/libssh2 ; RDP/VNC externes ; profils/import/export, dossiers et paramètres persistants.
 - **Code existant :** package Rust/GTK4, ui/dialogs/profiles/store/simulation/icons ; scripts AppImage, GTK et laboratoires réseau/PTY.
 - **Plateforme cible initiale :** Ubuntu Linux / GNOME. Debian ensuite.
-- **Dernière vérification réelle :** 42 tests Rust et contrôles Cargo réussis ; AppImage portable 0.7.0 publiée. Voir `docs/VALIDATION-0.7.0.md` et `docs/validation/0.7.0.json` pour les parcours et limites.
+- **Dernière vérification réelle :** 45 tests Rust et contrôles Cargo réussis ; AppImage 0.8.0 et parcours complet GUI/discovery/SSH/SFTP/Wayland PASS. Voir `docs/VALIDATION-0.8.0.md` et `docs/validation/0.8.0.json`.
 
 ## 2. Objectif immuable
 
@@ -557,3 +557,32 @@ APFS) uniquement avec autorisation de sa cible ; sinon poursuivre les laboratoir
 Corriger ensuite les diagnostics de focus GTK et examiner le sélecteur Move sous
 GTK natif de l’hôte. P1-04/SQLite et P2-02 moteur intégré restent ouverts. Ne pas
 annoncer de parité ARD haute performance ni de stockage du mot de passe VNC.
+
+## Incrément 0.8.0 — 2026-11-14
+
+Reprise propre sur e43af17. Demande : Apple dans le clic droit des dossiers et
+outil de découverte Windows/Apple/Linux avec ajout de connexions/dossiers/comptes.
+`exchange.rs` ajoute Apple (preset4) et VNC au menu existant. L’éditeur conserve
+le dossier demandé ; passerelle Apple laissée vide reprend host/user du formulaire.
+`editor_prefilled` réutilise le même chemin de validation/coffre/persistance pour les
+résultats réseau, sans connexion automatique.
+
+Nouveaux `discovery.rs` et `dialogs/discovery.rs`, action/menu Outils. Simulation
+par défaut ; scan réel explicitement autorisé, RFC1918/loopback IPv4 /24 max,
+ports22/3389/5900/445, huit workers, 30s + fin I/O courte, annulable. Lecture RFB
+limitée pour type30, sans choisir d’authentification. OS indicatif : ne pas assimiler
+SSH à Linux ou SMB/RDP à une preuve Windows. IPv6/public/link-local refusés. Aucun
+réseau réel scanné pendant le développement : sockets factices loopback en tests.
+
+45 tests Rust et fmt/check/Clippy réussis ; AppImage 0.8 construite, ABI glibc 2.36 et
+startup Debian 12 passés. Harnais GUI étendu pour menu Apple de dossier, contrôles
+scope/consentement et création de trois profils depuis les résultats simulés avec
+comptes et dossiers existants/nouveaux. Les CheckButton GTK4.8 n’offrent pas toujours
+une action AT-SPI cliquable ; test corrigé par clic physique dans le Xvfb privé.
+Mode RUSTREMOTE_DISCOVERY_ONLY=1 pour rejeu ciblé, le parent rapporte discovery_gui
+au lieu d’affirmer que le terminal GUI a été testé dans ce mode.
+
+Parcours ciblé et complet de l’artefact final PASS ; bouton dynamique traduit après
+revue de capture, simulation reste hors ligne après bascule du contrôle. Capture
+inspectée, README/rapport prêts. Prochaine action : publier et vérifier les assets.
+Ne pas scanner un réseau réel pour qualifier le produit sans cible autorisée.

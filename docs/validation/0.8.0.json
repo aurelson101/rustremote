@@ -1,0 +1,88 @@
+{
+  "version": "0.8.0",
+  "date": "2026-11-14",
+  "artifact": "RustRemote-0.8.0-preview-x86_64.AppImage",
+  "sha256": "6499c7effff769a214bb832a551fb8b1345d277c902d6c24d5cfa5894c34bede",
+  "abi": {
+    "architecture": "x86_64",
+    "minimum_glibc": "2.36",
+    "gtk": "4.8.3",
+    "vte": "0.70.6"
+  },
+  "cargo": {
+    "fmt": true,
+    "check": true,
+    "clippy_deny_warnings": true,
+    "tests_passed": 45
+  },
+  "debian12_startup_passed": true,
+  "wayland_startup_fullscreen_passed": true,
+  "real_lan_scanned": false,
+  "discovery_engine_tests": [
+    "private CIDR bounds and public/link-local/IPv6 rejection",
+    "ephemeral loopback TCP listener and cancellation",
+    "loopback RFB Apple advertisement, no authentication type selected"
+  ],
+  "gui_and_protocol_results": [
+    {
+      "target": "127.0.0.1",
+      "personal_desktop_accessed": false,
+      "english_default_without_override": true,
+      "profile_context_move_and_nested_creation": true,
+      "folder_drag_moves_descendants_and_profiles": true,
+      "profile_drag_and_drop": true,
+      "view_actions": true,
+      "apple_profile_preset_and_simulation_saved": true,
+      "folder_right_click_apple_and_gateway_defaults": true,
+      "discovery_simulated_context_profiles_accounts_folders": true,
+      "discovery_simulated_results_stay_offline": true,
+      "discovery_real_scan_consent_and_public_scope_blocked": true,
+      "tools_system_information_and_public_key_fingerprint": true,
+      "sftp_graphical_multiple_files_folders_upload": true,
+      "sftp_filter_clears_hidden_selection": true,
+      "sftp_graphical_drag_and_drop_upload": true,
+      "sftp_graphical_edit_readback": true,
+      "sftp_graphical_multiple_files_folders_download": true,
+      "french_setting_persisted_after_restart": true,
+      "success": true,
+      "serial_received_bytes": 0,
+      "serial_commands": [],
+      "serial_replies": [],
+      "application_exit_before_cleanup": null
+    },
+    {
+      "target": "127.0.0.1",
+      "system_account_or_shell_used": false,
+      "openssh_utf8_exec": true,
+      "wrong_identity_rejected": true,
+      "changed_host_key_rejected": true,
+      "opensftp_bidirectional_files_folders": true,
+      "ssh_pty_and_resize": true,
+      "sftp_edit_readback": true,
+      "traversal_and_symlink_rejected": true,
+      "application_terminal_gui": true,
+      "success": true,
+      "services_stopped": true,
+      "events": {
+        "publickey_accepted": 9,
+        "publickey_rejected": 1,
+        "pty_requested": 2,
+        "resize_requested": 1,
+        "unsafe_path_rejected": 2,
+        "shell_commands": 0
+      }
+    }
+  ],
+  "limits": [
+    "OS hints are not confirmed identification",
+    "IPv4 private/loopback, /24 maximum, TCP22/3389/5900/445,8workers,30s plus current short probe",
+    "No real LAN, real Windows/AD or Mac/hardware qualification",
+    "Known GTK4.8 focus diagnostics remain",
+    "SFTP and external VNC limits from0.7 unchanged"
+  ],
+  "publication": {
+    "status": "pending",
+    "release": "https://github.com/aurelson101/rustremote/releases/tag/v0.8.0",
+    "repository_public_verified": true
+  }
+}

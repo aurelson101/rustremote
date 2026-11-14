@@ -414,9 +414,58 @@ with tempfile.TemporaryDirectory(prefix="rustremote-ssh-display-") as directory:
                     for n in range(1,21):xt.XTestFakeMotionEvent(display,-1,int(sx+(ex-sx)*n/20),int(sy+(ey-sy)*n/20),0);x.XFlush(display);time.sleep(.06)
                     xt.XTestFakeButtonEvent(display,1,0,0);x.XFlush(display)
                 finally:x.XCloseDisplay(display)
+            def exercise_discovery():
+                pointer_click(wait(lambda:find("Linux"),"Folder menu target absent"),3)
+                click("New Apple connection in this folder")
+                text("Profile name","Folder Mac");text("Host / IP address","folder-mac.example.invalid");text("Username","folderadmin")
+                click("Local simulation (no network)");click("Save profile")
+                wait(lambda:any(p["name"]=="Folder Mac" for p in workspace()["profiles"]),"Folder Apple profile missing")
+                folder_mac=next(p for p in workspace()["profiles"] if p["name"]=="Folder Mac")
+                assert folder_mac["folder"]=="Linux" and folder_mac["platform"]=="MacOs"
+                assert folder_mac["options"]["tunnel"]["username"]=="folderadmin"
+                assert folder_mac["options"]["tunnel"]["host"]==folder_mac["host"]
+                result["folder_right_click_apple_and_gateway_defaults"]=True
+                click("Tools");click("Discover devices…");wait(lambda:find("Network discovery"),"Discovery absent")
+                pointer_click(wait(lambda:find("Local simulation — no network packets"),"Simulation checkbox absent"),1)
+                click("Find devices")
+                wait(lambda:any("Real scan blocked" in n.get_name() for n in walk(app())),"Unapproved real scan was not blocked")
+                pointer_click(wait(lambda:find("I am authorized to scan this network range"),"Consent checkbox absent"),1)
+                text("Authorized IPv4 range","8.8.8.8")
+                assert not find("I am authorized to scan this network range").get_state_set().contains(Atspi.StateType.CHECKED),"Consent was retained for a changed scope"
+                click("Find devices")
+                wait(lambda:any("Only private and loopback" in n.get_name() for n in walk(app())),"Public scan was not refused")
+                text("Authorized IPv4 range","127.0.0.1")
+                pointer_click(wait(lambda:find("Local simulation — no network packets"),"Simulation checkbox absent"),1);click("Find devices")
+                wait(lambda:any(n.get_name().startswith("192.0.2.11 ·") for n in walk(app())),"Discovery fixtures missing")
+                capture("discovery","Network discovery")
+                pointer_click(wait(lambda:find("Local simulation — no network packets"),"Simulation checkbox absent"),1)
+                for address,choice,name,user in [("192.0.2.11","Add as Apple / ARD…","Discovered Mac","macscan"),("192.0.2.10","Add as Windows / RDP…","Discovered Windows","Administrator"),("192.0.2.12","Add as Linux / SSH…","Discovered Linux","linuxscan")]:
+                    node=wait(lambda:next((n for n in walk(app()) if n.get_name().startswith(address+" ·")),None),"Device row missing")
+                    if name=="Discovered Linux":click("Add as connection…")
+                    else:pointer_click(node,3)
+                    click(choice);wait(lambda:find("Connection settings"),"Discovered profile editor absent")
+                    text("Profile name",name);text("Username",user)
+                    if name=="Discovered Windows":text("AD domain / realm","LAB")
+                    if name=="Discovered Mac":
+                        select_combo("Connection settings",workspace()["folders"].index("Linux")+1)
+                    else:text("New session folder","Discovered/"+("Windows" if name=="Discovered Windows" else "Linux"))
+                    click("Save profile")
+                    wait(lambda:any(p["name"]==name for p in workspace()["profiles"]),"Discovered profile not saved")
+                    saved=next(p for p in workspace()["profiles"] if p["name"]==name)
+                    assert saved["host"]==address and saved["username"]==user and saved["simulation"]
+                    if name=="Discovered Mac":assert saved["folder"]=="Linux" and saved["platform"]=="MacOs" and saved["options"]["tunnel"]["username"]==user
+                    elif name=="Discovered Windows":assert saved["options"]["domain"]=="LAB" and saved["platform"]=="Windows"
+                    else:assert saved["platform"]=="Linux" and saved["options"]["protocol"]=="Ssh"
+                result["discovery_simulated_context_profiles_accounts_folders"]=True
+                result["discovery_simulated_results_stay_offline"]=True
+                result["discovery_real_scan_consent_and_public_scope_blocked"]=True
+                close_window("Network discovery")
             wait(lambda:find("Open profiles"),"Default English startup absent");click("Unlock / open")
             wait(lambda:find("Actions "+profile["name"]),"Profiles absent")
             result["english_default_without_override"]=True
+            if os.environ.get("RUSTREMOTE_DISCOVERY_ONLY")=="1":
+                exercise_discovery();result["success"]=True;raise SystemExit(0)
+
             for name in ("Linux/Servers/Production","Archive"):
                 click("New session folder");text("Folder name",name);click("Create folder")
                 wait(lambda:name in workspace()["folders"],"Folder not saved: "+name)
@@ -449,6 +498,7 @@ with tempfile.TemporaryDirectory(prefix="rustremote-ssh-display-") as directory:
             assert mac["platform"]=="MacOs" and mac["options"]["protocol"]=="Vnc" and mac["simulation"]
             assert mac["port"]==5900 and mac["options"]["tunnel"]["host"]==mac["host"]
             result["apple_profile_preset_and_simulation_saved"]=True
+            exercise_discovery()
             click("RDP");wait(lambda:find("Connection settings"),"RDP form absent");text("Profile name","Windows lab");text("Host / IP address","windows.example.invalid");text("Username","Administrator");text("AD domain / realm","LAB");capture("rdp","Connection settings");click("Cancel")
             click("Tools");click("System information…")
             wait(lambda:find("System information"),"System information absent");capture("system","System information");close_window("System information")

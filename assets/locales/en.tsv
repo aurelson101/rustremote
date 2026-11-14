@@ -416,3 +416,33 @@ Rechercher dans les deux panneaux	Search both panes
 Filtre SFTP	SFTP filter
 Fichiers cachés	Hidden files
 macOS : choisir macOS / Apple, VNC et le même Mac comme passerelle SSH. Activez Partage d’écran et Connexion à distance sur le Mac. TigerVNC 1.14+ demande le compte macOS et son mot de passe dans sa fenêtre ; aucun repli VNC ni mot de passe exporté.	macOS: choose macOS / Apple, VNC and the same Mac as SSH gateway. Enable Screen Sharing and Remote Login on the Mac. TigerVNC 1.14+ prompts for the macOS account and password in its window; no VNC fallback or exported password.
+Nouvelle connexion Apple dans ce dossier	New Apple connection in this folder
+Nouvelle connexion VNC dans ce dossier	New VNC connection in this folder
+Découvrir les équipements…	Discover devices…
+Découverte réseau	Network discovery
+TCP 22/3389/5900/445 · IPv4 privé /24 maximum · 8 workers · 30 s. Aucune authentification. Le système reste à confirmer.	TCP 22/3389/5900/445 · private IPv4 /24 maximum · 8 workers · 30 s. No authentication. Confirm the operating system.
+Plage IPv4 autorisée	Authorized IPv4 range
+Je suis autorisé à analyser cette plage réseau	I am authorized to scan this network range
+Rechercher les équipements	Find devices
+Équipements détectés	Discovered devices
+Annuler le scan	Cancel scan
+Scan réel bloqué : autorisation de la plage requise et mode hors ligne désactivé.	Real scan blocked: authorize the range and leave offline mode.
+Plage	Range
+Scan terminé ou arrêté (limite 30 s)	Scan finished or stopped (30 s limit)
+Clic droit pour créer un profil ; système à confirmer	Right-click to create a profile; confirm the operating system
+Ajouter comme connexion…	Add as connection…
+Ajouter en SSH…	Add as SSH…
+Ajouter en Windows / RDP…	Add as Windows / RDP…
+Ajouter en Apple / ARD…	Add as Apple / ARD…
+Ajouter en VNC…	Add as VNC…
+Apple ARD annoncé · système à confirmer	Apple ARD advertised · confirm the operating system
+RDP · Windows possible	RDP · possibly Windows
+VNC · macOS/Linux possible	VNC · possibly macOS/Linux
+SMB · Windows/Linux possible	SMB · possibly Windows/Linux
+SSH · système non identifié	SSH · operating system unknown
+Adresse IPv4 ou CIDR privé requis	An IPv4 address or private CIDR is required
+Préfixe CIDR invalide	Invalid CIDR prefix
+Limite : un réseau /24 maximum (254 hôtes)	Limit: at most a /24 network (254 hosts)
+Seules les adresses privées et loopback sont autorisées	Only private and loopback addresses are allowed
+Passerelle Apple vide : adresse et compte du Mac utilisés.	Blank Apple gateway: use the Mac address and account.
+Ajouter en Linux / SSH…	Add as Linux / SSH…

@@ -14,6 +14,7 @@
 | P1-04 | Ergonomie | Haute | PARTIAL | Favoris, édition, recherche/raccourcis et dossiers hiérarchiques avec DND livrés ; migration SQLite reste ouverte. |
 | P2-01 | RDP | Haute | PARTIAL | PoC IronRDP sécurisée avec labo Windows, certificat, UI basique. |
 | P2-02 | VNC | Moyenne | PARTIAL | Lanceur TigerVNC avec tunnel SSH ; Apple ARD type30 via DH ajouté en 0.7.0. Moteur intégré et qualification Mac réel restent ouverts. |
+| P2-07 | Découverte | Moyenne | PARTIAL | Découverte TCP privée bornée et création de profils via clic droit ; identification OS indicative, qualification des réseaux réels ouverte. |
 | P2-06 | Série | Moyenne | PARTIAL | Profil picocom et switch simulé ; liaison PTY testée, matériel physique non testé. |
 | P2-03 | Réseau | Moyenne | PARTIAL | Tunnels local/distant/SOCKS et ProxyJump livrés ; X11 forwarding reste ouvert. |
 | P2-04 | Outils | Moyenne | DONE | Macros et Multi-Exec sur sessions SSH authentifiées avec prévisualisation, annulation et approbation testées en laboratoire. |
@@ -265,3 +266,15 @@ Publication 0.7.0 effectuée : sources/README/captures sur GitHub, tag
 `a132fbb72e2f8df8fe4a42b30815cef1a1e3f7f5`, AppImage et trois fichiers annexes
 retéléchargés et comparés. Rejeu final AppImage SSH/SFTP/Apple et Wayland PASS.
 Le dépôt est public au moment de cette livraison ; visibilité inchangée.
+
+## Incrément 0.8.0 — 2026-11-14
+
+Clic droit de dossier : Apple et VNC ajoutés, dossier conservé dans l’éditeur.
+Outils/Découvrir les équipements : simulation par défaut, TCP IPv4 privé /24 max,
+autorisation explicite réinitialisée quand la cible change, refus public/link-local
+et --offline, huit workers et budget 30s avec annulation. Sonde RFB limitée à
+l’annonce de sécurité, sans sélection d’authentification. Les systèmes ne sont pas
+certifiés à partir de ports. Clic droit d’un résultat : éditeur prérempli, choix du
+dossier existant/nouveau, compte et options SSH/RDP/Apple/VNC ; pas de connexion
+automatique, simulations conservées. 45 tests Rust et contrôles Cargo réussis.
+La qualification GUI finale et la publication sont décrites dans VALIDATION-0.8.0.md.

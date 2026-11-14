@@ -162,3 +162,10 @@ rustremote/
 ├── AGENTS.md
 └── MEMORY.md
 ```
+
+## Découverte implémentée — 0.8.0
+
+`discovery.rs` isole la validation des plages privées, les sondes TCP/RFB bornées,
+les huit workers et leur annulation. `dialogs/discovery.rs` expose les résultats et
+les menus ; leur ajout passe par `editor_prefilled`, puis par la validation et le
+stockage existants. Le worker réseau ne lit aucun coffre ni donnée d’authentification.

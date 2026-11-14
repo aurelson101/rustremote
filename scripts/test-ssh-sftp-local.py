@@ -389,7 +389,7 @@ with tempfile.TemporaryDirectory(prefix="rustremote-ssh-") as directory:
             (config/"profiles.json").write_text(json.dumps({"version":1,"folders":["Linux"],"profiles":[primary,agent_profile]}))
             gui=subprocess.run(["dbus-run-session","--","python3",str(Path(__file__).with_name("smoke-connected.py")),str(image),str(config.parent)],env=gui_env,timeout=600)
             assert gui.returncode==0,"Parcours SSH intégré échoué"
-            summary["application_terminal_gui"]=True
+            summary["application_discovery_gui" if os.environ.get("RUSTREMOTE_DISCOVERY_ONLY")=="1" else "application_terminal_gui"]=True
         summary["success"] = True
     finally:
         if client:
