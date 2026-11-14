@@ -5,7 +5,7 @@
 
 ## 1. État de référence
 
-- **Mise à jour :** 2026-11-14 — 0.9.1 préparée, rapport SignPath local et anciennes releases sauvegardées.
+- **Mise à jour :** 2026-11-14 — 0.9.1 publiée/vérifiée, anciennes releases retirées après sauvegarde, rapport HTML local.
 - **Dernier agent :** Codex ; confidentialité/GPL, notices et build portable, vérification GUI SSH/SFTP.
 - **Phase :** P1 — terminal/SFTP natifs, MVP encore incomplet.
 - **État confirmé :** terminal SSH/série intégré VTE, SFTP natif ssh2/libssh2 ; RDP/VNC externes ; profils/import/export, dossiers et paramètres persistants.
@@ -719,6 +719,12 @@ Pas de nouvelle qualification LAN, Windows/macOS, périphériques ou endurance.
 
 Six releases GitHub v0.5.0 à v0.9.0 sauvegardées avec métadonnées, tous les assets,
 SHA256 et vérification des sidecars. Archive dans dist/release-backups, hors Git.
-À terminer : publier/vérifier 0.9.1, puis retirer seulement ces anciennes releases
-si leurs IDs/métadonnées n'ont pas changé, en conservant leurs tags et le rollback.
-Archiver les anciens artefacts locaux, préserver le rapport HTML et la nouvelle image.
+Publication0.9.1 effectuée et quatre assets retéléchargés/comparés ; source
+`db99bb1ba943b3f244f8c31c3aafebd706d8254f`. Six anciennes releases supprimées après vérification des sauvegardes
+et des IDs/métadonnées inchangés ; six tags Git conservés avec mêmes cibles. Archive
+locale complète22assets et métadonnées, plus17anciens artefacts locaux déplacés ;
+rapport HTML et nouvelle AppImage préservés. SHA256 nouvelle image : `e2642a459140ad0326117f50aee5d6b85e767834008fa085145abd101b18a29b`.
+https://github.com/aurelson101/rustremote/releases/tag/v0.9.1
+Le commit suivant ne modifie que les statuts de livraison. Prochaine tâche :
+qualification GtkText focus-out/mDNS/matériels selon autorisation, portage Windows
+et admission SignPath restent ouverts. Aucun formulaire SignPath envoyé.

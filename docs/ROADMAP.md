@@ -326,3 +326,8 @@ DONE : rapport SignPath HTML local exclu du dépôt ; notices GPL/confidentialit
 contrôles Cargo PASS ; GUI anglais SSH/SFTP/About PASS. Vérification du rapport dans
 Brave headless isolé. Voir VALIDATION-0.9.1.md. Publication/nettoyage après backup et
 comparaison des nouveaux assets ; tags historiques conservés. SignPath non acquis.
+
+Publication0.9.1 vérifiée : quatre assets retéléchargés/comparés. Six anciennes
+releases retirées après sauvegarde intégrale et contrôle d'absence de changement ;
+leurs tags Git sont conservés.17anciens artefacts locaux archivés. Le rapport HTML
+personnel reste exclu de Git et des assets. État de reprise dans MEMORY.md.

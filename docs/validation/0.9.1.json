@@ -32,7 +32,18 @@
     "SignPath admission pending; no signed Windows release"
   ],
   "publication": {
-    "status": "not_published"
+    "status": "published",
+    "release": "https://github.com/aurelson101/rustremote/releases/tag/v0.9.1",
+    "source_commit": "db99bb1ba943b3f244f8c31c3aafebd706d8254f",
+    "downloaded_assets_match_local": true,
+    "prerelease": true,
+    "draft": false,
+    "assets": [
+      "RustRemote-0.9.1-preview-x86_64.AppImage",
+      "RustRemote-0.9.1-preview-x86_64.AppImage.sha256",
+      "RustRemote-0.9.1-ABI.json",
+      "build-packages.txt"
+    ]
   },
   "targeted_gui_and_protocol_results": [
     {
@@ -88,5 +99,19 @@
         "shell_commands": 0
       }
     }
-  ]
+  ],
+  "retired_releases": {
+    "tags": [
+      "v0.9.0",
+      "v0.8.1",
+      "v0.8.0",
+      "v0.7.0",
+      "v0.6.0",
+      "v0.5.0"
+    ],
+    "metadata_assets_backed_up": true,
+    "historical_git_tags_preserved": true,
+    "backup_directory": "dist/release-backups/2026-11-14-before-0.9.1",
+    "old_local_artifacts_archived": 17
+  }
 }
