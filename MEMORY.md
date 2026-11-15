@@ -1061,3 +1061,12 @@ facultatif. Credential Manager lié au compte/hôte/domaine/config SSH.
 Tests Linux workspace et modèles portables PASS ; nouveaux appels Win32 encore
 à compiler et qualifier par CI Server2022 et Windows11 ARM (x64 émulé).
 Aucun MSI ni protocole Windows complet revendiqué. Branche dédiée de validation.
+
+CI b9ad193 run43726514421 : Server2022 build, 6 modèles, 8 tests prototype,
+WINDOWS_STORAGE_OK et WINDOWS_CREDENTIALS_OK PASS, ConPTY/live CLI PASS.
+Smoke GTK initial PASS ; smoke live FAIL timeout phase2 (resize). Ajout diagnostics
+non sensibles dimensions/capture et conservation artefacts même à l’échec.
+Windows11 ARM encore en cours ; ne pas déclarer qualification complète.
+Linux après extraction : fmt/check/clippy PASS ; 60 tests PASS,2ignored ;
+rejeu GUI SSH/SFTP intégral PASS /tmp/rustremote-windows-core-linux-gui.log.
+Test ciblé supplémentaire de liaison des secrets aux paramètres SSH PASS.

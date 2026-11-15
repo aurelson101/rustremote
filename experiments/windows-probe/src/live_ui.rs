@@ -304,7 +304,22 @@ pub fn attach(
                 return gtk::glib::ControlFlow::Break;
             };
             if std::time::Instant::now() > deadline {
-                eprintln!("GUI live terminal timeout at phase {phase}");
+                eprintln!(
+                    "GUI live terminal timeout at phase {phase}; window={}x{}, before={before_size:?}, current={:?}",
+                    window.width(),
+                    window.height(),
+                    sessions
+                        .borrow()
+                        .as_ref()
+                        .and_then(|s| s.snapshot(0))
+                        .map(|s| s.screen.size())
+                );
+                if capture_ui {
+                    let _ = crate::capture::window(
+                        &window,
+                        std::path::Path::new("dist/windows-probe/terminal-failure.png"),
+                    );
+                }
                 if let Some(session) = sessions.borrow().as_ref() {
                     session.close();
                 }
@@ -341,6 +356,11 @@ pub fn attach(
                         .as_ref()
                         .and_then(|s| s.snapshot(0))
                         .map(|s| s.screen.size());
+                    eprintln!(
+                        "GUI resize request: window={}x{}, grid={before_size:?}",
+                        window.width(),
+                        window.height()
+                    );
                     window.set_default_size(540, 680);
                     phase = 2;
                 }

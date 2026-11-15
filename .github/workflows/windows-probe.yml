@@ -71,7 +71,8 @@ jobs:
         run: |
           cp experiments/windows-probe/README.md dist/windows-probe/README.md
           cp LICENSE NOTICE dist/windows-probe/
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      - if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: windows-feasibility-probe-${{ matrix.runner }}
           path: dist/windows-probe/

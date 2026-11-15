@@ -67,6 +67,45 @@ mod portable_tests {
     }
 
     #[test]
+    fn credentials_follow_identity_and_trust_not_display_metadata() {
+        let profile = profile();
+        let scope = profile.credential_scope().unwrap();
+        let mut changed = profile.clone();
+        changed.name = "Renamed".into();
+        changed.folder = "Archive".into();
+        changed.favorite = !changed.favorite;
+        assert_eq!(changed.credential_scope().unwrap(), scope);
+        changed = profile.clone();
+        changed.port += 1;
+        assert_ne!(changed.credential_scope().unwrap(), scope);
+        changed = profile.clone();
+        changed.username = "another-account".into();
+        assert_ne!(changed.credential_scope().unwrap(), scope);
+        changed = profile.clone();
+        if let ProtocolOptions::Ssh { agent, .. } = &mut changed.options {
+            *agent = !*agent;
+        }
+        assert_ne!(changed.credential_scope().unwrap(), scope);
+        changed = profile.clone();
+        if let ProtocolOptions::Ssh { config_file, .. } = &mut changed.options {
+            *config_file = Some(
+                if cfg!(windows) {
+                    r"C:\Users\Lab\config"
+                } else {
+                    "/tmp/config"
+                }
+                .into(),
+            );
+        }
+        assert_ne!(changed.credential_scope().unwrap(), scope);
+        changed = profile.clone();
+        changed.host = "EXAMPLE.INVALID".into();
+        let upper = changed.credential_scope().unwrap();
+        changed.host = "example.invalid".into();
+        assert_eq!(changed.credential_scope().unwrap(), upper);
+    }
+
+    #[test]
     fn ssh_paths_follow_native_path_semantics() {
         let mut profile = profile();
         let key = if cfg!(windows) {
