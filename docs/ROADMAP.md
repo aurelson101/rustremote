@@ -2,11 +2,47 @@
 
 **Règle :** le statut `DONE` exige résultat observable + commande de vérification enregistrée dans `MEMORY.md`. Si l'outil est indisponible, marquer `BLOCKED`, jamais `DONE`. Une seule tâche principale ouverte par agent.
 
+## Revue ciblée Linux / Windows — 2026-11-15
+
+- Linux : édition SFTP corrigée pour conserver les permissions ordinaires (000–777) avant remplacement atomique ; refus si permissions indisponibles. Les bits privilégiés ne sont pas restaurés. Propriétaire, ACL et attributs étendus ne sont pas conservés par ce remplacement : qualification et stratégie dédiée restent TODO.
+- Windows : validation ConPTY renforcée pour refuser un flux UTF-8 invalide, même contenant le marqueur attendu ; test unitaire local PASS. Revalidation native Windows de ce changement TODO.
+- Validation Linux TODO : le rejeu GUI natif bloque avant SFTP sur l’action « Move » ; qualifier le pilote AT-SPI/DropDown et atteindre l’assertion 0755. Les tests protocolaires loopback passent, sans valider l’éditeur Rust.
+- P0 Windows : terminer WIN-01 (rendu ANSI interactif, clavier, resize et arrêt), puis frontière OS et stockage sécurisé WIN-02/03 ; aucun MSI fonctionnel disponible.
+- P1 Linux : borner/sérialiser les écritures de file de transferts et qualifier les changements de profil/chiffrement avec files existantes ; endurance CPU/RAM et qualification KDE/Xfce/Cinnamon restent ouvertes.
+- P1 distribution Windows : tester installation/mise à jour/désinstallation MSI et runtime avant WinGet ; MSIX/signature ensuite.
+
+## Incrément Windows ANSI — 2026-11-15
+
+WIN-01 reste PARTIAL : écran ANSI de preuve ajouté au prototype indépendant
+`experiments/windows-probe` (vt100 0.18.1 + GTK/Pango), avec couleurs ANSI/256/RGB,
+styles, curseur, UTF-8 et cellules larges. Aperçu déterministe au démarrage et
+rendu de la sortie du test ConPTY après son arrêt ; pas encore de flux interactif.
+Entrée bornée à64Kio, grille maximale60×160, scrollback désactivé, texte échappé,
+aucune action OSC/presse-papiers/lien. Tests du modèle et smoke GTK local PASS.
+Le workflow manuel Windows exécute désormais ces tests ; ce nouvel incrément
+n’a pas encore été rejoué sur runner Windows.
+
+Prochaine tâche WIN-01 : connexion ConPTY persistante avec commandes bornées,
+clavier/IME et redimensionnement GUI synchronisé, rendu incrémental et annulation
+à la fermeture (arrêt des seuls processus appartenant à la session). Qualifier
+copie/sélection, polices/DPI et consommation avant migration de l’application.
+Pas de MSI/WinGet avant cette preuve et les adaptations WIN-02 à WIN-07.
+
+## WIN-01 interactif — en validation native
+
+Transport ConPTY persistant ajouté au prototype : saisie UTF-8/IME, touches ANSI,
+resize mesuré, copie/sélection, collage confirmé et déconnexion. Job Object privé
+kill-on-close, création suspendue/assignation avant exécution ; I/O hors GTK,
+queues bornées, état d’écran coalescé, OSC fixe et zéro scrollback.
+Workflow manuel désormais sur Windows Server2022, avec tests CLI et GUI de flux,
+resize/arrêt. Validation Windows11, protocoles/profils/coffre, parité UI et MSI
+restent TODO ; ne pas confondre le prototype avec l’application complète.
+
 ## Priorité active : stabilisation GTK puis portage Windows
 
 Le correctif du focus GTK est prioritaire avant le portage. Windows n'est pas
 encore implémenté : ni MSI, ni MSIX, ni compatibilité obtenue par conversion de
-l'AppImage. Cible du premier port : Windows11 x64, sans promesse de parité initiale.
+l'AppImage. Cibles minimales : Windows11 x64 et Windows Server2022 x64 avec Desktop Experience. Server Core exclu pour cette interface GTK.
 Les interfaces/protocoles Linux fonctionnels sont conservés.
 
 | Ordre | Lot | Priorité | Dépend de | Statut | Critère de passage |

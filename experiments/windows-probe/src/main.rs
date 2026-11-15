@@ -3,8 +3,18 @@ use gtk::prelude::*;
 use std::{cell::Cell, rc::Rc, time::Duration};
 #[cfg(windows)]
 mod conpty;
+mod live;
+mod live_ui;
+mod probe_output;
+mod terminal;
+mod terminal_keys;
 
-fn probe() -> Result<String, String> {
+struct ProbeResult {
+    report: String,
+    screen: terminal::Frame,
+}
+
+fn probe() -> Result<ProbeResult, String> {
     #[cfg(windows)]
     {
         conpty::run()
@@ -19,6 +29,18 @@ fn main() -> std::process::ExitCode {
     if args.iter().any(|a| a == "--self-test") {
         return match probe() {
             Ok(report) => {
+                println!("{}", report.report);
+                std::process::ExitCode::SUCCESS
+            }
+            Err(error) => {
+                eprintln!("{error}");
+                std::process::ExitCode::FAILURE
+            }
+        };
+    }
+    if args.iter().any(|a| a == "--self-test-live") {
+        return match live::self_test() {
+            Ok(report) => {
                 println!("{report}");
                 std::process::ExitCode::SUCCESS
             }
@@ -28,6 +50,7 @@ fn main() -> std::process::ExitCode {
             }
         };
     }
+    let smoke_live = args.iter().any(|a| a == "--smoke-live-ui");
     let smoke = args.iter().any(|a| a == "--smoke-ui");
     let smoke_ok = Rc::new(Cell::new(false));
     let seen = smoke_ok.clone();
@@ -35,6 +58,14 @@ fn main() -> std::process::ExitCode {
         .application_id("com.rustremote.WindowsProbe")
         .build();
     app.connect_activate(move |app| {
+        if let Some(settings) = gtk::Settings::default() {
+            settings.set_gtk_application_prefer_dark_theme(true);
+        }
+        let css = gtk::CssProvider::new();
+        css.load_from_data("#ansi-screen { background: #151b24; padding: 12px; font-size: 14px; }");
+        if let Some(display) = gtk::gdk::Display::default() {
+            gtk::style_context_add_provider_for_display(&display, &css, gtk::STYLE_PROVIDER_PRIORITY_APPLICATION);
+        }
         let body = gtk::Box::new(gtk::Orientation::Vertical, 16);
         for side in [gtk::PositionType::Top, gtk::PositionType::Bottom, gtk::PositionType::Left, gtk::PositionType::Right] {
             match side {
@@ -46,21 +77,39 @@ fn main() -> std::process::ExitCode {
         }
         let title = gtk::Label::new(Some("RustRemote — Windows feasibility probe"));
         title.add_css_class("title-1"); body.append(&title);
-        let note = gtk::Label::new(Some("Technical prototype: GTK window and bounded local ConPTY test.\nNo remote connection, MSI, credentials or interactive ANSI renderer yet."));
+        let note = gtk::Label::new(Some("Technical prototype: GTK window and bounded local ConPTY test.\nLocal interactive terminal on Windows; remote profiles and MSI are not available yet."));
         note.set_wrap(true); body.append(&note);
         let status = gtk::Label::new(Some("Ready — local test only"));
         status.set_wrap(true); status.set_selectable(true); body.append(&status);
+        let screen = gtk::Label::new(None);
+        screen.set_xalign(0.0); screen.set_yalign(0.0);
+        screen.set_selectable(true); screen.set_wrap(false);
+        let preview = terminal::preview();
+        let preview_ok = preview.plain.contains("UTF-8: été");
+        screen.set_markup(&preview.markup);
+        screen.set_widget_name("ansi-screen");
+        let viewport = gtk::ScrolledWindow::builder().hexpand(true).vexpand(true)
+            .min_content_height(260).child(&screen).build();
+        body.append(&viewport);
         let run = gtk::Button::with_label("Run local ConPTY test");
         let output = status.clone();
+        let screen_output = screen.clone();
         run.connect_clicked(move |button| {
             button.set_sensitive(false); output.set_text("Testing on a worker thread…");
             let (tx, rx) = std::sync::mpsc::sync_channel(1);
             std::thread::spawn(move || { let _ = tx.send(probe()); });
             let button = button.downgrade(); let output = output.downgrade();
+            let screen = screen_output.downgrade();
             gtk::glib::timeout_add_local(Duration::from_millis(50), move || {
                 match rx.try_recv() {
                     Ok(result) => {
-                        if let Some(output) = output.upgrade() { output.set_text(&result.unwrap_or_else(|e| e)); }
+                        match result {
+                            Ok(result) => {
+                                if let Some(screen) = screen.upgrade() { screen.set_markup(&result.screen.markup); }
+                                if let Some(output) = output.upgrade() { output.set_text(&result.report); }
+                            }
+                            Err(error) => if let Some(output) = output.upgrade() { output.set_text(&error); },
+                        }
                         if let Some(button) = button.upgrade() { button.set_sensitive(true); }
                         gtk::glib::ControlFlow::Break
                     }
@@ -74,19 +123,24 @@ fn main() -> std::process::ExitCode {
             });
         });
         body.append(&run);
-        let window = gtk::ApplicationWindow::builder().application(app).title("RustRemote Windows probe").default_width(760).default_height(300).child(&body).build();
+        let window = gtk::ApplicationWindow::builder().application(app).title("RustRemote Windows probe").default_width(760).default_height(600).child(&body).build();
+        live_ui::attach(&body, &screen, &viewport, &status, &window, smoke_live, seen.clone());
         window.present();
         if smoke {
             let app = app.downgrade(); let seen = seen.clone();
             gtk::glib::timeout_add_local_once(Duration::from_secs(1), move || {
-                seen.set(window.is_mapped() && window.width() > 0);
+                seen.set(window.is_mapped() && window.width() > 0
+                    && preview_ok && screen.is_mapped() && screen.width() > 0
+                    && screen.text().contains("Progress: 100%")
+                    && !screen.text().contains('\u{1b}'));
+                if seen.get() { println!("ANSI_GUI_OK: mapped UTF-8/styled screen, escaped markup"); }
                 if seen.get() { println!("GUI_SMOKE_OK"); }
                 if let Some(app) = app.upgrade() { app.quit(); }
             });
         }
     });
     let result = app.run_with_args(&["rustremote-windows-probe"]);
-    if smoke && !smoke_ok.get() {
+    if (smoke || smoke_live) && !smoke_ok.get() {
         std::process::ExitCode::FAILURE
     } else {
         std::process::ExitCode::from(result.get())

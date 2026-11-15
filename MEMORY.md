@@ -828,3 +828,103 @@ Annotation CI : upload-artifact v4 Node20 est exécuté via Node24 ; passage à 
 version native Node24 à prévoir lors de maintenance (pas un échec de ce run).
 Le rapport HTML SignPath reste local, exclu de Git ; politiques de publication
 et licenceGPL inchangées. Preuves : docs/validation/windows-probe.json.
+
+
+## 2026-11-15 — revue ciblée Linux et Windows (suite)
+
+Départ propre sur 830221f. Corrigé src/sftp.rs : la sauvegarde atomique de
+l’éditeur remplaçait un fichier exécutable par un temporaire 0600. Le temporaire
+reprend maintenant les permissions ordinaires du fichier (0777), avant rename ;
+échec fermé si mode absent ou chmod refusé, nettoyage si chmod échoue. Les bits
+privilégiés ne sont pas rétablis. ACL, propriétaire et attributs étendus ne sont
+pas préservés par ce mécanisme : limite à traiter séparément.
+
+experiments/windows-probe/src/{conpty,main,probe_output}.rs : validation UTF-8
+stricte et sortie bornée ; auparavant from_utf8_lossy pouvait accepter un marqueur
+correct malgré d’autres octets invalides. Test local valide/malformé/marqueur
+absent/dépassement PASS ; aucun nouveau test natif Windows réalisé dans cette étape.
+
+scripts/smoke-connected.py : assertion conservation 0755 après édition distante.
+Premier labo GUI natif échoué avant SFTP : clic générique Close a fermé la fenêtre
+principale sur le GTK installé. Corrigé le scope du helper click (y compris sa
+recherche de bouton visible) et ciblé le dialogue About RustRemote.
+
+Vérifications : cargo fmt/check/clippy(-D warnings)/test workspace PASS : 54 tests
+principaux +1 askpass, 1 test GTK explicitement ignoré sans display. Prototype :
+fmt/test/clippy offline PASS (1 test). Aucune publication/commit/push ni modification
+de release ; aucune connexion réelle, seuls services loopback de laboratoire.
+Priorités dans ROADMAP : Windows ANSI/clavier/resize/arrêt puis frontière OS,
+stockage sécurisé et MSI ; Linux endurance, files concurrentes, migration des
+files lors de changement de profil et qualification des bureaux restent ouvertes.
+
+Résultat du rejeu GUI natif : échec avant le scénario SFTP, action « Move » introuvable
+après sélection du dossier. L’application reste active ; le premier problème Close
+est dépassé. Automatisation DropDown/AT-SPI du GTK hôte à qualifier, pas de cause
+applicative affirmée. La conservation 0755 est compilée et couverte par une assertion
+ajoutée, mais cette assertion n’a PAS été atteinte : validation runtime encore TODO.
+Le laboratoire protocolaire loopback passe : OpenSSH UTF-8/PTY/resize, mauvaises clés
+et clés hôte modifiées refusées, SFTP fichiers/dossiers bidirectionnels et édition,
+traversal/liens refusés. Ce contrôle utilise OpenSSH/Paramiko, pas l’éditeur Rust.
+Journal local : /tmp/rustremote-review-lab.log ; résultat protocolaire dist/ssh-sftp-local-result.json.
+Prochaine action Linux : corriger/qualifier l’automatisation native « Move » ou rejouer
+sur le runtime portable, puis atteindre l’assertion permissions SFTP. Ne pas déclarer
+une nouvelle release validée sur la base de ce rejeu incomplet.
+
+
+## 2026-11-15 — WIN-01 : preuve de rendu ANSI GTK
+
+Changements antérieurs conservés (SFTP, pilote GUI et validation ConPTY) ; aucun
+commit/push/release dans cette étape. Prototype indépendant complété :
+- src/terminal.rs : vt1000.18.1, capture ANSI vers cellules puis markup Pango
+  échappé ; styles/couleurs ANSI256/RGB, curseur, UTF-8/caractères larges.
+- src/main.rs : aperçu déterministe sans shell, zone sombre sélectionnable avec
+  défilement ; résultat du test worker affiché dans le même écran. Smoke vérifie
+  écran mappé/non vide et texte rendu (aucun ESC brut).
+- src/conpty.rs : retourne rapport+écran, exige le marqueur dans l’écran ANSI
+  interprété en plus du contrôle du flux brut. Pas de transcription dans les logs.
+- Cargo.toml/lock : ajout vt100=0.18.1 et quatre dépendances transitives ; licences
+  MIT ou MIT/Apache-2.0 compatibles. Requête OSV ciblée des5versions : aucune
+  vulnérabilité connue retournée, sans garantie générale de sécurité.
+- .github/workflows/windows-probe.yml : tests ANSI avant ConPTY/smoke natifs ;
+  README du prototype et ROADMAP actualisés.
+
+Limites explicites : grille60×160,64Kio d’entrée, zéro scrollback, aucune action
+OSC/URL/presse-papiers. Il s’agit de snapshots après terminaison, pas de terminal
+interactif. Pas de clavier ConPTY ni resize GUI synchronisé, ni qualification
+polices/IME/DPI native Windows. Le reste de l’application n’est pas encore porté.
+
+Vérifications Linux : prototype fmt/test/clippy(-D warnings) PASS,4tests (3ANSI +
+1validation flux), build PASS. Smoke GTK Xvfb : ANSI_GUI_OK et GUI_SMOKE_OK.
+Workspace Linux fmt/check/clippy/test PASS :54+1tests,1GTK ignoré sans display.
+Une erreur de compilation initiale venait de l’API vt1000.18 (dimensions NonZeroU16),
+corrigée avant les tests. Aucun test natif Windows de cet incrément : workflow
+préparé mais non lancé, pas de revendication MSI ou release Windows fonctionnelle.
+Prochaine tâche : transport ConPTY persistant, clavier/resize/fermeture puis preuve
+native avant les adaptations stockage/protocoles. Les modifications Linux et les
+limites du dernier rejeu SFTP restent inchangées.
+
+Capture finale inspectée : dist/windows-ansi-preview.png (locale, ignorée Git),
+écran ANSI lisible, couleurs/UTF-8/curseur, bouton accessible. Application maintenue
+active avec G_DEBUG=fatal-warnings, capture sur X11 isolé. Premier essai de capture
+noir puis timeout : backend non forcé ; corrigé la procédure avec GDK_BACKEND=x11
+pour empêcher le choix Wayland hérité. Smoke rejoué après changement CSS sur X11 :
+ANSI_GUI_OK + GUI_SMOKE_OK. Les avertissements de services portal à la fermeture
+et DRI3 logiciel concernent le laboratoire ; aucun avertissement GTK applicatif
+observé dans le journal de capture. Pas de test natif Windows dans ce résultat.
+
+
+## 2026-11-15 — demande de port complet Windows11 / Server2022
+
+Travail en cours WIN-01 : live.rs/live_ui.rs/terminal_keys.rs ajoutés au prototype.
+Session ConPTY persistante, IM commit, touches ANSI, resize selon mesures Pango,
+copie et collage confirmé borné et lié à l’identité de session (pas de collage
+retardé vers une autre connexion), déconnexion hors GTK. ConPTY sous Job Object
+kill-on-close, enfant créé suspendu puis assigné avant ResumeThread. Reader actif
+pendant ClosePseudoConsole pour Server2022 ; writer séparé pour ne pas bloquer le
+signal d’arrêt quand le pipe d’entrée est saturé. OSC fixe (vt100 std désactivé),
+écran coalescé sans transcripts en queue, runs Pango groupés pour réduire CPU/RAM.
+7tests prototype PASS, Clippy PASS ; root fmt/check/clippy/test PASS (55+1ignoré).
+CI ciblée windows-2022 avec --self-test-live et --smoke-live-ui ajoutée. Native en
+attente au moment de cette note. Windows11 nécessite une VM dédiée (question envoyée).
+Cible serveur avec Desktop Experience, pas Server Core. Aucun protocole complet,
+coffre Windows ou MSI livré à ce stade. Modifications Linux précédentes conservées.

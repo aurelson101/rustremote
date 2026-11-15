@@ -1,4 +1,5 @@
-//! Native Windows transport proof. Fixed local commands only; no network or secrets.
+//! Native Windows ConPTY transport. No automatic remote connection or credentials.
+use crate::probe_output::{EXPECTED, MAX_OUTPUT, validate};
 use std::{
     fs::File,
     io::{Read, Write},
@@ -11,18 +12,22 @@ use windows_sys::Win32::{
     Foundation::WAIT_OBJECT_0,
     System::{
         Console::{COORD, ClosePseudoConsole, CreatePseudoConsole, HPCON, ResizePseudoConsole},
+        JobObjects::{
+            AssignProcessToJobObject, CreateJobObjectW, JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE,
+            JOBOBJECT_EXTENDED_LIMIT_INFORMATION, JobObjectExtendedLimitInformation,
+            SetInformationJobObject,
+        },
         Pipes::CreatePipe,
         SystemInformation::GetSystemDirectoryW,
         Threading::{
-            CreateProcessW, DeleteProcThreadAttributeList, EXTENDED_STARTUPINFO_PRESENT,
-            GetExitCodeProcess, InitializeProcThreadAttributeList, LPPROC_THREAD_ATTRIBUTE_LIST,
-            PROC_THREAD_ATTRIBUTE_PSEUDOCONSOLE, PROCESS_INFORMATION, STARTF_USESTDHANDLES,
-            STARTUPINFOEXW, TerminateProcess, UpdateProcThreadAttribute, WaitForSingleObject,
+            CREATE_SUSPENDED, CreateProcessW, DeleteProcThreadAttributeList,
+            EXTENDED_STARTUPINFO_PRESENT, GetExitCodeProcess, InitializeProcThreadAttributeList,
+            LPPROC_THREAD_ATTRIBUTE_LIST, PROC_THREAD_ATTRIBUTE_PSEUDOCONSOLE, PROCESS_INFORMATION,
+            ResumeThread, STARTF_USESTDHANDLES, STARTUPINFOEXW, TerminateProcess,
+            UpdateProcThreadAttribute, WaitForSingleObject,
         },
     },
 };
-const MAX_OUTPUT: usize = 64 * 1024;
-const EXPECTED: &str = "RUSTREMOTE_CONPTY_OK_été";
 fn os_error(step: &str) -> String {
     format!("{step}: {}", std::io::Error::last_os_error())
 }
@@ -97,6 +102,7 @@ impl Drop for Attributes {
 struct Child {
     process: OwnedHandle,
     _thread: OwnedHandle,
+    _job: OwnedHandle,
 }
 impl Drop for Child {
     fn drop(&mut self) {
@@ -110,6 +116,26 @@ impl Drop for Child {
     }
 }
 fn spawn(console: HPCON) -> Result<Child, String> {
+    // Assign suspended child before it can spawn descendants. Closing the private
+    // job kills only this session tree, including when the GUI process exits.
+    let raw_job = unsafe { CreateJobObjectW(null(), null()) };
+    if raw_job.is_null() {
+        return Err(os_error("CreateJobObjectW"));
+    }
+    let job = unsafe { OwnedHandle::from_raw_handle(raw_job) };
+    let mut limits = JOBOBJECT_EXTENDED_LIMIT_INFORMATION::default();
+    limits.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+    if unsafe {
+        SetInformationJobObject(
+            job.as_raw_handle(),
+            JobObjectExtendedLimitInformation,
+            (&limits as *const JOBOBJECT_EXTENDED_LIMIT_INFORMATION).cast(),
+            size_of::<JOBOBJECT_EXTENDED_LIMIT_INFORMATION>() as u32,
+        )
+    } == 0
+    {
+        return Err(os_error("SetInformationJobObject"));
+    }
     let attributes = Attributes::new(console)?;
     let mut directory = vec![0u16; 32768];
     let len =
@@ -141,7 +167,7 @@ fn spawn(console: HPCON) -> Result<Child, String> {
             null(),
             null(),
             0,
-            EXTENDED_STARTUPINFO_PRESENT,
+            EXTENDED_STARTUPINFO_PRESENT | CREATE_SUSPENDED,
             null(),
             cwd.as_ptr(),
             &startup.StartupInfo,
@@ -151,14 +177,25 @@ fn spawn(console: HPCON) -> Result<Child, String> {
     {
         return Err(os_error("CreateProcessW"));
     }
-    Ok(unsafe {
+    let child = unsafe {
         Child {
             process: OwnedHandle::from_raw_handle(information.hProcess),
             _thread: OwnedHandle::from_raw_handle(information.hThread),
+            _job: job,
         }
-    })
+    };
+    if unsafe {
+        AssignProcessToJobObject(child._job.as_raw_handle(), child.process.as_raw_handle())
+    } == 0
+    {
+        return Err(os_error("AssignProcessToJobObject"));
+    }
+    if unsafe { ResumeThread(child._thread.as_raw_handle()) } == u32::MAX {
+        return Err(os_error("ResumeThread"));
+    }
+    Ok(child)
 }
-pub fn run() -> Result<String, String> {
+pub fn run() -> Result<crate::ProbeResult, String> {
     let start = Instant::now();
     let (input_read, input_write) = pipe()?;
     let (output_read, output_write) = pipe()?;
@@ -194,7 +231,9 @@ pub fn run() -> Result<String, String> {
                     let left = MAX_OUTPUT.saturating_sub(data.len());
                     data.extend_from_slice(&buffer[..n.min(left)]);
                     overflow |= n > left;
-                    if !announced && String::from_utf8_lossy(&data).contains(EXPECTED) {
+                    if !announced
+                        && std::str::from_utf8(&data).is_ok_and(|text| text.contains(EXPECTED))
+                    {
                         let _ = ready_tx.try_send(());
                         announced = true;
                     }
@@ -231,21 +270,150 @@ pub fn run() -> Result<String, String> {
     let output = reader.join().map_err(|_| "ConPTY reader interrupted")?;
     operation?;
     let (output, overflow) = output?;
-    if overflow {
-        return Err("ConPTY output exceeded 64 KiB".into());
+    validate(&output, overflow)?;
+    let screen = crate::terminal::render(&output, 30, 100)?;
+    if !screen.plain.contains(EXPECTED) {
+        return Err("ConPTY marker absent from rendered ANSI screen".into());
     }
-    let text = String::from_utf8_lossy(&output);
-    if !text.contains(EXPECTED) {
-        return Err(format!(
-            "ConPTY marker missing: bytes={}, ascii_prefix={}, utf8_valid={}",
+    Ok(crate::ProbeResult {
+        screen,
+        report: format!(
+            "CONPTY_OK: input/output UTF-8, ANSI screen, resize 100x30, exit 0, {} bytes, {} ms",
             output.len(),
-            text.contains("RUSTREMOTE_CONPTY_OK_"),
-            std::str::from_utf8(&output).is_ok()
-        ));
+            start.elapsed().as_millis()
+        ),
+    })
+}
+
+pub fn run_live(
+    commands: std::sync::mpsc::Receiver<crate::live::Command>,
+    state: std::sync::Arc<std::sync::Mutex<crate::live::State>>,
+    stop: std::sync::Arc<std::sync::atomic::AtomicBool>,
+) -> Result<String, String> {
+    use std::sync::{atomic::Ordering, mpsc};
+    let (input_read, input_write) = pipe()?;
+    let (output_read, output_write) = pipe()?;
+    let mut handle = 0;
+    let result = unsafe {
+        CreatePseudoConsole(
+            COORD { X: 80, Y: 24 },
+            input_read.as_raw_handle(),
+            output_write.as_raw_handle(),
+            0,
+            &mut handle,
+        )
+    };
+    if result < 0 {
+        return Err(format!("CreatePseudoConsole HRESULT {result:#x}"));
     }
-    Ok(format!(
-        "CONPTY_OK: input/output UTF-8, resize 100x30, exit 0, {} bytes, {} ms",
-        output.len(),
-        start.elapsed().as_millis()
-    ))
+    let console = Console(handle);
+    drop(input_read);
+    drop(output_write);
+    let reader_state = state.clone();
+    // Never queue transcripts. Parse into a bounded screen; OSC buffer is fixed
+    // (vt100/vte std feature disabled), zero scrollback, fixed-size cells.
+    let reader = std::thread::spawn(move || -> Result<(), String> {
+        let mut output = File::from(output_read);
+        let mut bytes = [0u8; 4096];
+        loop {
+            match output.read(&mut bytes) {
+                Ok(0) => return Ok(()),
+                Ok(n) => {
+                    let mut state = reader_state
+                        .lock()
+                        .map_err(|_| "Terminal state interrupted")?;
+                    state.parser.process(&bytes[..n]);
+                    state.revision = state.revision.wrapping_add(1);
+                }
+                Err(e) if e.raw_os_error() == Some(109) => return Ok(()),
+                Err(_) => return Err("Terminal output pipe failed".into()),
+            }
+        }
+    });
+    // Writes can block when an application stops consuming input. Keep the
+    // controller/stop path separate; closing the job/console breaks the pipe.
+    let (write_tx, write_rx) = mpsc::sync_channel::<Vec<u8>>(8);
+    let writer = std::thread::spawn(move || -> Result<(), String> {
+        let mut input = File::from(input_write);
+        while let Ok(bytes) = write_rx.recv() {
+            input
+                .write_all(&bytes)
+                .map_err(|_| "Terminal input pipe failed")?;
+        }
+        Ok(())
+    });
+    let operation: Result<String, String> = (|| {
+        let child = spawn(console.0)?;
+        {
+            let mut state = state.lock().map_err(|_| "Terminal state interrupted")?;
+            state.status = "Local CMD — running".into();
+            state.revision = state.revision.wrapping_add(1);
+        }
+        let mut dimensions = (80, 24);
+        loop {
+            if stop.load(Ordering::Acquire) {
+                return Ok("Local terminal stopped".into());
+            }
+            if unsafe { WaitForSingleObject(child.process.as_raw_handle(), 0) } == WAIT_OBJECT_0 {
+                let mut code = 0;
+                if unsafe { GetExitCodeProcess(child.process.as_raw_handle(), &mut code) } == 0 {
+                    return Err(os_error("GetExitCodeProcess"));
+                }
+                // Let ConHost flush while its output is still drained.
+                return Ok(format!("Local terminal exited ({code})"));
+            }
+            if reader.is_finished() || writer.is_finished() {
+                return Err("Terminal I/O worker stopped".into());
+            }
+            match commands.recv_timeout(Duration::from_millis(20)) {
+                Ok(crate::live::Command::Input(bytes)) => {
+                    if !bytes.is_empty() && bytes.len() <= 4096 {
+                        // Fail visibly rather than silently dropping typed commands.
+                        write_tx
+                            .try_send(bytes)
+                            .map_err(|_| "Terminal input queue full; session stopped")?;
+                    }
+                }
+                Ok(crate::live::Command::Resize(cols, rows)) => {
+                    if !(20..=160).contains(&cols) || !(5..=60).contains(&rows) {
+                        return Err("Invalid terminal dimensions".into());
+                    }
+                    if dimensions != (cols, rows) {
+                        if unsafe {
+                            ResizePseudoConsole(
+                                console.0,
+                                COORD {
+                                    X: cols as i16,
+                                    Y: rows as i16,
+                                },
+                            )
+                        } < 0
+                        {
+                            return Err("ConPTY resize failed".into());
+                        }
+                        let mut state = state.lock().map_err(|_| "Terminal state interrupted")?;
+                        state.parser.set_size(
+                            std::num::NonZeroU16::new(rows).unwrap(),
+                            std::num::NonZeroU16::new(cols).unwrap(),
+                        );
+                        state.revision = state.revision.wrapping_add(1);
+                        dimensions = (cols, rows);
+                    }
+                }
+                Err(mpsc::RecvTimeoutError::Disconnected) => {
+                    return Ok("Local terminal closed".into());
+                }
+                Err(mpsc::RecvTimeoutError::Timeout) => {}
+            }
+        }
+        // Child's private job closes here, killing remaining descendants.
+    })();
+    drop(write_tx);
+    // Close off the GTK thread with the output reader still draining: required
+    // to avoid ClosePseudoConsole deadlocks on Windows Server 2022/older Win11.
+    drop(console);
+    let read_result = reader.join().map_err(|_| "Terminal reader interrupted")?;
+    let _ = writer.join(); // Broken pipe during deliberate shutdown is expected.
+    read_result?;
+    operation
 }

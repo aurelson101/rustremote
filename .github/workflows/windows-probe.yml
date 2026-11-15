@@ -8,7 +8,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   native-windows:
-    runs-on: windows-latest
+    runs-on: windows-2022
     timeout-minutes: 25
     defaults:
       run:
@@ -32,17 +32,29 @@ jobs:
       - name: Native environment
         run: |
           mkdir -p dist/windows-probe
-          { rustc -Vv; cargo -V; pkg-config --modversion gtk4; pacman -Q mingw-w64-ucrt-x86_64-rust mingw-w64-ucrt-x86_64-gtk4; } > dist/windows-probe/environment.txt
+          { cmd.exe //c ver; rustc -Vv; cargo -V; pkg-config --modversion gtk4; pacman -Q mingw-w64-ucrt-x86_64-rust mingw-w64-ucrt-x86_64-gtk4; } > dist/windows-probe/environment.txt
       - name: Build native Windows probe
         run: cargo build --locked --manifest-path experiments/windows-probe/Cargo.toml
+      - name: ANSI screen and output validation tests
+        run: |
+          set -o pipefail
+          cargo test --locked --manifest-path experiments/windows-probe/Cargo.toml | tee dist/windows-probe/ansi-tests.txt
       - name: Local ConPTY input-output and resize
         run: |
           set -o pipefail
           experiments/windows-probe/target/debug/rustremote-windows-probe.exe --self-test | tee dist/windows-probe/conpty.txt
+      - name: Interactive ConPTY streaming and lifecycle
+        run: |
+          set -o pipefail
+          experiments/windows-probe/target/debug/rustremote-windows-probe.exe --self-test-live | tee dist/windows-probe/live-conpty.txt
       - name: GTK Windows startup
         run: |
           set -o pipefail
           experiments/windows-probe/target/debug/rustremote-windows-probe.exe --smoke-ui | tee dist/windows-probe/gui.txt
+      - name: GTK interactive terminal lifecycle
+        run: |
+          set -o pipefail
+          experiments/windows-probe/target/debug/rustremote-windows-probe.exe --smoke-live-ui | tee dist/windows-probe/live-gui.txt
       - name: Prepare diagnostic artifact (not an installer)
         run: |
           cp experiments/windows-probe/README.md dist/windows-probe/README.md
