@@ -8,7 +8,6 @@ mod i18n;
 mod icons;
 mod preferences;
 mod profiles;
-mod session_tree;
 mod sftp;
 mod sftp_ui;
 mod simulation;

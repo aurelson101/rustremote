@@ -102,8 +102,10 @@ mod tests {
     use super::*;
     #[test]
     fn moving_nested_sessions_preserves_credentials_and_siblings() {
-        let mut w =
-            Workspace::decode(include_bytes!("../assets/simulations/serveur-ia.json")).unwrap();
+        let mut w = Workspace::decode(include_bytes!(
+            "../../../assets/simulations/serveur-ia.json"
+        ))
+        .unwrap();
         w.add_folder("Linux/DB").unwrap();
         w.add_folder("Linux2").unwrap();
         w.add_folder("Archive").unwrap();

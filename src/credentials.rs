@@ -3,16 +3,8 @@ use std::sync::Mutex;
 pub type Secret = zeroize::Zeroizing<String>;
 static ACCESS: Mutex<()> = Mutex::new(());
 const SERVICE: &str = "com.rustremote.credentials";
-pub fn valid_reference(value: &str) -> bool {
-    value.len() == 36
-        && value.bytes().enumerate().all(|(i, b)| {
-            if [8, 13, 18, 23].contains(&i) {
-                b == b'-'
-            } else {
-                b.is_ascii_hexdigit()
-            }
-        })
-}
+pub use rustremote_core::valid_credential_reference as valid_reference;
+
 fn entry(reference: &str) -> Result<keyring::Entry, String> {
     if !valid_reference(reference) {
         return Err("Référence de coffre invalide".into());

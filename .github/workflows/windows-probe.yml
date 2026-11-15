@@ -8,7 +8,11 @@ concurrency:
   cancel-in-progress: false
 jobs:
   native-windows:
-    runs-on: windows-2022
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [windows-2022, windows-11-arm]
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 25
     defaults:
       run:
@@ -33,12 +37,20 @@ jobs:
         run: |
           mkdir -p dist/windows-probe
           { cmd.exe //c ver; rustc -Vv; cargo -V; pkg-config --modversion gtk4; pacman -Q mingw-w64-ucrt-x86_64-rust mingw-w64-ucrt-x86_64-gtk4; } > dist/windows-probe/environment.txt
+      - name: Shared models without Linux adapters
+        run: |
+          set -o pipefail
+          cargo test --locked -p rustremote-core --no-default-features | tee dist/windows-probe/core-tests.txt
       - name: Build native Windows probe
         run: cargo build --locked --manifest-path experiments/windows-probe/Cargo.toml
       - name: ANSI screen and output validation tests
         run: |
           set -o pipefail
           cargo test --locked --manifest-path experiments/windows-probe/Cargo.toml | tee dist/windows-probe/ansi-tests.txt
+      - name: Windows private profile storage and credentials
+        run: |
+          set -o pipefail
+          experiments/windows-probe/target/debug/rustremote-windows-probe.exe --self-test-storage | tee dist/windows-probe/storage.txt
       - name: Local ConPTY input-output and resize
         run: |
           set -o pipefail
@@ -61,7 +73,7 @@ jobs:
           cp LICENSE NOTICE dist/windows-probe/
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: windows-feasibility-probe
+          name: windows-feasibility-probe-${{ matrix.runner }}
           path: dist/windows-probe/
           retention-days: 7
           if-no-files-found: error

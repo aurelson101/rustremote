@@ -290,11 +290,7 @@ pub fn export_json(path: &Path, data: &Workspace) -> Result<(), String> {
     if !path.is_absolute() {
         return Err("Choisissez un chemin absolu pour l’export.".into());
     }
-    let mut exported = data.clone();
-    for profile in &mut exported.profiles {
-        profile.credential_ref = None;
-    }
-    let bytes = serde_json::to_vec_pretty(&exported).map_err(|_| "Export impossible")?;
+    let bytes = data.export_json()?;
     if bytes.len() as u64 > MAX_SIZE {
         return Err("Export trop volumineux (2 Mio maximum).".into());
     }

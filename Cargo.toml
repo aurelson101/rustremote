@@ -8,10 +8,11 @@ repository = "https://github.com/aurelson101/rustremote"
 default-run = "rustremote"
 
 [workspace]
-members = ["."]
+members = [".", "crates/core"]
 resolver = "3"
 
 [dependencies]
+rustremote-core = { path = "crates/core", features = ["linux-adapters"] }
 age = "0.11"
 gtk = { package = "gtk4", version = "=0.10.3", features = ["v4_8"] }
 libc = "0.2.191"

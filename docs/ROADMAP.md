@@ -2,6 +2,13 @@
 
 **Règle :** le statut `DONE` exige résultat observable + commande de vérification enregistrée dans `MEMORY.md`. Si l'outil est indisponible, marquer `BLOCKED`, jamais `DONE`. Une seule tâche principale ouverte par agent.
 
+## Port Windows actif — WIN-02/03 PARTIAL
+
+Modèles partagés extraits ; stockage Windows ACL/DPAPI et Credential Manager
+en validation native. Tests Windows11 ARM avec binaire x64 émulé ajoutés au
+workflow ; aucun résultat Windows11 acquis à ce stade. SSH/SFTP/RDP et MSI
+restent à intégrer et qualifier.
+
 ## Campagne 15 contrôles / 10 améliorations — 2026-11-15
 
 Dix améliorations livrées dans le code (cinq Linux, cinq prototype Windows), avec

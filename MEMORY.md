@@ -1050,3 +1050,14 @@ ni ne remplace le fichier existant. Focus GTK explicite PASS aussi. Rapport fina
 ACL/xattrs/propriétaire, erreurs clipboard non injectées et endurance non qualifiée.
 Pas de nouvelle AppImage/release. Prochaine tâche : migration des files de profil
 et frontière OS/stockage Windows WIN-02/03, puis SSH/SFTP natifs Windows.
+
+
+## Port Windows — profils natifs, en cours (2026-11-15)
+Extraction des modèles et dossiers dans crates/core, réexportés sans réécriture
+pour Linux. Import/export bornés, export sans références de secrets. Validation
+des chemins natifs avant utilisation. Nouveau stockage Windows : LocalAppData,
+ACL utilisateur/SYSTEM, verrou exclusif, remplacement avec sauvegarde, DPAPI
+facultatif. Credential Manager lié au compte/hôte/domaine/config SSH.
+Tests Linux workspace et modèles portables PASS ; nouveaux appels Win32 encore
+à compiler et qualifier par CI Server2022 et Windows11 ARM (x64 émulé).
+Aucun MSI ni protocole Windows complet revendiqué. Branche dédiée de validation.

@@ -81,6 +81,7 @@ fn expanded(value: &str) -> PathBuf {
 }
 impl Route {
     pub fn resolve(profile: &SessionProfile) -> Result<Self, String> {
+        profile.validate_native_paths()?;
         let (_, args) = profile.command()?;
         let output = tempfile::tempfile().map_err(|_| "Fichier temporaire SSH indisponible")?;
         let mut child = command()

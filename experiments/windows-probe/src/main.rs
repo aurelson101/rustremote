@@ -9,6 +9,10 @@ mod live_ui;
 mod probe_output;
 mod terminal;
 mod terminal_keys;
+#[cfg(windows)]
+mod win_credentials;
+#[cfg(windows)]
+mod win_storage;
 
 struct ProbeResult {
     report: String,
@@ -41,6 +45,24 @@ fn main() -> std::process::ExitCode {
     }
     if args.iter().any(|a| a == "--self-test-live") {
         return match live::self_test() {
+            Ok(report) => {
+                println!("{report}");
+                std::process::ExitCode::SUCCESS
+            }
+            Err(error) => {
+                eprintln!("{error}");
+                std::process::ExitCode::FAILURE
+            }
+        };
+    }
+    if args.iter().any(|a| a == "--self-test-storage") {
+        #[cfg(windows)]
+        let result = win_storage::self_test().and_then(|storage| {
+            win_credentials::self_test().map(|credentials| format!("{storage}\n{credentials}"))
+        });
+        #[cfg(not(windows))]
+        let result: Result<String, String> = Err("Storage qualification requires Windows".into());
+        return match result {
             Ok(report) => {
                 println!("{report}");
                 std::process::ExitCode::SUCCESS

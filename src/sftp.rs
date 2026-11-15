@@ -239,6 +239,7 @@ fn error(_: impl std::fmt::Display) -> String {
 impl Connection {
     pub fn connect(profile: &SessionProfile, password: Option<&str>) -> Result<Self, String> {
         profile.validate()?;
+        profile.validate_native_paths()?;
         if profile.simulation {
             return Err("Un profil de simulation ne contacte aucun serveur".into());
         }

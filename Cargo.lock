@@ -1896,12 +1896,21 @@ dependencies = [
  "gtk4",
  "keyring",
  "libc",
+ "rustremote-core",
  "serde",
  "serde_json",
  "ssh2",
  "tempfile",
  "vte4",
  "zeroize",
+]
+
+[[package]]
+name = "rustremote-core"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

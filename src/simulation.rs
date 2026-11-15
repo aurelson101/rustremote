@@ -725,6 +725,12 @@ fn clipboard(profile: &SessionProfile, status: &gtk::Label) -> gtk::Box {
 mod tests {
     use super::*;
     #[test]
+    fn switch_responses_are_local_and_reject_unknown_commands() {
+        assert!(switch_response("show version").contains("Simulator"));
+        assert!(switch_response("reload; rm").contains("lecture seule"));
+    }
+
+    #[test]
     fn files_folders_bidirectional_edit_and_collision() {
         let s = Sandbox::new().unwrap();
         s.copy(0, Path::new("dossier-test"), 1, Path::new("dossier-test"))
