@@ -118,7 +118,7 @@ fn main() -> std::process::ExitCode {
         let title = gtk::Label::new(Some("RustRemote — Windows feasibility probe"));
         title.set_wrap(true);
         title.add_css_class("title-1"); body.append(&title);
-        let note = gtk::Label::new(Some("Technical prototype: GTK window and bounded local ConPTY test.\nLocal interactive terminal on Windows; remote profiles and MSI are not available yet."));
+        let note = gtk::Label::new(Some("Windows preview: local terminal and saved connection profiles.\nRemote protocol launch and MSI packaging are still being integrated."));
         note.set_wrap(true); body.append(&note);
         let status = gtk::Label::new(Some("Ready — local test only"));
         status.set_wrap(true); status.set_selectable(true); body.append(&status);

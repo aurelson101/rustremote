@@ -14,7 +14,12 @@ experiments/windows-probe/target/debug/rustremote-windows-probe.exe --smoke-ui
 ```
 
 Without arguments the GUI displays a deterministic ANSI preview (no shell) and offers
-a local ConPTY self-test on a worker. Its successful output is parsed into the same
+a local ConPTY self-test on a worker. On Windows, “Manage connections…” opens the
+persistent profile manager: SSH/RDP metadata, domains, SSH file pickers, nested
+logical folders, edit/delete, favorites, JSON import/export and optional DPAPI.
+Password fields write references to Windows Credential Manager; no password is
+exported. Closing during a save is refused until the worker commits or reports
+an error. Profile editing does not yet launch a remote connection. Its successful output is parsed into the same
 selectable GTK/Pango screen, with ANSI colors, bold/italic/underline, cursor and
 Unicode cells. The initial preview is a snapshot. “Open local terminal” starts a real local CMD
 session on Windows: live ANSI display, Unicode/IME input, terminal keys, measured
@@ -91,8 +96,11 @@ Windows profile storage qualification (`--self-test-storage`):
   saves, corruption rejection, reopen, persisted credential references and vault cleanup.
   No real server, account or user profile is changed by this self-test.
 
-These are backend APIs and tests, not a finished Windows profile manager. GUI wiring,
-crash/power-loss recovery qualification, SSH/SFTP, mstsc integration and MSI remain open.
+The profile GUI is connected to these APIs. `--smoke-profiles-ui` runs in a fresh
+temporary store and cleans up generated vault entries; on Linux it uses an explicit
+simulated backend and does not validate DPAPI or Credential Manager. Native profile
+GUI results must be checked for the corresponding source commit. Crash/power-loss
+recovery qualification, SSH/SFTP, mstsc integration and MSI remain open.
 Windows 11 ARM emulation does not qualify Windows 11 x64 hardware, DPI/IME or peripherals.
 
 Backend/terminal qualification at source `10de7c6`:

@@ -1133,3 +1133,12 @@ snapshot après changement onglet attend désormais un nouveau frame GTK.
 Workflow natif étendu avec --smoke-profiles-ui, laboratoire temporaire Windows réel
 ACL/DPAPI/Credential Manager, sans profil utilisateur ni serveur réel. Pas encore
 rejoué nativement pour cet incrément ; SSH/SFTP/RDP transport et MSI restent ouverts.
+
+CI GUI profils source0340f22 run43730847748 : Server2022 PASS,7 modèles,
+12 tests prototype/service, ConPTY et GUI profils avec vrai coffre/DPAPI. Captures
+listes/formulaire téléchargées dans dist/windows-probe-validation/43730847748/windows-2022/.
+Formulaire inspecté : footer Enregistrer déplacé hors défilement ; port/mot de
+passe placés avant les options SSH, champs chemins étendus. Assertion GUI ajoutée
+sur bouton Enregistrer visible dans la fenêtre, validation locale fatal-warnings
+PASS. Test final refuse aussi une alerte de nettoyage du coffre. Nouvelle variante
+à requalifier Windows ; ARM64 du premier passage encore en cours.

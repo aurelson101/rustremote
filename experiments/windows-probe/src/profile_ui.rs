@@ -403,6 +403,7 @@ fn build(
             return;
         };
         let index = row.index() as usize;
+        let expected = p.data.borrow().profiles.get(index).cloned();
         let dialog = gtk::MessageDialog::builder()
             .transient_for(&p.window.upgrade().unwrap())
             .modal(true)
@@ -418,7 +419,7 @@ fn build(
                 && !p.busy.get()
             {
                 let mut data = p.data.borrow().clone();
-                if index < data.profiles.len() {
+                if data.profiles.get(index) == expected.as_ref() && expected.is_some() {
                     data.profiles.remove(index);
                     p.persist(data, None);
                 }
@@ -442,6 +443,7 @@ fn build(
     for (index, (label, entry)) in entry_fields.iter().enumerate() {
         if index >= 5 {
             let path = gtk::Box::new(gtk::Orientation::Horizontal, 8);
+            entry.set_hexpand(true);
             path.append(*entry);
             let browse = gtk::Button::with_label("Browse…");
             let entry = entry.downgrade();
@@ -468,18 +470,18 @@ fn build(
                 chooser.show();
             });
             path.append(&browse);
-            row(&form, index as i32 + 2, label, &path);
+            row(&form, index as i32 + 7, label, &path);
         } else {
             row(&form, index as i32 + 2, label, *entry);
         }
     }
-    row(&form, 10, "Port", &panel.port);
+    row(&form, 7, "Port", &panel.port);
     row(&form, 11, "Authentication", &panel.agent);
-    row(&form, 12, "Password / key passphrase", &panel.password);
-    row(&form, 13, "", &panel.forget);
-    row(&form, 14, "", &panel.favorite);
+    row(&form, 8, "Password / key passphrase", &panel.password);
+    row(&form, 9, "", &panel.forget);
+    row(&form, 10, "", &panel.favorite);
     let savebar = gtk::Box::new(gtk::Orientation::Horizontal, 8);
-    form.attach(&savebar, 0, 15, 2, 1);
+
     action("Save connection", &savebar, &panel, |p| match p.profile() {
         Err(error) => p.status.set_text(&error),
         Ok(profile) => {
@@ -516,13 +518,16 @@ fn build(
         }
     });
     action("New / clear", &savebar, &panel, |p| p.fill(None));
-    tabs.append_page(
+    let editor = gtk::Box::new(gtk::Orientation::Vertical, 8);
+    editor.append(
         &gtk::ScrolledWindow::builder()
+            .vexpand(true)
             .hscrollbar_policy(gtk::PolicyType::Never)
             .child(&form)
             .build(),
-        Some(&gtk::Label::new(Some("Profile"))),
     );
+    editor.append(&savebar);
+    tabs.append_page(&editor, Some(&gtk::Label::new(Some("Profile"))));
     let folders = fields();
     let current = panel.folder_source.clone();
     let destination = panel.folder_destination.clone();
@@ -720,23 +725,23 @@ pub fn attach(body: &gtk::Box, parent: &gtk::ApplicationWindow, status: &gtk::La
     });
 }
 
-fn click(root: &impl IsA<gtk::Widget>, name: &str) -> Result<(), String> {
-    fn find(widget: &gtk::Widget, name: &str) -> Option<gtk::Button> {
-        if widget.widget_name() == name
-            && let Ok(button) = widget.clone().downcast::<gtk::Button>()
-        {
+fn find_button(widget: &gtk::Widget, name: &str) -> Option<gtk::Button> {
+    if widget.widget_name() == name
+        && let Ok(button) = widget.clone().downcast::<gtk::Button>()
+    {
+        return Some(button);
+    }
+    let mut child = widget.first_child();
+    while let Some(widget) = child {
+        if let Some(button) = find_button(&widget, name) {
             return Some(button);
         }
-        let mut child = widget.first_child();
-        while let Some(widget) = child {
-            if let Some(button) = find(&widget, name) {
-                return Some(button);
-            }
-            child = widget.next_sibling();
-        }
-        None
+        child = widget.next_sibling();
     }
-    find(root.as_ref(), name)
+    None
+}
+fn click(root: &impl IsA<gtk::Widget>, name: &str) -> Result<(), String> {
+    find_button(root.as_ref(), name)
         .ok_or("Smoke button missing")?
         .emit_clicked();
     Ok(())
@@ -832,6 +837,18 @@ pub fn smoke(parent: &gtk::ApplicationWindow, result: Rc<Cell<bool>>, capture: b
                                 p.name != "SSH renamed" || p.credential_ref != reference
                             }) {
                                 return Err("Editing lost the existing credential".into());
+                            }
+                            let button = find_button(window.upcast_ref(), "Save connection")
+                                .ok_or("Save button missing")?;
+                            if !button.is_mapped()
+                                || button.compute_bounds(&window).is_none_or(|bounds| {
+                                    bounds.y() < 0.0
+                                        || bounds.y() + bounds.height() > window.height() as f32
+                                })
+                            {
+                                return Err(
+                                    "Save button is outside the visible profile window".into()
+                                );
                             }
                             if capture {
                                 crate::capture::window(
@@ -958,8 +975,12 @@ pub fn smoke(parent: &gtk::ApplicationWindow, result: Rc<Cell<bool>>, capture: b
                             phase = 9;
                         }
                         9 => {
-                            if !panel.data.borrow().profiles.is_empty() {
-                                return Err("Lab cleanup did not commit".into());
+                            if !panel.data.borrow().profiles.is_empty()
+                                || panel.status.text() != "Profiles saved"
+                            {
+                                return Err(
+                                    "Lab cleanup did not commit or vault cleanup failed".into()
+                                );
                             }
                             result.set(true);
                             println!(
