@@ -1080,3 +1080,11 @@ Premier run Windows11ARM : stockage/coffre/CLI/smoke initial PASS, même timeout
 resize phase2 ; second passage encore en cours. Ajout intégration coffre/profil
 persisté plain+DPAPI et preuve OS/architecture ; thème sombre GTK4.20+ sans appel
 déprécié, fallback GTK ancien. Smoke local GTK fatal-warnings PASS pour ce thème.
+
+Diagnostic Windows11ARM b1db964 : échec reproduit, fenêtre760x600 et grille14x84
+inchangées après set_default_size(540,680). Capture terminal-failure.png conservée
+sous dist/windows-probe-validation/43727041286/windows-11-arm/. Ce n’est pas une
+preuve de blocage ConPTY. Pilote remplacé par SetWindowPos sur le HWND portant le
+titre du prototype et appartenant au PID courant, dimensions client mesurées,
+bornes et propriété vérifiées. Attend encore réellement grille et largeur540px ;
+aucun contournement des assertions. Code réservé au smoke, aucune autre fenêtre.

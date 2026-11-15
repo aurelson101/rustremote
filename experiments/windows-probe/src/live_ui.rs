@@ -361,6 +361,15 @@ pub fn attach(
                         window.width(),
                         window.height()
                     );
+                    #[cfg(windows)]
+                    if let Err(error) = crate::capture::resize_own_probe_window(540, 680) {
+                        eprintln!("{error}");
+                        if let Some(app) = window.application() {
+                            app.quit();
+                        }
+                        return gtk::glib::ControlFlow::Break;
+                    }
+                    #[cfg(not(windows))]
                     window.set_default_size(540, 680);
                     phase = 2;
                 }
