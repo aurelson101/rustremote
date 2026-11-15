@@ -5,7 +5,7 @@ use std::{
     mem::size_of,
     os::windows::io::{AsRawHandle, FromRawHandle, OwnedHandle},
     ptr::{null, null_mut},
-    time::Instant,
+    time::{Duration, Instant},
 };
 use windows_sys::Win32::{
     Foundation::WAIT_OBJECT_0,
@@ -22,6 +22,7 @@ use windows_sys::Win32::{
     },
 };
 const MAX_OUTPUT: usize = 64 * 1024;
+const EXPECTED: &str = "RUSTREMOTE_CONPTY_OK_été";
 fn os_error(step: &str) -> String {
     format!("{step}: {}", std::io::Error::last_os_error())
 }
@@ -176,10 +177,12 @@ pub fn run() -> Result<String, String> {
     drop(output_write);
     // Drain output concurrently, including while ClosePseudoConsole completes.
     // Retain a bounded transcript; discard excess instead of blocking the producer.
+    let (ready_tx, ready_rx) = std::sync::mpsc::sync_channel(1);
     let reader = std::thread::spawn(move || -> Result<(Vec<u8>, bool), String> {
         let mut file = File::from(output_read);
         let mut data = Vec::new();
         let mut overflow = false;
+        let mut announced = false;
         let mut buffer = [0u8; 4096];
         loop {
             match file.read(&mut buffer) {
@@ -188,6 +191,10 @@ pub fn run() -> Result<String, String> {
                     let left = MAX_OUTPUT.saturating_sub(data.len());
                     data.extend_from_slice(&buffer[..n.min(left)]);
                     overflow |= n > left;
+                    if !announced && String::from_utf8_lossy(&data).contains(EXPECTED) {
+                        let _ = ready_tx.try_send(());
+                        announced = true;
+                    }
                 }
                 Err(e) if e.raw_os_error() == Some(109) => break, // ERROR_BROKEN_PIPE
                 Err(e) => return Err(format!("ConPTY read: {e}")),
@@ -212,6 +219,9 @@ pub fn run() -> Result<String, String> {
         {
             return Err("ConPTY child failed".into());
         }
+        // Process exit does not imply ConHost has rendered its final frame.
+        // Wait for the reader's observation, never sleep blindly or close early.
+        let _ = ready_rx.recv_timeout(Duration::from_secs(2));
         Ok(())
     })();
     drop(console);
@@ -222,8 +232,13 @@ pub fn run() -> Result<String, String> {
         return Err("ConPTY output exceeded 64 KiB".into());
     }
     let text = String::from_utf8_lossy(&output);
-    if !text.contains("RUSTREMOTE_CONPTY_OK_été") {
-        return Err("ConPTY UTF-8 output marker missing".into());
+    if !text.contains(EXPECTED) {
+        return Err(format!(
+            "ConPTY marker missing: bytes={}, ascii_prefix={}, utf8_valid={}",
+            output.len(),
+            text.contains("RUSTREMOTE_CONPTY_OK_"),
+            std::str::from_utf8(&output).is_ok()
+        ));
     }
     Ok(format!(
         "CONPTY_OK: input/output UTF-8, resize 100x30, exit 0, {} bytes, {} ms",

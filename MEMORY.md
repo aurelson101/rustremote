@@ -787,3 +787,11 @@ d'inférence Result dans la closure de test ConPTY (code non compilé sous Linux
 Type Result<(),String> explicité ; nouveau run nécessaire. Le runner GUI utilise
 Cairo pour ne pas dépendre d'un GPU. L'artefact de faisabilité distribue seulement
 les rapports, pas d'exécutable produit sans runtime/notices ni de faux MSI.
+
+CI43692050108 : compilation Windows PASS ; test ConPTY sort avec marqueur absent.
+Le processus enfant avait terminé, mais la console était fermée immédiatement avant
+la fin du rendu asynchrone ConHost. Attente bornée par canal (2s après exit, sans
+sleep arbitraire) du marqueur vu par le reader avant ClosePseudoConsole, suivant
+le besoin de rattrapage documenté par l'exemple Microsoft. Nouveau rejeu requis ;
+ne pas annoncer ConPTY validé avant succès. Diagnostics d'échec limités à tailles/
+présence ASCII/validité UTF-8, sans transcript ni secret journalisé.

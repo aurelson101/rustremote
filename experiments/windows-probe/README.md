@@ -14,7 +14,8 @@ experiments/windows-probe/target/debug/rustremote-windows-probe.exe --smoke-ui
 
 Without arguments the GUI offers a local ConPTY self-test on a worker. The transport
 starts only the system cmd.exe with AutoRun disabled, sends fixed built-in commands,
-checks input/output UTF-8 and resize, and checks a clean child exit within 10seconds.
+checks input/output UTF-8 and resize, and checks a clean child exit within 10seconds, then waits up to two more seconds for
+the output reader to observe the final marker before closing ConPTY.
 Output is drained on another thread, limited to64KiB in memory and not logged as a
 transcript. It performs no network connection and uses no credential. It is not a
 sandbox for arbitrary user commands. No interactive ANSI renderer is implemented.
