@@ -181,7 +181,7 @@ impl Controller {
             }
             while let Some(row)=list.first_child(){list.remove(&row);}
             status.set_text(&format!("{} · {}",crate::i18n::text("Plage"),parsed.description()));
-            button.set_sensitive(false);scope.set_sensitive(false);simulated.set_sensitive(false);consent.set_sensitive(false);cancel.set_sensitive(true);
+            button.set_sensitive(false);set_input_sensitive(&scope,false);simulated.set_sensitive(false);consent.set_sensitive(false);cancel.set_sensitive(true);
             stop.store(false,Ordering::Relaxed);
             let version=generation.get();let generation=generation.clone();
             let flag=stop.clone();let controller=c.clone();let list=list.clone();let status=status.clone();let run=button.clone();let cancel=cancel.clone();let scope=scope.clone();let simulated=simulated.clone();let consent=consent.clone();let weak_window=weak_window.clone();

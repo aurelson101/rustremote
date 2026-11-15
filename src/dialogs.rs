@@ -50,6 +50,20 @@ pub(crate) fn defer_unparent(widget: &impl IsA<gtk::Widget>) {
     });
 }
 
+/// GTK4 can leave GtkText's cursor tick active when a focused subtree becomes
+/// insensitive. Deliver focus-out while the input is still sensitive.
+pub(crate) fn set_input_sensitive(widget: &impl IsA<gtk::Widget>, sensitive: bool) {
+    let widget = widget.as_ref();
+    if !sensitive
+        && let Some(window) = widget.root().and_downcast::<gtk::Window>()
+        && let Some(focus) = gtk::prelude::GtkWindowExt::focus(&window)
+        && (focus == *widget || focus.is_ancestor(widget))
+    {
+        gtk::prelude::GtkWindowExt::set_focus(&window, None::<&gtk::Widget>);
+    }
+    widget.set_sensitive(sensitive);
+}
+
 pub(crate) fn clear_window_later(window: &gtk::Window) {
     let window = window.clone();
     gtk::glib::idle_add_local_once(move || {
@@ -586,7 +600,7 @@ impl Controller {
         }
         button.set_sensitive(false);
         if let Some(content) = window.child() {
-            content.set_sensitive(false);
+            set_input_sensitive(&content, false);
         }
         window.set_deletable(false);
         error.set_text("Enregistrement…");
@@ -1524,7 +1538,7 @@ impl Controller {
                 if let Err(message)=crate::credentials::validate_password(password.text().as_str()){error.set_text(&message);return;}
                 Some(std::sync::Arc::new(crate::credentials::Secret::new(password.text().to_string())))
             };
-            button.set_sensitive(false);password.set_sensitive(false);
+            button.set_sensitive(false);set_input_sensitive(&password, false);
             let c=controller.clone();let profile=profile.clone();let w=w.clone();let b=button.clone();let e=error.clone();let p=password.clone();
             controller.with_password(profile.clone(),entered,move|result|{
                 if !w.is_visible(){return;}
@@ -1583,5 +1597,57 @@ impl Controller {
         });
         window.set_child(Some(&body));
         crate::i18n::present(&window);
+    }
+}
+
+#[cfg(test)]
+mod focus_tests {
+    use super::*;
+
+    #[test]
+    #[ignore = "requires an isolated GTK display; run with fatal-warnings"]
+    fn disabling_input_delivers_focus_out_and_preserves_other_input() {
+        gtk::init().unwrap();
+        let window = gtk::Window::new();
+        let layout = gtk::Box::new(gtk::Orientation::Vertical, 0);
+        let panel = gtk::Box::new(gtk::Orientation::Vertical, 0);
+        let input = gtk::Entry::new();
+        let other = gtk::Entry::new();
+        panel.append(&input);
+        layout.append(&panel);
+        layout.append(&other);
+        window.set_child(Some(&layout));
+        window.present();
+        let main_loop = gtk::glib::MainLoop::new(None, false);
+        let was_focused = Rc::new(Cell::new(false));
+        let entry = input.clone();
+        gtk::glib::timeout_add_local_once(std::time::Duration::from_millis(150), move || {
+            entry.grab_focus();
+        });
+        let w = window.clone();
+        let p = panel.clone();
+        let seen = was_focused.clone();
+        gtk::glib::timeout_add_local_once(std::time::Duration::from_millis(450), move || {
+            seen.set(gtk::prelude::GtkWindowExt::focus(&w).is_some_and(|f| f.is_ancestor(&p)));
+            set_input_sensitive(&p, false);
+        });
+        let done = main_loop.clone();
+        gtk::glib::timeout_add_local_once(std::time::Duration::from_millis(2200), move || {
+            done.quit()
+        });
+        main_loop.run();
+        assert!(was_focused.get());
+        assert!(!panel.is_sensitive());
+        assert!(gtk::prelude::GtkWindowExt::focus(&window).is_none_or(|f| !f.is_ancestor(&panel)));
+        other.grab_focus();
+        let focus = gtk::prelude::GtkWindowExt::focus(&window).unwrap();
+        set_input_sensitive(&panel, false);
+        assert_eq!(
+            gtk::prelude::GtkWindowExt::focus(&window).as_ref(),
+            Some(&focus)
+        );
+        set_input_sensitive(&panel, true);
+        assert!(panel.is_sensitive());
+        window.close();
     }
 }

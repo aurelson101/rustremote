@@ -1,0 +1,88 @@
+{
+  "version": "0.9.2",
+  "date": "2026-11-15",
+  "artifact": "RustRemote-0.9.2-preview-x86_64.AppImage",
+  "sha256": "8fc3b041caf74ef738c2c47a20dd710515b889dae31797f9b1f34965962fae4c",
+  "publication": {
+    "status": "preparing"
+  },
+  "cargo": {
+    "fmt": true,
+    "check": true,
+    "clippy_deny_warnings": true,
+    "normal_tests_passed": 55,
+    "gtk_regression_ignored_by_default": 1,
+    "gtk_regression_explicitly_passed": 1
+  },
+  "gtk_focus_reproducer": {
+    "runtime": "GTK4.8.3 from AppImage",
+    "before_exit": 133,
+    "before_warning": "GtkText - did not receive a focus-out event",
+    "after_exit": 0,
+    "fatal_warnings": true
+  },
+  "windows": {
+    "implemented": false,
+    "priorities": "docs/ROADMAP.md",
+    "first_task": "WIN-01 GTK4 and ConPTY proof on Windows11 x64"
+  },
+  "gui_replay_status": "passed",
+  "gui_application_fatal_warnings": true,
+  "gtk_text_focus_warning_count": 0,
+  "rustremote_gtk_warning_or_critical_count": 0,
+  "targeted_gui_and_protocol_results": [
+    {
+      "target": "127.0.0.1",
+      "personal_desktop_accessed": false,
+      "english_default_without_override": true,
+      "about_gpl_and_privacy_notice_in_english": true,
+      "profile_context_move_and_nested_creation": true,
+      "folder_drag_moves_descendants_and_profiles": true,
+      "profile_drag_and_drop": true,
+      "view_actions": true,
+      "apple_profile_preset_and_simulation_saved": true,
+      "folder_right_click_apple_and_gateway_defaults": true,
+      "discovery_results_invalidated_on_scope_and_mode_change": true,
+      "discovery_simulated_context_profiles_accounts_folders": true,
+      "discovery_simulated_results_stay_offline": true,
+      "discovery_real_scan_consent_and_public_scope_blocked": true,
+      "tools_system_information_and_public_key_fingerprint": true,
+      "sftp_graphical_multiple_files_folders_upload": true,
+      "sftp_single_click_directory_navigation_repeated": true,
+      "sftp_filter_clears_hidden_selection": true,
+      "sftp_graphical_drag_and_drop_upload": true,
+      "sftp_graphical_edit_readback": true,
+      "sftp_graphical_multiple_files_folders_download": true,
+      "sftp_persistent_queue_manual_restart_after_browser_close": true,
+      "sftp_limits_configured_and_persisted_in_settings": true,
+      "french_setting_persisted_after_restart": true,
+      "success": true,
+      "serial_received_bytes": 0,
+      "serial_commands": [],
+      "serial_replies": [],
+      "application_exit_before_cleanup": null
+    },
+    {
+      "target": "127.0.0.1",
+      "system_account_or_shell_used": false,
+      "openssh_utf8_exec": true,
+      "wrong_identity_rejected": true,
+      "changed_host_key_rejected": true,
+      "opensftp_bidirectional_files_folders": true,
+      "ssh_pty_and_resize": true,
+      "sftp_edit_readback": true,
+      "traversal_and_symlink_rejected": true,
+      "application_terminal_gui": true,
+      "success": true,
+      "services_stopped": true,
+      "events": {
+        "publickey_accepted": 11,
+        "publickey_rejected": 1,
+        "pty_requested": 2,
+        "resize_requested": 1,
+        "unsafe_path_rejected": 2,
+        "shell_commands": 0
+      }
+    }
+  ]
+}

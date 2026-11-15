@@ -379,6 +379,8 @@ with tempfile.TemporaryDirectory(prefix="rustremote-ssh-display-") as directory:
         time.sleep(.5)
         assert keyring.poll() is None,"Coffre de laboratoire indisponible"
     app_env=dict(os.environ)
+    if os.environ.get("RUSTREMOTE_GTK_FATAL_WARNINGS")=="1":
+        app_env["G_DEBUG"]="fatal-warnings"
     if os.environ.get("RUSTREMOTE_ENGLISH_GUI")=="1":app_env.pop("RUSTREMOTE_LANGUAGE",None)
     process=subprocess.Popen(launch,env=app_env)
     result={"target":"127.0.0.1","personal_desktop_accessed":False}

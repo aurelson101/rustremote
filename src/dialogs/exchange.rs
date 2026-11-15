@@ -137,7 +137,7 @@ impl Controller {
             staged_copy.replace(None);
             c.set_sensitive(false);
             button.set_sensitive(false);
-            path_copy.set_sensitive(false);
+            set_input_sensitive(&path_copy, false);
             w.set_deletable(false);
             m.set_text("Vérification…");
             let path = std::path::PathBuf::from(path_copy.text().as_str());

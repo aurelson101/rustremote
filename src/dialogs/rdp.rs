@@ -65,7 +65,7 @@ impl RdpForm {
         monitors.set_placeholder_text(Some("0,1 pour deux écrans"));
         monitors.set_sensitive(false);
         let m = monitors.clone();
-        multi.connect_toggled(move |b| m.set_sensitive(b.is_active()));
+        multi.connect_toggled(move |b| set_input_sensitive(&m, b.is_active()));
         widget.append_page(&display, Some(&gtk::Label::new(Some("Affichage RDP"))));
         let devices = gtk::Box::new(gtk::Orientation::Vertical, 10);
         devices.set_margin_top(12);

@@ -2,6 +2,46 @@
 
 **Règle :** le statut `DONE` exige résultat observable + commande de vérification enregistrée dans `MEMORY.md`. Si l'outil est indisponible, marquer `BLOCKED`, jamais `DONE`. Une seule tâche principale ouverte par agent.
 
+## Priorité active : stabilisation GTK puis portage Windows
+
+Le correctif du focus GTK est prioritaire avant le portage. Windows n'est pas
+encore implémenté : ni MSI, ni MSIX, ni compatibilité obtenue par conversion de
+l'AppImage. Cible du premier port : Windows11 x64, sans promesse de parité initiale.
+Les interfaces/protocoles Linux fonctionnels sont conservés.
+
+| Ordre | Lot | Priorité | Dépend de | Statut | Critère de passage |
+|---|---|---|---|---|---|
+| 0 | GTK-FOCUS | P0 | — | DONE | Focus libéré avant désactivation des champs ; test GTK4.8 avec fatal-warnings et rejeu GUI sans GtkText focus-out. |
+| 1 | WIN-01 : preuves GUI/terminal | P0 | GTK-FOCUS | TODO | Sur Windows réel/VM dédiée : fenêtre GTK4 Rust empaquetable et prototype terminal ConPTY avec affichage ANSI/UTF-8, saisie, resize et arrêt propre, I/O hors GTK et tampons bornés. Choisir le rendu après ce PoC ; ConPTY ne fournit pas le widget graphique. |
+| 2 | WIN-02 : compilation et frontière OS | P0 | WIN-01 | TODO | Build Windows natif reproductible et job CI ; isoler dépendances VTE/Linux, chemins /usr/bin, sockets Unix, pidfd, permissions/flock. Modèles et tests communs compilent sur Linux/Windows ; pas de cfg dispersés dans les protocoles. |
+| 3 | WIN-03 : stockage et secrets | P0 | WIN-02 | TODO | Dossier de configuration Windows, fichiers atomiques/ACL privées/verrou interprocessus, coffre Windows Credential Manager ou backend keyring Windows validé. Conservation du chiffrement optionnel, export sans secrets, aucune clé/mot de passe dans argv ou logs. |
+| 4 | WIN-04 : SSH/SFTP natifs | P0 | WIN-03 | TODO | Terminal Windows via ConPTY et OpenSSH Windows ; routage/askpass/agent à adapter explicitement. SFTP libssh2 portable, chemins Windows/UNC/Unicode, transferts, collisions, édition, annulation, file persistante. known_hosts strict et refus des clés modifiées testés sur labo isolé. |
+| 5 | WIN-05 : RDP Windows | P1 | WIN-03 | TODO | Client système mstsc via profils .rdp, domaine/NLA/certificat, taille/moniteurs, son et redirections opt-in. Prompt natif/coffre pour les secrets ; jamais de mot de passe en ligne de commande. Clipboard texte/fichiers/dossiers et déconnexion vérifiés en labo Windows autorisé. |
+| 6 | WIN-06 : ergonomie et outils | P1 | WIN-04, WIN-05 | TODO | Dossiers/profils/import-export, glisser-déposer, copier-coller, DPI125–200%, tests UI Automation Windows (AT-SPI reste Linux), multi-écrans et commandes ping/tracert adaptés ; résolution de noms Windows sans getent. Linux reste couvert par les tests. |
+| 7 | WIN-07 : paquet et qualification | P1 | WIN-06 | TODO | ZIP de test autonome puis MSIX : runtime GTK/DLL, icônes, manifeste/identité Store, installation compte standard, mise à jour/désinstallation, Defender et Windows App Certification Kit. Profil utilisateur et secrets préservés à la mise à jour. |
+| 8 | WIN-08 : distribution/signature | P1 | WIN-07 | TODO | MSIX soumis au Store par le titulaire du compte ; MSI séparé seulement si nécessaire. SignPath soumis à admission et provenance CI/approbation manuelle/MFA. Aucun certificat ni compte fictif, aucune garantie d'absence de faux positifs. |
+| 9 | WIN-09 : extensions | P2 | WIN-07 | TODO | VNC/Apple avec client et tunnel validés, série via API COM/backend portable en remplacement de picocom. Intégration RDP dans les onglets après validation séparée ; matériel réel et endurance distincts de simulations. |
+
+### Pourquoi cet ordre
+
+Le terminal actuel (`src/terminal.rs`) dépend de VTE/PTY et de pidfd Linux : c'est
+le risque principal à lever avant de multiplier les adaptations. `store.rs`,
+`transfers.rs`, `ssh_route.rs`, `ssh_auth.rs`, `credentials.rs`, `external.rs` et
+`rustremote-askpass` contiennent également des intégrations Unix/Linux. Une simple
+compilation croisée ne donne pas une application Windows fonctionnelle.
+
+Le MVP Windows comprend organisation des sessions, SSH/SFTP, coffre et RDP externe.
+VNC/Apple, série et intégration RDP en onglets passent après ce socle. La vérification
+Windows nécessite un runner/VM Windows ; les tests Linux ne la remplacent pas.
+Aucun nouveau langage applicatif ni remplacement global de l'interface n'est décidé
+sans la preuve WIN-01. Les durées ne sont pas promises avant ces preuves.
+
+Références primaires vérifiées le15novembre2026 : [GTK pour Windows](https://www.gtk.org/docs/installations/windows/),
+[session ConPTY](https://learn.microsoft.com/en-us/windows/console/creating-a-pseudoconsole-session),
+[Credential Manager](https://learn.microsoft.com/en-us/windows/win32/api/wincred/nf-wincred-credwritew).
+
+## Roadmap Linux et fonctionnalités existantes
+
 | ID | Phase | Priorité | Statut initial | Livraison vérifiable |
 |---|---|---|---|---|
 | P0-01 | Base | Critique | DONE | Versions Ubuntu, Rust, GTK4, pkg-config et plan de prérequis relevés. |
@@ -331,3 +371,12 @@ Publication0.9.1 vérifiée : quatre assets retéléchargés/comparés. Six anci
 releases retirées après sauvegarde intégrale et contrôle d'absence de changement ;
 leurs tags Git sont conservés.17anciens artefacts locaux archivés. Le rapport HTML
 personnel reste exclu de Git et des assets. État de reprise dans MEMORY.md.
+
+## Stabilisation GTK — 2026-11-15
+
+GTK-FOCUS DONE : cause reproduite avec GTK4.8.3 (désactivation du panneau actif),
+focus libéré avant désactivation et préservé hors panneau. Test dédié sous warnings
+bloquants PASS,55tests normaux PASS ; rejeu GUI final SSH/SFTP sans GtkText et sans
+warning/critical GTK RustRemote. AppImage0.9.2 locale validée ; aucune release GitHub
+publiée dans cette étape. Voir VALIDATION-0.9.2.md et validation/0.9.2.json.
+Prochaine priorité Windows : WIN-01 ; tous les lots Windows restent TODO.

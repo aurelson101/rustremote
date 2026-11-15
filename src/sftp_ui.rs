@@ -148,7 +148,7 @@ impl Browser {
         if matches!(&operation, Some(Operation::List(_))) {
             self.invalidate_listing();
         }
-        self.controls.set_sensitive(false);
+        crate::dialogs::set_input_sensitive(&self.controls, false);
         let configured = self.preferences.borrow().sftp.clone();
         self.status.set_text(&format!(
             "{} · {} s / {} MiB",

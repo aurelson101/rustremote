@@ -5,13 +5,13 @@
 
 ## 1. État de référence
 
-- **Mise à jour :** 2026-11-14 — 0.9.1 publiée/vérifiée, anciennes releases retirées après sauvegarde, rapport HTML local.
-- **Dernier agent :** Codex ; confidentialité/GPL, notices et build portable, vérification GUI SSH/SFTP.
+- **Mise à jour :** 2026-11-15 — correctif focus GTK 0.9.2 local et priorisation Windows ; release GitHub actuelle 0.9.1.
+- **Dernier agent :** Codex ; cause GtkText reproduite, focus libéré avant désactivation, feuille de route Windows ordonnée.
 - **Phase :** P1 — terminal/SFTP natifs, MVP encore incomplet.
 - **État confirmé :** terminal SSH/série intégré VTE, SFTP natif ssh2/libssh2 ; RDP/VNC externes ; profils/import/export, dossiers et paramètres persistants.
 - **Code existant :** package Rust/GTK4, ui/dialogs/profiles/store/simulation/icons ; scripts AppImage, GTK et laboratoires réseau/PTY.
 - **Plateforme cible initiale :** Ubuntu Linux / GNOME. Debian ensuite.
-- **Dernière vérification réelle :** 55 tests Rust et contrôles Cargo réussis ; AppImage 0.9.1 construite, contenu licence/confidentialité vérifié, GUI anglais SSH/SFTP PASS. Voir `docs/VALIDATION-0.9.1.md` et `docs/validation/0.9.1.json`.
+- **Dernière vérification réelle :** 55 tests normaux +1 régression GTK explicite PASS ; contrôles Cargo PASS. AppImage locale 0.9.2 et GUI SSH/SFTP avec warnings applicatifs bloquants PASS, aucun GtkText reproduit. Voir `docs/VALIDATION-0.9.2.md` et `docs/validation/0.9.2.json`.
 
 ## 2. Objectif immuable
 
@@ -728,3 +728,47 @@ https://github.com/aurelson101/rustremote/releases/tag/v0.9.1
 Le commit suivant ne modifie que les statuts de livraison. Prochaine tâche :
 qualification GtkText focus-out/mDNS/matériels selon autorisation, portage Windows
 et admission SignPath restent ouverts. Aucun formulaire SignPath envoyé.
+
+## Focus GTK et feuille de route Windows — 2026-11-15
+
+Demande : corriger l'avertissement GTK, puis hiérarchiser le portage Windows.
+Dépôt propre au départ961f470. Reproduction minimale sous les libs GTK4.8.3 extraites
+de l'AppImage0.9.1 : champ actif dans panneau set_sensitive(false), callback de
+clignotement sans focus-out ; G_DEBUG=fatal-warnings =>exit133. Libérer le focus
+avant désactivation =>exit0. Ni filtre des warnings ni curseur désactivé.
+
+Nouveau helper dialogs::set_input_sensitive : vérifie que le focus appartient au
+sous-arbre à désactiver, puis le libère avant changement de sensibilité. Appliqué
+aux profils, paramètres, mot de passe, import, découverte, SFTP, moniteurs RDP et
+passerelle VNC. Focus hors panneau préservé. Test GTK dédié ignoré par défaut car
+nécessite affichage ; exécuté explicitement sous Xvfb/bus privés et GTK4.8 avec
+fatal-warnings : PASS.55tests normaux et fmt/check/Clippy PASS. Build portable et
+startup0.9.2 PASS ; image locale, pas de publication0.9.2 ni modification de0.9.1.
+
+Premier GUI anglais avec G_DEBUG global fatal-warnings PASS sans GtkText applicatif,
+mais portails du lab interrompus par leurs propres warnings. Harnais rectifié :
+RUSTREMOTE_GTK_FATAL_WARNINGS=1 rend les warnings fatals uniquement dans RustRemote.
+Rejeu final de ce mode PASS : aucun GtkText ni warning/critical GTK RustRemote.
+Ne pas affirmer que les services externes du labo sont sans warning.
+
+Roadmap Windows dans docs/ROADMAP.md : GTK4+ConPTY prouvés d'abord, frontières OS/CI,
+stockage/ACL/coffre, SSH/SFTP, RDP mstsc, ergonomie/UI Automation/DPI, ZIP puis MSIX,
+Store/signature, VNC/Apple/série ensuite. Tous les lots Windows TODO, aucun binaire
+Windows, aucun pipeline ou compte Store prétendu actif. Références Microsoft/GTK
+vérifiées. Ne pas créer dix crates ni remplacer l'interface Linux avant le PoC.
+
+Fichiers : dialogs.rs et sous-modules settings/exchange/discovery/rdp/connections,
+sftp_ui.rs, test smoke-connected, Cargo version/lock0.9.2, ROADMAP et validation0.9.2.
+Le rapport HTML personnel reste local et les backups/releases existants inchangés.
+Résultats consignés dans VALIDATION-0.9.2.md et validation/0.9.2.json.
+Prochaine tâche : WIN-01, preuve GTK4/ConPTY sur Windows dédié ; le portage n'est pas
+implémenté. Modifications locales non committées/non poussées dans cette étape.
+Pas d'infrastructure réelle contactée.
+
+## Publication 0.9.2 et démarrage Windows — 2026-11-15
+
+Utilisateur autorise la publication GitHub du correctif et le début du portage,
+avec MSI/WinGet prioritaires, puis MSIX/signature. « Linux en MSI » interprété comme
+Windows en MSI (Linux conserve l'AppImage). Les changements GTK précédents sont
+connus, testés et autorisés pour publication ; le rapport HTML reste hors Git.
+Publication0.9.2 en préparation ; début Windows isolé du binaire Linux existant.

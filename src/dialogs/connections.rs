@@ -42,7 +42,7 @@ impl ConnectionsForm {
         let gateway_user = field(&gateway_box, "Utilisateur de la passerelle SSH", "");
         vnc.append(&gateway_box);
         let b = gateway_box.clone();
-        tunnel.connect_toggled(move |t| b.set_sensitive(t.is_active()));
+        tunnel.connect_toggled(move |t| set_input_sensitive(&b, t.is_active()));
         let note = gtk::Label::new(Some(
             "Tunnel : SSH Agent et ~/.ssh/config ; empreinte hôte à vérifier. L’hôte VNC est vu depuis la passerelle. Sans tunnel : certificat X509 signé requis. Aucun mot de passe enregistré.",
         ));

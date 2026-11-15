@@ -190,7 +190,7 @@ impl Controller {
             button.set_sensitive(false);
             w.set_deletable(false);
             if let Some(child) = w.child() {
-                child.set_sensitive(false);
+                set_input_sensitive(&child, false);
             }
             let c = controller.clone();
             let w = w.clone();

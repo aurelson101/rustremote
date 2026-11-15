@@ -6,8 +6,8 @@ a graphical SFTP browser, saved sessions, and RDP, VNC and serial connections.
 **Preview software. English is the default; French is available in Settings
 (restart required).** Developed independently, without proprietary MobaXterm code.
 
-[Download v0.9.1](https://github.com/aurelson101/rustremote/releases/tag/v0.9.1) ·
-[Validation](docs/VALIDATION-0.9.1.md) · [Roadmap](docs/ROADMAP.md) ·
+[Download v0.9.2](https://github.com/aurelson101/rustremote/releases/tag/v0.9.2) ·
+[Validation](docs/VALIDATION-0.9.2.md) · [Roadmap](docs/ROADMAP.md) ·
 [Security](docs/SECURITY.md) · [License](LICENSE)
 
 ## Screenshots
@@ -141,10 +141,10 @@ system protocol clients are required. The `-ABI.json` release asset records the
 libraries used to build this version.
 
 ```bash
-chmod +x RustRemote-0.9.1-preview-x86_64.AppImage
-./RustRemote-0.9.1-preview-x86_64.AppImage
+chmod +x RustRemote-0.9.2-preview-x86_64.AppImage
+./RustRemote-0.9.2-preview-x86_64.AppImage
 # Without FUSE:
-APPIMAGE_EXTRACT_AND_RUN=1 ./RustRemote-0.9.1-preview-x86_64.AppImage
+APPIMAGE_EXTRACT_AND_RUN=1 ./RustRemote-0.9.2-preview-x86_64.AppImage
 ```
 
 Protocol clients: OpenSSH, **FreeRDP 3** (`xfreerdp3` or a verified version-3
