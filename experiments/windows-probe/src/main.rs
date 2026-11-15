@@ -7,6 +7,8 @@ mod conpty;
 mod live;
 mod live_ui;
 mod probe_output;
+mod profile_service;
+mod profile_ui;
 mod terminal;
 mod terminal_keys;
 #[cfg(windows)]
@@ -74,6 +76,7 @@ fn main() -> std::process::ExitCode {
         };
     }
     let capture_ui = args.iter().any(|a| a == "--capture-ui");
+    let smoke_profiles = args.iter().any(|a| a == "--smoke-profiles-ui");
     let smoke_live = args.iter().any(|a| a == "--smoke-live-ui");
     let smoke = args.iter().any(|a| a == "--smoke-ui");
     let smoke_ok = Rc::new(Cell::new(false));
@@ -94,7 +97,12 @@ fn main() -> std::process::ExitCode {
             }
         }
         let css = gtk::CssProvider::new();
-        css.load_from_data("#ansi-screen { background: #151b24; padding: 12px; font-size: 14px; }");
+        css.load_from_data("#ansi-screen { background: #151b24; padding: 12px; font-size: 14px; }
+.profiles { background: #151b24; color: #e4e9f2; padding: 12px; }
+.profiles entry, .profiles passwordentry { background: #0e141d; border: 1px solid #334254; border-radius: 7px; min-height: 32px; }
+.profiles button { border-radius: 7px; padding: 8px 12px; }
+.profiles button.suggested-action { background: #2463b6; color: white; }
+.profiles list { background: #192332; border-radius: 8px; padding: 8px; }");
         if let Some(display) = gtk::gdk::Display::default() {
             gtk::style_context_add_provider_for_display(&display, &css, gtk::STYLE_PROVIDER_PRIORITY_APPLICATION);
         }
@@ -159,7 +167,9 @@ fn main() -> std::process::ExitCode {
         let shell = gtk::ScrolledWindow::builder().hscrollbar_policy(gtk::PolicyType::Never).child(&body).build();
         let window = gtk::ApplicationWindow::builder().application(app).title("RustRemote Windows probe").default_width(760).default_height(600).child(&shell).build();
         live_ui::attach(&body, &screen, &viewport, &status, &window, live_ui::SmokeOptions { enabled: smoke_live, capture: capture_ui, result: seen.clone() }, &run);
+        profile_ui::attach(&body, &window, &status);
         window.present();
+        if smoke_profiles { profile_ui::smoke(&window, seen.clone(), capture_ui); }
         if smoke {
             let app = app.downgrade(); let seen = seen.clone();
             gtk::glib::timeout_add_local_once(Duration::from_secs(1), move || {
@@ -177,7 +187,7 @@ fn main() -> std::process::ExitCode {
         }
     });
     let result = app.run_with_args(&["rustremote-windows-probe"]);
-    if (smoke || smoke_live) && !smoke_ok.get() {
+    if (smoke || smoke_live || smoke_profiles) && !smoke_ok.get() {
         std::process::ExitCode::FAILURE
     } else {
         std::process::ExitCode::from(result.get())

@@ -11,7 +11,9 @@ source10de7c6 : 7 tests communs,8 tests prototype et essais natifs stockage/coff
 ConPTY et interface redimensionnée. Pilote de resize natif propriétaire du PID ;
 ancien échec sur changement de taille par défaut GTK documenté dans MEMORY.md.
 La qualification concerne ces composants, pas une application Windows complète.
-GUI profils à raccorder ; SSH/SFTP/RDP et MSI restent à intégrer et qualifier.
+GUI profils raccordée dans le prototype : CRUD, domaines, dossiers, coffre et
+import/export ; tests service et GUI locale PASS, validation Windows de cette
+interface en cours. SSH/SFTP/RDP et MSI restent à intégrer et qualifier.
 Windows11 x64 matériel, périphériques, DPI/IME et endurance restent non qualifiés.
 
 ## Campagne 15 contrôles / 10 améliorations — 2026-11-15

@@ -1113,3 +1113,23 @@ Vérifications finales Linux après dernier test commun : fmt/check/clippy PASS 
 cargo test --workspace PASS (61 réussis,2 ignorés explicitement). Log final
 /tmp/rustremote-windows-core-final-tests.log. Rejeu GUI SSH/SFTP PASS indiqué
 ci-dessus ; aucun serveur réel ni équipement contacté.
+
+## Intégration Windows profils — en cours (2026-11-15)
+Ajout profile_service.rs : mutations transactionnelles, nouvelle référence de coffre
+avant sauvegarde, rollback si échec, nettoyage ancien secret après commit, référence
+invalidée après changement identité/config SSH. Erreur de nettoyage distincte de
+l’échec de sauvegarde. Import2Mio retire les références ; export exclusif sans secrets.
+Ajout profile_ui.rs : onglets connexions/profil/dossiers, création/modification SSH
+et RDP avec domaine, fichiers SSH sélectionnables, mot de passe/coffre, favoris,
+création de sous-dossiers, renommage/déplacement et suppression vide, import/export,
+DPAPI opt-in. I/O sur worker, opération unique, focus libéré avant désactivation,
+fermeture refusée pendant une écriture, fenêtre unique réutilisée.
+Tests locaux :4 tests service PASS, Clippy prototype tous targets PASS ; GUI sous
+Xvfb avec fatal-warnings PASS (backend simulé Linux, pas de prétention DPAPI Linux).
+Parcours : création2protocoles, modification, rétention puis invalidation des creds,
+dossiers descendants, refus import doublons, import renommé/export, cleanup. Capture
+profil listée et inspectée. Échecs du pilote corrigés : doublons attendus par merge,
+snapshot après changement onglet attend désormais un nouveau frame GTK.
+Workflow natif étendu avec --smoke-profiles-ui, laboratoire temporaire Windows réel
+ACL/DPAPI/Credential Manager, sans profil utilisateur ni serveur réel. Pas encore
+rejoué nativement pour cet incrément ; SSH/SFTP/RDP transport et MSI restent ouverts.

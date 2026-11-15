@@ -73,6 +73,10 @@ jobs:
         run: |
           set -o pipefail
           experiments/windows-probe/target/debug/rustremote-windows-probe.exe --smoke-live-ui --capture-ui | tee dist/windows-probe/live-gui.txt
+      - name: Native profile manager and vault integration
+        run: |
+          set -o pipefail
+          G_DEBUG=fatal-warnings experiments/windows-probe/target/debug/rustremote-windows-probe.exe --smoke-profiles-ui --capture-ui | tee dist/windows-probe/profiles-gui.txt
       - name: Prepare diagnostic artifact (not an installer)
         run: |
           cp experiments/windows-probe/README.md dist/windows-probe/README.md
