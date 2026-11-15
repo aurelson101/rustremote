@@ -772,3 +772,12 @@ avec MSI/WinGet prioritaires, puis MSIX/signature. « Linux en MSI » interprét
 Windows en MSI (Linux conserve l'AppImage). Les changements GTK précédents sont
 connus, testés et autorisés pour publication ; le rapport HTML reste hors Git.
 Publication0.9.2 en préparation ; début Windows isolé du binaire Linux existant.
+
+Premier incrément Windows : experiments/windows-probe (GTK4 séparé, API ConPTY
+Windows natives, cmd.exe système AutoRun désactivé, commandes internes fixes,
+entrée/sortie UTF-8, resize,10s max enfant, transcript mémoire64KiB non journalisé).
+Main GTK reste réactif via worker/canal. Compilation et Clippy du frontend sur
+Linux PASS ; aucune preuve Windows à ce stade. Workflow natif manuel en préparation,
+MSYS2 UCRT64, actions épinglées, permissions lecture. Linux principal inchangé par
+ce package indépendant. WIN-01 reste IN PROGRESS, pas de renderer terminal ANSI ni
+profil Windows intégré. Pas de MSI de démonstration présenté comme produit fini.

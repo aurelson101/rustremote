@@ -12,14 +12,14 @@ Les interfaces/protocoles Linux fonctionnels sont conservés.
 | Ordre | Lot | Priorité | Dépend de | Statut | Critère de passage |
 |---|---|---|---|---|---|
 | 0 | GTK-FOCUS | P0 | — | DONE | Focus libéré avant désactivation des champs ; test GTK4.8 avec fatal-warnings et rejeu GUI sans GtkText focus-out. |
-| 1 | WIN-01 : preuves GUI/terminal | P0 | GTK-FOCUS | TODO | Sur Windows réel/VM dédiée : fenêtre GTK4 Rust empaquetable et prototype terminal ConPTY avec affichage ANSI/UTF-8, saisie, resize et arrêt propre, I/O hors GTK et tampons bornés. Choisir le rendu après ce PoC ; ConPTY ne fournit pas le widget graphique. |
+| 1 | WIN-01 : preuves GUI/terminal | P0 | GTK-FOCUS | IN PROGRESS | Sur Windows réel/VM dédiée : fenêtre GTK4 Rust empaquetable et prototype terminal ConPTY avec affichage ANSI/UTF-8, saisie, resize et arrêt propre, I/O hors GTK et tampons bornés. Choisir le rendu après ce PoC ; ConPTY ne fournit pas le widget graphique. |
 | 2 | WIN-02 : compilation et frontière OS | P0 | WIN-01 | TODO | Build Windows natif reproductible et job CI ; isoler dépendances VTE/Linux, chemins /usr/bin, sockets Unix, pidfd, permissions/flock. Modèles et tests communs compilent sur Linux/Windows ; pas de cfg dispersés dans les protocoles. |
 | 3 | WIN-03 : stockage et secrets | P0 | WIN-02 | TODO | Dossier de configuration Windows, fichiers atomiques/ACL privées/verrou interprocessus, coffre Windows Credential Manager ou backend keyring Windows validé. Conservation du chiffrement optionnel, export sans secrets, aucune clé/mot de passe dans argv ou logs. |
 | 4 | WIN-04 : SSH/SFTP natifs | P0 | WIN-03 | TODO | Terminal Windows via ConPTY et OpenSSH Windows ; routage/askpass/agent à adapter explicitement. SFTP libssh2 portable, chemins Windows/UNC/Unicode, transferts, collisions, édition, annulation, file persistante. known_hosts strict et refus des clés modifiées testés sur labo isolé. |
 | 5 | WIN-05 : RDP Windows | P1 | WIN-03 | TODO | Client système mstsc via profils .rdp, domaine/NLA/certificat, taille/moniteurs, son et redirections opt-in. Prompt natif/coffre pour les secrets ; jamais de mot de passe en ligne de commande. Clipboard texte/fichiers/dossiers et déconnexion vérifiés en labo Windows autorisé. |
 | 6 | WIN-06 : ergonomie et outils | P1 | WIN-04, WIN-05 | TODO | Dossiers/profils/import-export, glisser-déposer, copier-coller, DPI125–200%, tests UI Automation Windows (AT-SPI reste Linux), multi-écrans et commandes ping/tracert adaptés ; résolution de noms Windows sans getent. Linux reste couvert par les tests. |
-| 7 | WIN-07 : paquet et qualification | P1 | WIN-06 | TODO | ZIP de test autonome puis MSIX : runtime GTK/DLL, icônes, manifeste/identité Store, installation compte standard, mise à jour/désinstallation, Defender et Windows App Certification Kit. Profil utilisateur et secrets préservés à la mise à jour. |
-| 8 | WIN-08 : distribution/signature | P1 | WIN-07 | TODO | MSIX soumis au Store par le titulaire du compte ; MSI séparé seulement si nécessaire. SignPath soumis à admission et provenance CI/approbation manuelle/MFA. Aucun certificat ni compte fictif, aucune garantie d'absence de faux positifs. |
+| 7 | WIN-07 : paquet et qualification | P1 | WIN-06 | TODO | ZIP de test autonome puis MSI en priorité : runtime GTK/DLL, icônes, installation compte standard, mise à jour/désinstallation, GUID UpgradeCode stable et ProductCode/version corrects ; profils préservés. Profil utilisateur et secrets préservés à la mise à jour. |
+| 8 | WIN-08 : distribution/signature | P1 | WIN-07 | TODO | Après MSI validé : manifeste WinGet avec URL immuable/SHA256 du MSI réel, installation silencieuse et désinstallation testées ; aucune soumission de manifeste fictif. MSIX/Store et signature viennent ensuite. SignPath soumis à admission et provenance CI/approbation manuelle/MFA. Aucun certificat ni compte fictif, aucune garantie d'absence de faux positifs. |
 | 9 | WIN-09 : extensions | P2 | WIN-07 | TODO | VNC/Apple avec client et tunnel validés, série via API COM/backend portable en remplacement de picocom. Intégration RDP dans les onglets après validation séparée ; matériel réel et endurance distincts de simulations. |
 
 ### Pourquoi cet ordre
@@ -380,3 +380,19 @@ bloquants PASS,55tests normaux PASS ; rejeu GUI final SSH/SFTP sans GtkText et s
 warning/critical GTK RustRemote. AppImage0.9.2 locale validée ; aucune release GitHub
 publiée dans cette étape. Voir VALIDATION-0.9.2.md et validation/0.9.2.json.
 Prochaine priorité Windows : WIN-01 ; tous les lots Windows restent TODO.
+
+## Démarrage Windows / MSI–WinGet — 2026-11-15
+
+WIN-01 commencé dans experiments/windows-probe, package Cargo indépendant pour
+préserver Linux. Fenêtre GTK4, test natif ConPTY borné (entrée/sortie UTF-8,
+redimensionnement, processus système local et arrêt), lecture sur worker et sortie
+retenue64KiB maximum. Pas de connexion SSH réelle ni d'identifiant. Le rendu ANSI
+interactif et l'intégration au produit restent ouverts : ne pas qualifier le lot DONE
+sur le seul transport. Workflow natif Windows explicite, actions épinglées, rapports
+et exécutable de diagnostic ; aucun faux MSI/MSIX de produit complet.
+
+L'ordre demandé est désormais : MVP Windows fonctionnel → MSI testé → WinGet →
+MSIX/signature. WinGet utilise des métadonnées et un hash d'installateur, et ne signe
+pas le programme à la place de l'éditeur. Choix entre dépôt communautaire et source
+privée à faire au moment de la distribution ; pas d'ouverture de PR communautaire
+avant livrable réel et validation. Référence : [manifestes WinGet](https://learn.microsoft.com/en-us/windows/package-manager/package/manifest).

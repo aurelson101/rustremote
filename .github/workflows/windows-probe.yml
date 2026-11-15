@@ -1,0 +1,55 @@
+name: Windows feasibility probe
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: windows-feasibility-probe
+  cancel-in-progress: false
+jobs:
+  native-windows:
+    runs-on: windows-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        shell: msys2 {0}
+    env:
+      CARGO_BUILD_JOBS: '2'
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          persist-credentials: false
+      - uses: msys2/setup-msys2@ec48f7c5447b3140e2b088413ae3a55687bccb6e
+        with:
+          msystem: UCRT64
+          update: true
+          install: >-
+            mingw-w64-ucrt-x86_64-gcc
+            mingw-w64-ucrt-x86_64-rust
+            mingw-w64-ucrt-x86_64-gtk4
+            mingw-w64-ucrt-x86_64-pkgconf
+      - name: Native environment
+        run: |
+          mkdir -p dist/windows-probe
+          { rustc -Vv; cargo -V; pkg-config --modversion gtk4; pacman -Q mingw-w64-ucrt-x86_64-rust mingw-w64-ucrt-x86_64-gtk4; } > dist/windows-probe/environment.txt
+      - name: Build native Windows probe
+        run: cargo build --locked --manifest-path experiments/windows-probe/Cargo.toml
+      - name: Local ConPTY input-output and resize
+        run: |
+          set -o pipefail
+          experiments/windows-probe/target/debug/rustremote-windows-probe.exe --self-test | tee dist/windows-probe/conpty.txt
+      - name: GTK Windows startup
+        run: |
+          set -o pipefail
+          experiments/windows-probe/target/debug/rustremote-windows-probe.exe --smoke-ui | tee dist/windows-probe/gui.txt
+      - name: Prepare diagnostic artifact (not an installer)
+        run: |
+          cp experiments/windows-probe/target/debug/rustremote-windows-probe.exe dist/windows-probe/
+          cp experiments/windows-probe/README.md dist/windows-probe/README.md
+          cp LICENSE NOTICE dist/windows-probe/
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: windows-feasibility-probe
+          path: dist/windows-probe/
+          retention-days: 7
+          if-no-files-found: error

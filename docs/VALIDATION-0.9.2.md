@@ -22,8 +22,8 @@ l'AppImage et G_DEBUG=fatal-warnings : PASS.
 ## Vérifications
 
 fmt/check/Clippy -D warnings et55tests normaux PASS, plus1régression GTK exécutée
-explicitement. Build AppImage portable Debian12 et startup PASS. L'image0.9.2 est
-locale ; aucune release GitHub remplacée ni publiée pour cette étape.
+explicitement. Build AppImage portable Debian12 et startup PASS. La préversion0.9.2 est publiée sur GitHub, source845238f ; ses quatre assets ont
+été retéléchargés et comparés aux locaux avant publication. La0.9.1 est conservée.
 
 Le premier parcours GUI global fatal-warnings passe sans GtkText dans RustRemote,
 mais faisait aussi avorter les portails de test GNOME. Le harnais dispose désormais

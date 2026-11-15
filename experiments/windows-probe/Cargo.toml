@@ -1,0 +1,16 @@
+[package]
+name = "rustremote-windows-probe"
+version = "0.1.0"
+edition = "2024"
+publish = false
+license = "GPL-3.0-only"
+
+# Independent feasibility probe: the Linux application and its VTE dependencies
+# are not compiled or refactored by this experiment.
+[workspace]
+
+[dependencies]
+gtk = { package = "gtk4", version = "=0.10.3", features = ["v4_8"] }
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "=0.61.2", features = ["Win32_Foundation", "Win32_Security", "Win32_System_Console", "Win32_System_Pipes", "Win32_System_Threading", "Win32_System_SystemInformation"] }
