@@ -107,3 +107,10 @@ Backend/terminal qualification at source `10de7c6`:
 [run43728388282](https://github.com/aurelson101/rustremote/actions/runs/43728388282)
 passed on Server 2022 x64 and Windows 11 Enterprise ARM64 with x64 emulation.
 This validates the listed components, not Windows remote protocols or an MSI.
+
+Profile manager integration at source `26702dc`:
+[run43731588185](https://github.com/aurelson101/rustremote/actions/runs/43731588185)
+passed on both runners, including 12 prototype/service tests and the temporary GUI
+profile/vault workflow with fatal GTK warnings. Save stays outside the scrolled
+form. Native file chooser interaction, physical input and remote protocol launch
+remain outside this qualification. No MSI has been produced.

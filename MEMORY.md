@@ -6,12 +6,12 @@
 ## 1. État de référence
 
 - **Mise à jour :** 2026-11-15 — 0.9.2 publiée/vérifiée ; preuve native Windows GTK4/ConPTY PASS, WIN-01 partiel, MSI/WinGet prioritaires.
-- **Dernier agent :** Codex ; cause GtkText reproduite, focus libéré avant désactivation, feuille de route Windows ordonnée.
+- **Dernier agent :** Codex ; gestionnaire de profils Windows relié au stockage/coffre, qualifié Server2022 x64 et Windows11 ARM64 avec émulation x64.
 - **Phase :** P1 — terminal/SFTP natifs, MVP encore incomplet.
 - **État confirmé :** terminal SSH/série intégré VTE, SFTP natif ssh2/libssh2 ; RDP/VNC externes ; profils/import/export, dossiers et paramètres persistants.
 - **Code existant :** package Rust/GTK4, ui/dialogs/profiles/store/simulation/icons ; scripts AppImage, GTK et laboratoires réseau/PTY.
 - **Plateforme cible initiale :** Ubuntu Linux / GNOME. Debian ensuite.
-- **Dernière vérification réelle :** 55 tests normaux +1 régression GTK explicite PASS ; contrôles Cargo PASS. AppImage locale 0.9.2 et GUI SSH/SFTP avec warnings applicatifs bloquants PASS, aucun GtkText reproduit. Voir `docs/VALIDATION-0.9.2.md` et `docs/validation/0.9.2.json`.
+- **Dernière vérification source :** 61 tests workspace PASS (2 ignorés explicitement), fmt/check/clippy PASS ; 12 tests prototype PASS. GUI profils/coffre Windows PASS, CI43731588185 sur source26702dc. AppImage0.9.2 conservée sans reconstruction dans cette étape. Voir les détails de reprise en fin de document.
 
 ## 2. Objectif immuable
 
@@ -1142,3 +1142,34 @@ passe placés avant les options SSH, champs chemins étendus. Assertion GUI ajou
 sur bouton Enregistrer visible dans la fenêtre, validation locale fatal-warnings
 PASS. Test final refuse aussi une alerte de nettoyage du coffre. Nouvelle variante
 à requalifier Windows ; ARM64 du premier passage encore en cours.
+
+## Intégration GUI profils Windows validée — 2026-11-15
+Source26702dc, CI43731588185 SUCCESS :
+https://github.com/aurelson101/rustremote/actions/runs/43731588185
+Server2022 x64 et Windows11 Enterprise ARM64 (binaire x64 émulé) :7 tests communs,
+12 tests prototype/service, stockage/coffre, ConPTY et GUI classiques PASS ; nouveau
+--smoke-profiles-ui avec G_DEBUG=fatal-warnings PASS sur les deux OS. Captures
+profiles.png et profiles-form.png téléchargées sous dist/windows-probe-validation/
+43731588185/{windows-2022,windows-11-arm}/ et inspectées : mot de passe/port/domaine
+visibles, bouton Save connection fixé hors défilement. Aucune donnée personnelle
+capturée, aucun profil utilisateur ni serveur réel modifié. Les références de test
+sont créées dans le coffre Windows puis retirées par la transaction/le laboratoire.
+
+Tests Linux :fmt/check/clippy workspace PASS ;61tests PASS,2ignored. Prototype :
+Clippy tous targets PASS,12tests PASS. GUI locale avec backend simulé et avertissements
+GTK applicatifs bloquants PASS. Logs /tmp/rustremote-profiles-{linux-workspace,probe-tests}.log
+et /tmp/rustremote-windows-profile-final-gui.log. Les dialogues natifs de sélection
+de fichiers et le clic physique Windows ne sont pas pilotés ; le parcours injecte
+les actions GTK et teste les mêmes fonctions import/export sur fichiers de labo.
+
+Fichiers :profile_ui.rs,profile_service.rs,main.rs du prototype,workflow Windows,
+README prototype,ROADMAP et MEMORY. Pas de nouvelle dépendance. Transaction garde
+l’ancien secret si sauvegarde échoue ; si nettoyage échoue après commit, sauvegarde
+confirmée avec alerte (test injecté). Dossiers logiques seulement, pas de suppression
+d’objets distants. Pas de MSI/release/connexion distante Windows prétendu livré.
+
+Prochaine tâche :WIN-04, relier ces profils au terminal SSH Windows via ConPTY,
+known_hosts strict/agent/askpass Windows, puis port SFTP. Distinguer chemins distants
+POSIX des chemins Windows : inclure naïvement src/sftp.rs serait incorrect (join
+Windows, renameat2, O_NOFOLLOW et ssh_route Unix). RDP mstsc et MSI ensuite.
+Branche windows/native-profile-storage publiée ; sources Linux fonctionnelles conservées.

@@ -12,8 +12,12 @@ ConPTY et interface redimensionnée. Pilote de resize natif propriétaire du PID
 ancien échec sur changement de taille par défaut GTK documenté dans MEMORY.md.
 La qualification concerne ces composants, pas une application Windows complète.
 GUI profils raccordée dans le prototype : CRUD, domaines, dossiers, coffre et
-import/export ; tests service et GUI locale PASS, validation Windows de cette
-interface en cours. SSH/SFTP/RDP et MSI restent à intégrer et qualifier.
+import/export, sauvegarde hors GTK et bouton Enregistrer hors défilement.
+[CI43731588185 PASS](https://github.com/aurelson101/rustremote/actions/runs/43731588185)
+sur source26702dc : interface/coffre réels Server2022 x64 et Windows11 ARM64 avec
+binaire x64 émulé,12 tests prototype/service et parcours GUI temporaire. Sélecteurs
+natifs de fichiers/clic physique non pilotés. Prochaine tâche :WIN-04 SSH/SFTP.
+Lancement SSH/SFTP/RDP et MSI restent à intégrer et qualifier.
 Windows11 x64 matériel, périphériques, DPI/IME et endurance restent non qualifiés.
 
 ## Campagne 15 contrôles / 10 améliorations — 2026-11-15
