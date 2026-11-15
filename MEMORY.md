@@ -970,3 +970,10 @@ WIN-04 SSH/SFTP natifs, WIN-05 mstsc/redirections, UI complète et MSI/WinGet.
 WIN-01 reste PARTIAL pour Windows11 et qualification IME/polices/plein écran/endurance.
 Les deux modifications Linux antérieures src/sftp.rs et scripts/smoke-connected.py
 restent locales non committées, pour ne pas publier une validation GUI non atteinte.
+
+Publication finale : branche Windows et main poussées sans force ; contenu code/
+README/captures publié dans45785b7 (code natif validé5cca68a). Vérification GitHub
+par SHA de blob pour README et les2captures : identique au local ; main distante
+égale au HEAD local après push. v0.9.2 : même ID et mêmes noms/tailles/digests des
+4assets avant/après nettoyage ; tag v0.9.1 toujours présent. Aucune nouvelle release
+ou paquet Windows créé. Les adaptations WIN-02/03/04/05/07 restent réellement TODO.
