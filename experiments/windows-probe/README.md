@@ -32,3 +32,8 @@ the later distribution step.
 Do not publish it as RustRemote's Windows MSI or submit it to WinGet. MSI packaging,
 installation/upgrade/uninstall, Windows profile/security adapters and the terminal
 renderer are subsequent work. MSIX and signing follow MSI/WinGet qualification.
+
+ConPTY child startup explicitly uses STARTF_USESTDHANDLES with null standard handles
+to avoid copying the parent's redirected CI streams. Background:
+https://github.com/microsoft/terminal/discussions/15814 . The CI self-test runs with
+redirected stdout intentionally, so the output marker must come from the PTY pipe.

@@ -795,3 +795,11 @@ sleep arbitraire) du marqueur vu par le reader avant ClosePseudoConsole, suivant
 le besoin de rattrapage documenté par l'exemple Microsoft. Nouveau rejeu requis ;
 ne pas annoncer ConPTY validé avant succès. Diagnostics d'échec limités à tailles/
 présence ASCII/validité UTF-8, sans transcript ni secret journalisé.
+
+CI43692887565 : compilation PASS, mais attente du flush seule insuffisante :
+194octets de contrôle et aucun préfixe de réponse ; bannière CMD envoyée au parent.
+Cause identifiée dans microsoft/terminal discussion15814 : Windows copie parfois
+les flux standard redirigés du parent dans le child ConPTY, même bInheritHandles=false.
+STARTF_USESTDHANDLES avec les trois handles standard nuls force les handles ConPTY.
+Correctif ajouté ; l'attente bornée de flush reste utile mais n'était pas la cause
+principale du marqueur absent. Rejeu requis, ne pas déclarer la preuve validée encore.

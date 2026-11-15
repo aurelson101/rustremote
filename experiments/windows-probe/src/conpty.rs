@@ -16,8 +16,8 @@ use windows_sys::Win32::{
         Threading::{
             CreateProcessW, DeleteProcThreadAttributeList, EXTENDED_STARTUPINFO_PRESENT,
             GetExitCodeProcess, InitializeProcThreadAttributeList, LPPROC_THREAD_ATTRIBUTE_LIST,
-            PROC_THREAD_ATTRIBUTE_PSEUDOCONSOLE, PROCESS_INFORMATION, STARTUPINFOEXW,
-            TerminateProcess, UpdateProcThreadAttribute, WaitForSingleObject,
+            PROC_THREAD_ATTRIBUTE_PSEUDOCONSOLE, PROCESS_INFORMATION, STARTF_USESTDHANDLES,
+            STARTUPINFOEXW, TerminateProcess, UpdateProcThreadAttribute, WaitForSingleObject,
         },
     },
 };
@@ -129,6 +129,9 @@ fn spawn(console: HPCON) -> Result<Child, String> {
         .collect();
     let mut startup = STARTUPINFOEXW::default();
     startup.StartupInfo.cb = size_of::<STARTUPINFOEXW>() as u32;
+    // Without this flag, Windows may copy redirected parent stdio (e.g. CI tee)
+    // into a ConPTY child. Explicit null stdio lets ConPTY create its own handles.
+    startup.StartupInfo.dwFlags = STARTF_USESTDHANDLES;
     startup.lpAttributeList = attributes.ptr;
     let mut information = PROCESS_INFORMATION::default();
     if unsafe {
