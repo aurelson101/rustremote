@@ -90,12 +90,23 @@ impl Session {
     }
 
     pub fn resize(&self, cols: u16, rows: u16) -> Result<(), String> {
+        if self.stop.load(Ordering::Acquire) {
+            return Err("Terminal is stopping; resize refused".into());
+        }
         if !(20..=160).contains(&cols) || !(5..=60).contains(&rows) {
             return Err("Terminal dimensions outside 20–160 × 5–60".into());
         }
         self.tx
             .try_send(Command::Resize(cols, rows))
             .map_err(|_| "Terminal resize busy or closed".into())
+    }
+
+    pub fn input_modes(&self) -> Option<(bool, bool)> {
+        let state = self.state.try_lock().ok()?;
+        Some((
+            state.parser.screen().application_cursor(),
+            state.parser.screen().bracketed_paste(),
+        ))
     }
 
     pub fn snapshot(&self, revision: u64) -> Option<Snapshot> {
@@ -198,7 +209,7 @@ mod tests {
 
     #[test]
     fn queues_are_bounded_and_stop_does_not_depend_on_a_free_queue_slot() {
-        let (tx, _rx) = mpsc::sync_channel(1);
+        let (tx, rx) = mpsc::sync_channel(1);
         let session = Session {
             tx,
             state: Arc::new(Mutex::new(State::new())),
@@ -209,8 +220,10 @@ mod tests {
         session.input(b"a".to_vec()).unwrap();
         assert!(session.input(b"b".to_vec()).is_err());
         session.close();
+        let _ = rx.try_recv().unwrap(); // A free queue must still refuse commands after stop.
         assert!(session.stop.load(Ordering::Acquire));
         assert!(session.input(b"c".to_vec()).is_err());
+        assert!(session.resize(80, 24).is_err());
     }
 
     #[test]
@@ -221,11 +234,20 @@ mod tests {
             state: Arc::new(Mutex::new(State::new())),
             stop: Arc::new(AtomicBool::new(false)),
         };
+        assert_eq!(session.input_modes(), Some((false, false)));
+        session
+            .state
+            .lock()
+            .unwrap()
+            .parser
+            .process(b"\x1b[?1h\x1b[?2004h");
+        assert_eq!(session.input_modes(), Some((true, true)));
         let initial = session.snapshot(0).unwrap();
         assert!(initial.running);
         assert!(session.snapshot(initial.revision).is_none());
         let mut state = session.state.lock().unwrap();
         assert!(session.snapshot(0).is_none());
+        assert!(session.input_modes().is_none());
         state.finish("Closed".into());
         drop(state);
         assert!(!session.snapshot(initial.revision).unwrap().running);

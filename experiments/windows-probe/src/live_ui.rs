@@ -20,9 +20,16 @@ pub fn attach(
     status: &gtk::Label,
     window: &gtk::ApplicationWindow,
     smoke: SmokeOptions,
+    diagnostic: &gtk::Button,
 ) {
     let session: Rc<RefCell<Option<Session>>> = Rc::new(RefCell::new(None));
-    let bar = gtk::Box::new(gtk::Orientation::Horizontal, 8);
+    let bar = gtk::FlowBox::builder()
+        .selection_mode(gtk::SelectionMode::None)
+        .min_children_per_line(1)
+        .max_children_per_line(4)
+        .column_spacing(8)
+        .row_spacing(8)
+        .build();
     let start = gtk::Button::with_label("Open local terminal");
     start.set_sensitive(cfg!(windows));
     let stop = gtk::Button::with_label("Disconnect");
@@ -31,7 +38,7 @@ pub fn attach(
     let paste = gtk::Button::with_label("Paste…");
     paste.set_sensitive(false);
     for button in [&start, &stop, &copy, &paste] {
-        bar.append(button);
+        bar.insert(button, -1);
     }
     body.append(&bar);
     let menu = gtk::gio::Menu::new();
@@ -63,14 +70,22 @@ pub fn attach(
     let target = screen.downgrade();
     let stop_button = stop.downgrade();
     let paste_button = paste.downgrade();
+    let diagnostic_test = diagnostic.downgrade();
     start.connect_clicked(move |button| {
-        if sessions.borrow().is_some() {
+        if sessions.borrow().is_some()
+            || diagnostic_test
+                .upgrade()
+                .is_none_or(|button| !button.is_sensitive())
+        {
             return;
         }
         match Session::start() {
             Ok(value) => {
                 *sessions.borrow_mut() = Some(value);
                 button.set_sensitive(false);
+                if let Some(diagnostic) = diagnostic_test.upgrade() {
+                    diagnostic.set_sensitive(false);
+                }
                 if let Some(stop) = stop_button.upgrade() {
                     stop.set_sensitive(true);
                 }
@@ -118,8 +133,20 @@ pub fn attach(
                 let Some(parent) = parent.upgrade() else {
                     return;
                 };
-                let Ok(Some(text)) = result else {
-                    return;
+                let text = match result {
+                    Ok(Some(text)) if !text.is_empty() => text,
+                    Ok(_) => {
+                        if let Some(output) = output.upgrade() {
+                            output.set_text("Clipboard contains no text");
+                        }
+                        return;
+                    }
+                    Err(_) => {
+                        if let Some(output) = output.upgrade() {
+                            output.set_text("Clipboard text could not be read");
+                        }
+                        return;
+                    }
                 };
                 if text.len() > 4000
                     || text
@@ -159,10 +186,14 @@ pub fn attach(
                             .replace("\r\n", "\n")
                             .replace('\r', "\n")
                             .replace('\n', "\r");
-                        if session
-                            .snapshot(0)
-                            .is_some_and(|s| s.screen.bracketed_paste())
-                        {
+                        let Some((_, bracketed)) = session.input_modes() else {
+                            if let Some(output) = output.upgrade() {
+                                output.set_text("Terminal busy; retry paste");
+                            }
+                            dialog.close();
+                            return;
+                        };
+                        if bracketed {
                             text = format!("\x1b[200~{text}\x1b[201~");
                         }
                         if let Err(error) = session.input(text.into_bytes())
@@ -229,9 +260,7 @@ pub fn attach(
         let Some(session) = sessions.as_ref() else {
             return Propagation::Proceed;
         };
-        let app_cursor = session
-            .snapshot(0)
-            .is_some_and(|s| s.screen.application_cursor());
+        let app_cursor = session.input_modes().is_some_and(|(cursor, _)| cursor);
         if let Some(bytes) = terminal_keys::encode(key, modifiers, app_cursor) {
             if let Err(error) = session.input(bytes)
                 && let Some(output) = output.upgrade()
@@ -260,6 +289,13 @@ pub fn attach(
         let window = window.downgrade();
         let stop_button = stop.downgrade();
         let input = input.clone();
+        let diagnostic_test = diagnostic.downgrade();
+        let toolbar = [
+            start.downgrade(),
+            stop.downgrade(),
+            copy.downgrade(),
+            paste.downgrade(),
+        ];
         let deadline = std::time::Instant::now() + Duration::from_secs(20);
         let mut phase = 0;
         let mut before_size = None;
@@ -284,6 +320,16 @@ pub fn attach(
                         .as_ref()
                         .is_some_and(|s| s.snapshot(0).is_some_and(|s| s.running))
                     {
+                        if diagnostic_test
+                            .upgrade()
+                            .is_none_or(|button| button.is_sensitive())
+                        {
+                            eprintln!("Diagnostic test overlaps a live session");
+                            if let Some(app) = window.application() {
+                                app.quit();
+                            }
+                            return gtk::glib::ControlFlow::Break;
+                        }
                         // Exercise the actual IM commit -> queue -> ConPTY -> GTK path.
                         input.emit_by_name::<()>("commit", &[&"set RR_A=RUSTREMOTE_CONPTY_\r\nset RR_B=OK_été\r\necho %RR_A%%RR_B%\r\n"]);
                         phase = 1;
@@ -295,7 +341,7 @@ pub fn attach(
                         .as_ref()
                         .and_then(|s| s.snapshot(0))
                         .map(|s| s.screen.size());
-                    window.set_default_size(1000, 740);
+                    window.set_default_size(540, 680);
                     phase = 2;
                 }
                 2 => {
@@ -305,6 +351,26 @@ pub fn attach(
                         .and_then(|s| s.snapshot(0))
                         .is_some_and(|s| Some(s.screen.size()) != before_size);
                     if resized {
+                        let responsive = window.width() <= 600
+                            && toolbar.iter().all(|button| {
+                                button
+                                    .upgrade()
+                                    .and_then(|button| button.compute_bounds(&window))
+                                    .is_some_and(|bounds| {
+                                        bounds.x() >= 0.0
+                                            && bounds.y() >= 0.0
+                                            && bounds.x() + bounds.width() <= window.width() as f32
+                                            && bounds.y() + bounds.height()
+                                                <= window.height() as f32
+                                    })
+                            });
+                        if !responsive {
+                            eprintln!("Toolbar controls overflow the narrow window");
+                            if let Some(app) = window.application() {
+                                app.quit();
+                            }
+                            return gtk::glib::ControlFlow::Break;
+                        }
                         if capture_ui
                             && let Err(error) = crate::capture::window(
                                 &window,
@@ -330,13 +396,16 @@ pub fn attach(
                     let stopped = output
                         .upgrade()
                         .is_some_and(|output| output.text() == "Local terminal stopped");
-                    smoke_ok.set(stopped);
+                    let diagnostic_restored = diagnostic_test
+                        .upgrade()
+                        .is_some_and(|button| button.is_sensitive());
+                    smoke_ok.set(stopped && diagnostic_restored);
                     if !stopped {
                         eprintln!("GUI disconnect did not complete cleanly");
                     }
                     if stopped {
                         println!(
-                            "GUI_LIVE_OK: IM commit, live ANSI display, window resize, disconnect"
+                            "GUI_LIVE_OK: IM commit, live ANSI display, narrow responsive window, exclusive diagnostics, disconnect"
                         );
                     }
                     if let Some(app) = window.application() {
@@ -356,6 +425,7 @@ pub fn attach(
     let start = start.downgrade();
     let stop = stop.downgrade();
     let paste = paste.downgrade();
+    let diagnostic = diagnostic.downgrade();
     let mut revision = 0;
     let mut dimensions = (0, 0);
     gtk::glib::timeout_add_local(Duration::from_millis(50), move || {
@@ -365,6 +435,11 @@ pub fn attach(
             session.borrow_mut().take();
             return gtk::glib::ControlFlow::Break;
         };
+        if session.borrow().is_none()
+            && let (Some(start), Some(diagnostic)) = (start.upgrade(), diagnostic.upgrade())
+        {
+            start.set_sensitive(cfg!(windows) && diagnostic.is_sensitive());
+        }
         let mut ended = false;
         if let Some(session) = session.borrow().as_ref() {
             // Measure the actual monospace font at the current scale/DPI.
@@ -391,6 +466,9 @@ pub fn attach(
             dimensions = (0, 0);
             if let Some(start) = start.upgrade() {
                 start.set_sensitive(cfg!(windows));
+            }
+            if let Some(diagnostic) = diagnostic.upgrade() {
+                diagnostic.set_sensitive(true);
             }
             if let Some(stop) = stop.upgrade() {
                 stop.set_sensitive(false);

@@ -78,6 +78,7 @@ fn main() -> std::process::ExitCode {
             }
         }
         let title = gtk::Label::new(Some("RustRemote — Windows feasibility probe"));
+        title.set_wrap(true);
         title.add_css_class("title-1"); body.append(&title);
         let note = gtk::Label::new(Some("Technical prototype: GTK window and bounded local ConPTY test.\nLocal interactive terminal on Windows; remote profiles and MSI are not available yet."));
         note.set_wrap(true); body.append(&note);
@@ -125,8 +126,9 @@ fn main() -> std::process::ExitCode {
             });
         });
         body.append(&run);
-        let window = gtk::ApplicationWindow::builder().application(app).title("RustRemote Windows probe").default_width(760).default_height(600).child(&body).build();
-        live_ui::attach(&body, &screen, &viewport, &status, &window, live_ui::SmokeOptions { enabled: smoke_live, capture: capture_ui, result: seen.clone() });
+        let shell = gtk::ScrolledWindow::builder().hscrollbar_policy(gtk::PolicyType::Never).child(&body).build();
+        let window = gtk::ApplicationWindow::builder().application(app).title("RustRemote Windows probe").default_width(760).default_height(600).child(&shell).build();
+        live_ui::attach(&body, &screen, &viewport, &status, &window, live_ui::SmokeOptions { enabled: smoke_live, capture: capture_ui, result: seen.clone() }, &run);
         window.present();
         if smoke {
             let app = app.downgrade(); let seen = seen.clone();

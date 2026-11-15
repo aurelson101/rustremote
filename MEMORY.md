@@ -977,3 +977,17 @@ par SHA de blob pour README et les2captures : identique au local ; main distante
 égale au HEAD local après push. v0.9.2 : même ID et mêmes noms/tailles/digests des
 4assets avant/après nettoyage ; tag v0.9.1 toujours présent. Aucune nouvelle release
 ou paquet Windows créé. Les adaptations WIN-02/03/04/05/07 restent réellement TODO.
+
+
+## 2026-11-15 — campagne15 vérifications /10 améliorations en cours
+
+Départ ae39b92, modifications SFTP/pilote GUI antérieures conservées. Cinq cibles
+Linux : permissions d’édition, nettoyage des temporaires en échec, sérialisation
+métadonnées de file, sélection GTK limitée au dialogue, compteur réel du listing.
+Cinq Windows : refus resize après arrêt, lecture des modes sans cloner l’écran,
+exclusion entre diagnostic et session live, erreurs clipboard visibles, boutons
+adaptatifs/scroll vertical. Tests locaux Rust/Clippy passent ; rejeu Linux bloque
+encore sur Move, instrumentation nécessaire avant de revendiquer sa correction.
+Rejeu Windows Server2022 préparé sur branche debug/linux-windows-15, avec contrôle
+natif d’une fenêtre étroite et boutons dans les limites de la fenêtre. Ne pas
+confondre ces essais avec une qualification Windows11 ni un port complet.
