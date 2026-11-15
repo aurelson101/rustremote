@@ -1,6 +1,7 @@
 //! Feasibility probe, not the full RustRemote Windows application.
 use gtk::prelude::*;
 use std::{cell::Cell, rc::Rc, time::Duration};
+mod capture;
 #[cfg(windows)]
 mod conpty;
 mod live;
@@ -50,6 +51,7 @@ fn main() -> std::process::ExitCode {
             }
         };
     }
+    let capture_ui = args.iter().any(|a| a == "--capture-ui");
     let smoke_live = args.iter().any(|a| a == "--smoke-live-ui");
     let smoke = args.iter().any(|a| a == "--smoke-ui");
     let smoke_ok = Rc::new(Cell::new(false));
@@ -124,7 +126,7 @@ fn main() -> std::process::ExitCode {
         });
         body.append(&run);
         let window = gtk::ApplicationWindow::builder().application(app).title("RustRemote Windows probe").default_width(760).default_height(600).child(&body).build();
-        live_ui::attach(&body, &screen, &viewport, &status, &window, smoke_live, seen.clone());
+        live_ui::attach(&body, &screen, &viewport, &status, &window, live_ui::SmokeOptions { enabled: smoke_live, capture: capture_ui, result: seen.clone() });
         window.present();
         if smoke {
             let app = app.downgrade(); let seen = seen.clone();
@@ -133,6 +135,9 @@ fn main() -> std::process::ExitCode {
                     && preview_ok && screen.is_mapped() && screen.width() > 0
                     && screen.text().contains("Progress: 100%")
                     && !screen.text().contains('\u{1b}'));
+                if capture_ui && let Err(error) = capture::window(&window, std::path::Path::new("dist/windows-probe/terminal-preview.png")) {
+                    eprintln!("{error}"); seen.set(false);
+                }
                 if seen.get() { println!("ANSI_GUI_OK: mapped UTF-8/styled screen, escaped markup"); }
                 if seen.get() { println!("GUI_SMOKE_OK"); }
                 if let Some(app) = app.upgrade() { app.quit(); }

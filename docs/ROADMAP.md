@@ -28,14 +28,16 @@ clavier/IME et redimensionnement GUI synchronisé, rendu incrémental et annulat
 copie/sélection, polices/DPI et consommation avant migration de l’application.
 Pas de MSI/WinGet avant cette preuve et les adaptations WIN-02 à WIN-07.
 
-## WIN-01 interactif — en validation native
+## WIN-01 interactif — preuve Server2022 validée, qualification restante
 
 Transport ConPTY persistant ajouté au prototype : saisie UTF-8/IME, touches ANSI,
 resize mesuré, copie/sélection, collage confirmé et déconnexion. Job Object privé
 kill-on-close, création suspendue/assignation avant exécution ; I/O hors GTK,
 queues bornées, état d’écran coalescé, OSC fixe et zéro scrollback.
-Workflow manuel désormais sur Windows Server2022, avec tests CLI et GUI de flux,
-resize/arrêt. Validation Windows11, protocoles/profils/coffre, parité UI et MSI
+Workflow manuel sur Windows Server2022 : run43698455015 PASS (source a29f8f1),
+build/tests, flux UTF-8/resize/exit0/annulation et GUI IM commit/affichage/resize/
+déconnexion. WIN-01 reste PARTIAL pour la qualification Windows11, IME/DPI,
+polices/sélection, applications terminal plein écran et endurance. Validation Windows11, protocoles/profils/coffre, parité UI et MSI
 restent TODO ; ne pas confondre le prototype avec l’application complète.
 
 ## Priorité active : stabilisation GTK puis portage Windows

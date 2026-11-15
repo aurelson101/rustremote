@@ -163,6 +163,17 @@ mod tests {
     }
 
     #[test]
+    fn long_osc_cannot_grow_a_streaming_transcript_or_execute_an_action() {
+        let mut parser = vt100::Parser::default();
+        parser.process(b"\x1b]52;c;");
+        for _ in 0..256 {
+            parser.process(&[b'a'; 4096]);
+        }
+        parser.process(b"\x07safe");
+        assert_eq!(parser.screen().contents(), "safe");
+    }
+
+    #[test]
     fn bounds_output_and_screen_and_restores_alternate_screen() {
         assert!(render(&[0; MAX_OUTPUT + 1], 24, 80).is_err());
         assert!(render(b"", 0, 80).is_err());

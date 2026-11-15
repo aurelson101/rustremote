@@ -50,11 +50,11 @@ jobs:
       - name: GTK Windows startup
         run: |
           set -o pipefail
-          experiments/windows-probe/target/debug/rustremote-windows-probe.exe --smoke-ui | tee dist/windows-probe/gui.txt
+          experiments/windows-probe/target/debug/rustremote-windows-probe.exe --smoke-ui --capture-ui | tee dist/windows-probe/gui.txt
       - name: GTK interactive terminal lifecycle
         run: |
           set -o pipefail
-          experiments/windows-probe/target/debug/rustremote-windows-probe.exe --smoke-live-ui | tee dist/windows-probe/live-gui.txt
+          experiments/windows-probe/target/debug/rustremote-windows-probe.exe --smoke-live-ui --capture-ui | tee dist/windows-probe/live-gui.txt
       - name: Prepare diagnostic artifact (not an installer)
         run: |
           cp experiments/windows-probe/README.md dist/windows-probe/README.md

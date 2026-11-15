@@ -7,14 +7,19 @@ use std::{
     time::Duration,
 };
 
+pub struct SmokeOptions {
+    pub enabled: bool,
+    pub capture: bool,
+    pub result: Rc<Cell<bool>>,
+}
+
 pub fn attach(
     body: &gtk::Box,
     screen: &gtk::Label,
     viewport: &gtk::ScrolledWindow,
     status: &gtk::Label,
     window: &gtk::ApplicationWindow,
-    smoke_live: bool,
-    smoke_ok: Rc<Cell<bool>>,
+    smoke: SmokeOptions,
 ) {
     let session: Rc<RefCell<Option<Session>>> = Rc::new(RefCell::new(None));
     let bar = gtk::Box::new(gtk::Orientation::Horizontal, 8);
@@ -29,6 +34,25 @@ pub fn attach(
         bar.append(button);
     }
     body.append(&bar);
+    let menu = gtk::gio::Menu::new();
+    menu.append(Some("Paste…"), Some("terminal.paste"));
+    menu.append(Some("Disconnect"), Some("terminal.disconnect"));
+    let actions = gtk::gio::SimpleActionGroup::new();
+    for (name, button) in [("paste", &paste), ("disconnect", &stop)] {
+        let action = gtk::gio::SimpleAction::new(name, None);
+        let button = button.downgrade();
+        action.connect_activate(move |_, _| {
+            if let Some(button) = button.upgrade()
+                && button.is_sensitive()
+            {
+                button.emit_clicked();
+            }
+        });
+        actions.add_action(&action);
+    }
+    screen.insert_action_group("terminal", Some(&actions));
+    screen.set_extra_menu(Some(&menu));
+
     screen.set_focusable(true);
     screen.set_tooltip_text(Some(
         "Click to type. Ctrl+Shift+C copies; paste requires confirmation. Ctrl+C interrupts.",
@@ -177,6 +201,7 @@ pub fn attach(
     let sessions = session.clone();
     let output = status.downgrade();
     let target = screen.downgrade();
+    let paste_shortcut = paste.downgrade();
     keys.connect_key_pressed(move |_, key, _, modifiers| {
         use gtk::{
             gdk::{Key, ModifierType},
@@ -187,6 +212,16 @@ pub fn attach(
         {
             if let Some(target) = target.upgrade() {
                 target.emit_copy_clipboard();
+            }
+            return Propagation::Stop;
+        }
+        if modifiers.contains(ModifierType::CONTROL_MASK | ModifierType::SHIFT_MASK)
+            && matches!(key, Key::v | Key::V)
+        {
+            if let Some(paste) = paste_shortcut.upgrade()
+                && paste.is_sensitive()
+            {
+                paste.emit_clicked();
             }
             return Propagation::Stop;
         }
@@ -215,10 +250,13 @@ pub fn attach(
         sessions.borrow_mut().take(); // Signals stop without joining on GTK.
         gtk::glib::Propagation::Proceed
     });
-    if smoke_live {
+    if smoke.enabled {
+        let capture_ui = smoke.capture;
+        let smoke_ok = smoke.result;
         start.emit_clicked();
         let sessions = session.clone();
         let target = screen.downgrade();
+        let output = status.downgrade();
         let window = window.downgrade();
         let stop_button = stop.downgrade();
         let input = input.clone();
@@ -267,6 +305,21 @@ pub fn attach(
                         .and_then(|s| s.snapshot(0))
                         .is_some_and(|s| Some(s.screen.size()) != before_size);
                     if resized {
+                        if capture_ui
+                            && let Err(error) = crate::capture::window(
+                                &window,
+                                std::path::Path::new("dist/windows-probe/terminal-live.png"),
+                            )
+                        {
+                            eprintln!("{error}");
+                            if let Some(session) = sessions.borrow().as_ref() {
+                                session.close();
+                            }
+                            if let Some(app) = window.application() {
+                                app.quit();
+                            }
+                            return gtk::glib::ControlFlow::Break;
+                        }
                         if let Some(stop) = stop_button.upgrade() {
                             stop.emit_clicked();
                         }
@@ -274,10 +327,18 @@ pub fn attach(
                     }
                 }
                 3 if sessions.borrow().is_none() => {
-                    smoke_ok.set(true);
-                    println!(
-                        "GUI_LIVE_OK: IM commit, live ANSI display, window resize, disconnect"
-                    );
+                    let stopped = output
+                        .upgrade()
+                        .is_some_and(|output| output.text() == "Local terminal stopped");
+                    smoke_ok.set(stopped);
+                    if !stopped {
+                        eprintln!("GUI disconnect did not complete cleanly");
+                    }
+                    if stopped {
+                        println!(
+                            "GUI_LIVE_OK: IM commit, live ANSI display, window resize, disconnect"
+                        );
+                    }
                     if let Some(app) = window.application() {
                         app.quit();
                     }

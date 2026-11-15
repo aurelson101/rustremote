@@ -928,3 +928,20 @@ CI ciblée windows-2022 avec --self-test-live et --smoke-live-ui ajoutée. Nativ
 attente au moment de cette note. Windows11 nécessite une VM dédiée (question envoyée).
 Cible serveur avec Desktop Experience, pas Server Core. Aucun protocole complet,
 coffre Windows ou MSI livré à ce stade. Modifications Linux précédentes conservées.
+
+
+WIN-01 natif PASS sur branche windows/server2022-interactive, commit a29f8f1,
+run43698455015. Rapports téléchargés et lus dans dist/windows-probe-validation/
+43698455015 : Windows10.0.20348.5870 (Server2022), Rust1.100.0/MSYS2, GTK4.24.1.
+Build,7tests, ConPTY simple, flux live/UTF-8/resize/exit0/annulation, GUI IM commit
+→ConPTY→affichage→resize→disconnect PASS. Ce n’est pas une VM Windows11, aucun
+protocole distant testé. L’utilisateur ne dispose pas de Windows11, demande des
+simulations, README/GitHub/captures et suppression des anciennes releases.
+Ajouts de contrôle en cours : collage via clic droit/CtrlShiftV, refus des contrôles
+collés, réponse différée liée à la session, test OSC long (8tests locaux), état
+« stopped » vérifié explicitement dans smoke GUI. Captures GTK de la seule fenêtre
+avec create_new, sans capturer le bureau ; premier smoke/capture Linux PASS.
+Sauvegarde v0.9.1 et vérification de la v0.9.2 préservée : dist/release-backups/
+2026-11-15-before-retiring-0.9.1/manifest.json,5entrées hashées ; pas encore supprimé
+à cette note. Les tags historiques seront conservés. Nouveau rejeu natif à suivre
+avant publication des captures et du README.

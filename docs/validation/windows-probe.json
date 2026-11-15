@@ -2,15 +2,17 @@
   "date": "2026-11-15",
   "scope": "Windows feasibility probe, not the complete application",
   "status": "partial",
-  "source_commit": "57f93fafd44b6349f85157dc4e470e5cf011d5e7",
-  "ci_run": "https://github.com/aurelson101/rustremote/actions/runs/43693375903",
+  "source_commit": "a29f8f11fe49946f33302dcb6c470bd425a212cc",
+  "ci_run": "https://github.com/aurelson101/rustremote/actions/runs/43698455015",
   "native_windows": {
     "build": true,
     "conpty_input_output_utf8_resize_and_exit": true,
     "gtk_startup": true,
-    "transport_report": "CONPTY_OK: input/output UTF-8, resize 100x30, exit 0, 546 bytes, 45 ms",
+    "transport_report": "CONPTY_OK: input/output UTF-8, ANSI screen, resize 100x30, exit 0, 357 bytes, 78 ms",
     "gui_report": "GUI_SMOKE_OK",
     "environment": [
+      "",
+      "Microsoft Windows [Version 10.0.20348.5870]",
       "rustc 1.100.0 (0ef1bc386 2026-11-09) (Rev1, Built by MSYS2 project)",
       "binary: rustc",
       "commit-hash: 0ef1bc386059596dada8fb65b50425aab2ea637a",
@@ -22,13 +24,19 @@
       "4.24.1",
       "mingw-w64-ucrt-x86_64-rust 1.100.0-1",
       "mingw-w64-ucrt-x86_64-gtk4 4.24.1-1"
-    ]
+    ],
+    "interactive_streaming_input_resize_exit_and_cancellation": true,
+    "gtk_im_commit_display_resize_disconnect": true,
+    "os": "Windows Server 2022, build 10.0.20348.5870",
+    "live_transport_report": "LIVE_CONPTY_OK: streaming ANSI/UTF-8, input, resize, exit0, cancellation, private job lifecycle",
+    "live_gui_report": "GUI_LIVE_OK: IM commit, live ANSI display, window resize, disconnect"
   },
   "linux_frontend": {
     "check": true,
     "clippy_deny_warnings": true,
     "gui_smoke": true,
-    "does_not_validate_conpty": true
+    "does_not_validate_conpty": true,
+    "tests": 8
   },
   "prior_failures": [
     {
@@ -46,11 +54,15 @@
   ],
   "artifact": "Diagnostic reports only; no Windows installer or executable distributed",
   "remaining": [
-    "Interactive ANSI terminal renderer and keyboard binding",
+    "Windows11 native VM, IME/selection/font/DPI/endurance and full-screen terminal applications qualification",
     "Full application platform adapters/storage/secrets/SSH/SFTP/RDP",
     "MSI installation, upgrade and removal qualification",
     "Real installer URL and SHA256 before WinGet manifest",
     "MSIX and signing later",
     "Windows11 physical/DPI/AD/hardware/endurance qualification"
-  ]
+  ],
+  "previous_native_run": {
+    "source_commit": "57f93fafd44b6349f85157dc4e470e5cf011d5e7",
+    "ci_run": "https://github.com/aurelson101/rustremote/actions/runs/43693375903"
+  }
 }
