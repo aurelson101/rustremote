@@ -83,7 +83,15 @@ fn main() -> std::process::ExitCode {
         .build();
     app.connect_activate(move |app| {
         if let Some(settings) = gtk::Settings::default() {
-            settings.set_gtk_application_prefer_dark_theme(true);
+            if let Some(property) = settings.find_property("gtk-interface-color-scheme") {
+                if let Some(value) = gtk::glib::EnumClass::with_type(property.value_type())
+                    .and_then(|class| class.to_value_by_nick("dark"))
+                {
+                    settings.set_property_from_value("gtk-interface-color-scheme", &value);
+                }
+            } else {
+                settings.set_gtk_application_prefer_dark_theme(true);
+            }
         }
         let css = gtk::CssProvider::new();
         css.load_from_data("#ansi-screen { background: #151b24; padding: 12px; font-size: 14px; }");

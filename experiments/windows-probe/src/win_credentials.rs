@@ -137,6 +137,30 @@ pub fn self_test() -> Result<String, String> {
     }
     let _cleanup = Cleanup(reference.clone());
     profile.credential_ref = Some(reference.clone());
+    let temp = tempfile::tempdir().map_err(|_| "Credential profile lab unavailable")?;
+    let store = crate::win_storage::Store::at(temp.path().join("Credential profiles"))?;
+    let workspace = Workspace {
+        profiles: vec![profile.clone()],
+        ..Default::default()
+    };
+    for encrypted in [false, true] {
+        store.save(&workspace, encrypted)?;
+        let (loaded, mode) = store.load()?;
+        if loaded.profiles != workspace.profiles || mode != encrypted {
+            return Err("Credential profile persistence mismatch".into());
+        }
+        if read(&loaded.profiles[0])?.as_deref().map(|s| s.as_str()) != Some(secret.as_str()) {
+            return Err("Persisted profile lost its credential binding".into());
+        }
+        let bytes = std::fs::read(temp.path().join("Credential profiles/profiles.rstore"))
+            .map_err(|_| "Cannot inspect credential profile lab")?;
+        if bytes
+            .windows(secret.len())
+            .any(|part| part == secret.as_bytes())
+        {
+            return Err("Profile store leaked a plaintext password".into());
+        }
+    }
     if read(&profile)?.as_deref().map(|s| s.as_str()) != Some(secret.as_str()) {
         return Err("Credential binding roundtrip failed".into());
     }
@@ -166,5 +190,5 @@ pub fn self_test() -> Result<String, String> {
         return Err("Export leaked a credential reference".into());
     }
     remove(&reference)?;
-    Ok("WINDOWS_CREDENTIALS_OK: current-user vault, account/host/domain binding, secret-free export, cleanup".into())
+    Ok("WINDOWS_CREDENTIALS_OK: current-user vault, account/host/domain binding, plain/DPAPI profile integration, secret-free export, cleanup".into())
 }

@@ -33,6 +33,12 @@ jobs:
             mingw-w64-ucrt-x86_64-rust
             mingw-w64-ucrt-x86_64-gtk4
             mingw-w64-ucrt-x86_64-pkgconf
+      - name: Native operating system and architecture
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist/windows-probe | Out-Null
+          Get-CimInstance Win32_OperatingSystem | Select-Object Caption, Version, OSArchitecture | ConvertTo-Json | Set-Content dist/windows-probe/os.json
+          [System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture.ToString() | Set-Content dist/windows-probe/native-architecture.txt
       - name: Native environment
         run: |
           mkdir -p dist/windows-probe

@@ -1070,3 +1070,13 @@ Windows11 ARM encore en cours ; ne pas déclarer qualification complète.
 Linux après extraction : fmt/check/clippy PASS ; 60 tests PASS,2ignored ;
 rejeu GUI SSH/SFTP intégral PASS /tmp/rustremote-windows-core-linux-gui.log.
 Test ciblé supplémentaire de liaison des secrets aux paramètres SSH PASS.
+
+Second passage b1db964 run43727041286 : Server2022 entièrement PASS,7 modèles,
+8 tests prototype, stockage/coffre/ConPTY, smoke initial et live GUI. Capture
+locale dist/windows-probe-validation/43727041286/windows-2022/terminal-live.png
+vérifiée visuellement (540px, boutons visibles, texte UTF8 réel). Échec resize
+intermittent précédent non expliqué : instrumentation conservée, pas de fix inventé.
+Premier run Windows11ARM : stockage/coffre/CLI/smoke initial PASS, même timeout
+resize phase2 ; second passage encore en cours. Ajout intégration coffre/profil
+persisté plain+DPAPI et preuve OS/architecture ; thème sombre GTK4.20+ sans appel
+déprécié, fallback GTK ancien. Smoke local GTK fatal-warnings PASS pour ce thème.

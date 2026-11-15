@@ -365,7 +365,7 @@ impl Store {
         Self::at(directory()?)
     }
 
-    fn at(root: PathBuf) -> Result<Self, String> {
+    pub(crate) fn at(root: PathBuf) -> Result<Self, String> {
         if !root.is_absolute() {
             return Err("Profile directory must be absolute".into());
         }
