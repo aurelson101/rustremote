@@ -2,7 +2,8 @@
 
 Isolated Rust/GTK4 + native ConPTY transport experiment for WIN-01. This is not the
 complete Windows application, SSH client, MSI or MSIX installer.
-It does not alter the Linux application. GPL-3.0-only; root LICENSE/NOTICE apply.
+It reuses `rustremote-core` profile models; Linux keeps its existing VTE and protocol adapters.
+GPL-3.0-only; root LICENSE/NOTICE apply.
 
 On Windows with an ABI-compatible GTK4 development runtime and Rust toolchain:
 
@@ -46,8 +47,8 @@ locally built executable needs the matching GTK DLL runtime; it is not a standal
 application or an end-user package. Runtime/dependency notice bundling belongs to
 the later distribution step.
 Do not publish it as RustRemote's Windows MSI or submit it to WinGet. MSI packaging,
-installation/upgrade/uninstall, Windows profile/security adapters and the terminal
-interactive renderer/input integration are subsequent work. MSIX and signing follow MSI/WinGet qualification.
+installation/upgrade/uninstall and integration of Windows profile/security adapters
+into the application are subsequent work. MSIX and signing follow MSI/WinGet qualification.
 
 ConPTY child startup explicitly uses STARTF_USESTDHANDLES with null standard handles
 to avoid copying the parent's redirected CI streams. Background:
@@ -62,11 +63,14 @@ CARGO_TARGET_DIR=target cargo build --locked --manifest-path experiments/windows
 GDK_BACKEND=x11 GTK_THEME=Adwaita GSK_RENDERER=cairo xvfb-run -a dbus-run-session -- target/debug/rustremote-windows-probe --smoke-ui
 ```
 
-The manual Windows workflow uses `windows-2022` (Server 2022) and now runs the parser tests as well as ConPTY validation
+The manual Windows workflow uses `windows-2022` (Server 2022 x64) and
+`windows-11-arm` (Windows 11 ARM64, x64 executable under emulation). It records
+the native OS/CPU separately from the compiler target, and runs parser tests as well as ConPTY validation
 and the mapped ANSI GTK screen smoke test. `--self-test-live` verifies streaming
 input/resize/clean exit/cancellation. `--smoke-live-ui` verifies the actual IM commit
-→ ConPTY → GTK display, window resize and disconnect path. It must be rerun on Windows before
-claiming native validation of this increment. Diagnostic artifacts remain reports
+→ ConPTY → GTK display, window resize and disconnect path. The smoke resizes only its own process window via Windows and checks
+the resulting GTK layout and terminal grid. Native run results must be checked before
+claiming validation of a particular source commit. Diagnostic artifacts remain reports
 only, with no executable/runtime redistribution.
 
 Target baseline: Windows 11 x64 and Windows Server 2022 x64 with Desktop Experience.
@@ -74,3 +78,24 @@ Server Core is outside this graphical application target. A Server 2022 CI resul
 does not certify Windows 11, AD/RDP peripherals, IME hardware or full protocol parity.
 The complete Linux application remains separate until the platform adapters and
 profile/storage/protocol port have passed their own tests.
+
+Windows profile storage qualification (`--self-test-storage`):
+
+- Shared bounded JSON models, nested folders, portable import/export without credential references.
+- Current-user LocalAppData location, protected owner/SYSTEM ACL, exclusive process lock,
+  reparse/hard-link rejection and flushed replacement with private backup on failure.
+- Optional current-user DPAPI metadata encryption; plaintext metadata is also supported.
+- Credential Manager secrets bound to host/port/account/domain and SSH trust configuration.
+  Changing the identity refuses the old secret; exports never carry passwords.
+- Ephemeral local fixtures exercise Unicode paths, lock contention, plain/encrypted
+  saves, corruption rejection, reopen, persisted credential references and vault cleanup.
+  No real server, account or user profile is changed by this self-test.
+
+These are backend APIs and tests, not a finished Windows profile manager. GUI wiring,
+crash/power-loss recovery qualification, SSH/SFTP, mstsc integration and MSI remain open.
+Windows 11 ARM emulation does not qualify Windows 11 x64 hardware, DPI/IME or peripherals.
+
+Backend/terminal qualification at source `10de7c6`:
+[run43728388282](https://github.com/aurelson101/rustremote/actions/runs/43728388282)
+passed on Server 2022 x64 and Windows 11 Enterprise ARM64 with x64 emulation.
+This validates the listed components, not Windows remote protocols or an MSI.

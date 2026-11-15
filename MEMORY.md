@@ -1088,3 +1088,28 @@ preuve de blocage ConPTY. Pilote remplacé par SetWindowPos sur le HWND portant 
 titre du prototype et appartenant au PID courant, dimensions client mesurées,
 bornes et propriété vérifiées. Attend encore réellement grille et largeur540px ;
 aucun contournement des assertions. Code réservé au smoke, aucune autre fenêtre.
+
+## Résultat final WIN-02/03 backend — 2026-11-15
+Source10de7c6576414ee826eff3705feedfeed48dc668, run43728388282 SUCCESS :
+https://github.com/aurelson101/rustremote/actions/runs/43728388282
+Server2022 Datacenter10.0.20348 X64 ET Windows11 Enterprise10.0.26200 ARM64
+(binaire GNU x64 émulé) : 7 tests modèles,8 tests prototype, CLI ConPTY/live,
+WINDOWS_STORAGE_OK, WINDOWS_CREDENTIALS_OK avec persistance profil plain/DPAPI,
+GUI_SMOKE_OK et GUI_LIVE_OK PASS. Pas de Gtk-WARNING du thème dans ces logs.
+Captures propres fenêtres inspectées visuellement ; artefacts téléchargés dans
+ dist/windows-probe-validation/43728388282/{windows-2022,windows-11-arm}/.
+Resize natif résout le blocage du pilote observé avec la taille par défaut GTK ;
+aucune assertion supprimée. Une seule réussite de cette version par OS : ce n’est
+pas une qualification d’endurance ni un correctif GTK prouvé en amont.
+Run43727799897 annulé volontairement pour remplacer le pilote sans gaspiller CI.
+Branche windows/native-profile-storage publiée ; aucune release/MSI créée.
+WIN-02/03 restent PARTIAL : bibliothèque et backends testés mais pas encore reliés
+à un gestionnaire de profils Windows. Prochaine tâche : GUI Windows de création,
+modification, dossiers et import/export avec sauvegarde hors thread GTK, puis
+SSH/askpass/agent/known_hosts, SFTP portable, mstsc et MSI. Ne pas annoncer ces
+protocoles Windows livrés, ni Windows11 x64 matériel/AD/clipboard RDP qualifiés.
+
+Vérifications finales Linux après dernier test commun : fmt/check/clippy PASS ;
+cargo test --workspace PASS (61 réussis,2 ignorés explicitement). Log final
+/tmp/rustremote-windows-core-final-tests.log. Rejeu GUI SSH/SFTP PASS indiqué
+ci-dessus ; aucun serveur réel ni équipement contacté.

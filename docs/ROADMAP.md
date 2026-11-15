@@ -4,10 +4,15 @@
 
 ## Port Windows actif — WIN-02/03 PARTIAL
 
-Modèles partagés extraits ; stockage Windows ACL/DPAPI et Credential Manager
-en validation native. Tests Windows11 ARM avec binaire x64 émulé ajoutés au
-workflow ; aucun résultat Windows11 acquis à ce stade. SSH/SFTP/RDP et MSI
-restent à intégrer et qualifier.
+Modèles partagés extraits ; backends Windows ACL/DPAPI et Credential Manager
+validés sur Server2022 x64 et Windows11 Enterprise ARM64 (binaire x64 émulé).
+[CI43728388282 réussie](https://github.com/aurelson101/rustremote/actions/runs/43728388282),
+source10de7c6 : 7 tests communs,8 tests prototype et essais natifs stockage/coffre,
+ConPTY et interface redimensionnée. Pilote de resize natif propriétaire du PID ;
+ancien échec sur changement de taille par défaut GTK documenté dans MEMORY.md.
+La qualification concerne ces composants, pas une application Windows complète.
+GUI profils à raccorder ; SSH/SFTP/RDP et MSI restent à intégrer et qualifier.
+Windows11 x64 matériel, périphériques, DPI/IME et endurance restent non qualifiés.
 
 ## Campagne 15 contrôles / 10 améliorations — 2026-11-15
 
