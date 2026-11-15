@@ -24,8 +24,10 @@ Source dependencies are locked and actions pinned; system package versions are
 recorded. This is a feasibility environment, not the final reproducible production
 build. GUI smoke proves startup, not visual quality or Windows11 hardware coverage.
 
-The diagnostic artifact contains the probe executable and reports. It requires the
-matching GTK DLL runtime; it is not a standalone application or an end-user package.
+The diagnostic artifact contains test/environment reports, not an executable. A
+locally built executable needs the matching GTK DLL runtime; it is not a standalone
+application or an end-user package. Runtime/dependency notice bundling belongs to
+the later distribution step.
 Do not publish it as RustRemote's Windows MSI or submit it to WinGet. MSI packaging,
 installation/upgrade/uninstall, Windows profile/security adapters and the terminal
 renderer are subsequent work. MSIX and signing follow MSI/WinGet qualification.

@@ -781,3 +781,9 @@ Linux PASS ; aucune preuve Windows à ce stade. Workflow natif manuel en prépar
 MSYS2 UCRT64, actions épinglées, permissions lecture. Linux principal inchangé par
 ce package indépendant. WIN-01 reste IN PROGRESS, pas de renderer terminal ANSI ni
 profil Windows intégré. Pas de MSI de démonstration présenté comme produit fini.
+
+Première CI Windows43691391385 : SDK/GTK installés et compilés, mais erreur E0283
+d'inférence Result dans la closure de test ConPTY (code non compilé sous Linux).
+Type Result<(),String> explicité ; nouveau run nécessaire. Le runner GUI utilise
+Cairo pour ne pas dépendre d'un GPU. L'artefact de faisabilité distribue seulement
+les rapports, pas d'exécutable produit sans runtime/notices ni de faux MSI.

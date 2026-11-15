@@ -195,7 +195,7 @@ pub fn run() -> Result<String, String> {
         }
         Ok((data, overflow))
     });
-    let operation = (|| {
+    let operation: Result<(), String> = (|| {
         let child = spawn(console.0)?;
         if unsafe { ResizePseudoConsole(console.0, COORD { X: 100, Y: 30 }) } < 0 {
             return Err("ConPTY resize failed".into());
