@@ -65,7 +65,12 @@ with tempfile.TemporaryDirectory(prefix="rustremote-ssh-display-") as directory:
 
     def find(name):
         root=app()
-        return next((n for n in walk(root) if n.get_name()==name),None) if root else None
+        fallback=None
+        for node in walk(root) if root else []:
+            if node.get_name()!=name:continue
+            if fallback is None:fallback=node
+            if node.get_state_set().contains(Atspi.StateType.SHOWING):return node
+        return fallback
 
     def wait(predicate,message):
         deadline=time.monotonic()+25
@@ -98,12 +103,9 @@ with tempfile.TemporaryDirectory(prefix="rustremote-ssh-display-") as directory:
                         break
                     n=n.get_parent()
                     if not n or n.get_role() in (Atspi.Role.FRAME,Atspi.Role.APPLICATION):break
-            shown=[n for n in nodes if n.get_state_set().contains(Atspi.StateType.SHOWING) or n.get_state_set().contains(Atspi.StateType.VISIBLE)]
+            shown=[n for n in nodes if n.get_state_set().contains(Atspi.StateType.SHOWING)]
             return (shown or nodes)[-1] if nodes else None
         node=wait(actionable,"Action absente : "+name)
-        root=app()
-        shown=next((n for n in walk(root) if n.get_name()==name and n.get_state_set().contains(Atspi.StateType.SHOWING) and n.get_state_set().contains(Atspi.StateType.SENSITIVE) and "Action" in [i.rsplit('.',1)[-1] for i in n.get_interfaces()] and n.get_action_iface().get_n_actions() and current_button(n)),None)
-        if shown:node=shown
         interface=node.get_action_iface()
         index=next(i for i in range(interface.get_n_actions()) if Atspi.Action.get_action_name(interface,i) in ("click","activate","press","toggle"))
         assert interface.do_action(index),name
@@ -119,6 +121,10 @@ with tempfile.TemporaryDirectory(prefix="rustremote-ssh-display-") as directory:
         origin=frame.get_component_iface().get_extents(Atspi.CoordType.WINDOW)
         px=rect.x-origin.x+rect.width//2
         py=rect.y-origin.y+rect.height//2
+        # Explicit calibration for a private Xvfb/GTK runtime whose AT-SPI coordinates
+        # differ from rendered pixels. Zero by default; never used by the application.
+        offset=int(os.environ.get("RUSTREMOTE_TEST_SFTP_POINTER_OFFSET","0"));assert abs(offset)<=128
+        if frame.get_name().startswith("SFTP — "):px+=offset;py+=offset
         x=c.CDLL("libX11.so.6");xt=c.CDLL("libXtst.so.6")
         x.XOpenDisplay.argtypes=[c.c_char_p];x.XOpenDisplay.restype=c.c_void_p
         x.XFlush.argtypes=[c.c_void_p];x.XCloseDisplay.argtypes=[c.c_void_p]
@@ -151,8 +157,9 @@ with tempfile.TemporaryDirectory(prefix="rustremote-ssh-display-") as directory:
     def select_combo(title,index):
         focus_window(title)
         current="English" if title=="Settings and security" else "Unassigned"
-        label=wait(lambda:next((n for n in walk(app()) if n.get_role()==Atspi.Role.LABEL and n.get_name()==current and n.get_state_set().contains(Atspi.StateType.VISIBLE)),None),"Selected combo label missing")
-        pointer_click(label,1)
+        scope=wait(lambda:next((n for n in walk(app()) if n.get_name()==title and n.get_role() in (Atspi.Role.FRAME,Atspi.Role.DIALOG)),None),"Combo window missing: "+title)
+        wait(lambda:next((n for n in walk(scope) if n.get_role()==Atspi.Role.LABEL and n.get_name()==current and n.get_state_set().contains(Atspi.StateType.SHOWING)),None),"Selected combo label missing in: "+title)
+        click(current,scope)
         keypress("Home")
         for _ in range(index):keypress("Down")
         keypress("Return")
@@ -411,6 +418,8 @@ with tempfile.TemporaryDirectory(prefix="rustremote-ssh-display-") as directory:
                         return node.get_component_iface().get_extents(Atspi.CoordType.WINDOW)
                     so=origin(source);eo=origin(target)
                     sx,sy=start.x-so.x+start.width//2,start.y-so.y+start.height//2;ex,ey=end.x-eo.x+end.width//2,end.y-eo.y+end.height//2
+                    offset=int(os.environ.get("RUSTREMOTE_TEST_SFTP_POINTER_OFFSET","0"));assert abs(offset)<=128
+                    if title.startswith("SFTP — "):sx+=offset;sy+=offset;ex+=offset;ey+=offset
                     print("Private DND coordinates:",sx,sy,ex,ey,flush=True)
                     xt.XTestFakeMotionEvent(display,-1,sx,sy,0);x.XFlush(display);time.sleep(.2);xt.XTestFakeButtonEvent(display,1,1,0);x.XFlush(display)
                     for n in range(1,21):xt.XTestFakeMotionEvent(display,-1,int(sx+(ex-sx)*n/20),int(sy+(ey-sy)*n/20),0);x.XFlush(display);time.sleep(.06)
@@ -477,7 +486,7 @@ with tempfile.TemporaryDirectory(prefix="rustremote-ssh-display-") as directory:
             subprocess.run(["gapplication","action","com.rustremote.Preview","about"],check=True)
             wait(lambda:find("About RustRemote"),"About dialog missing")
             wait(lambda:any("GPL-3.0-only" in n.get_name() and "No warranty; redistribution permitted under GPLv3." in n.get_name() and "Privacy: no telemetry sent to the project." in n.get_name() for n in walk(app())),"About licensing/privacy notice absent or untranslated")
-            click("Close")
+            click("Close",find("About RustRemote"))
             result["about_gpl_and_privacy_notice_in_english"]=True
             if os.environ.get("RUSTREMOTE_DISCOVERY_ONLY")=="1":
                 exercise_discovery();result["success"]=True;raise SystemExit(0)
@@ -487,7 +496,8 @@ with tempfile.TemporaryDirectory(prefix="rustremote-ssh-display-") as directory:
                 wait(lambda:name in workspace()["folders"],"Folder not saved: "+name)
             click("Actions "+profile["name"]);click("Move…")
             position=workspace()["folders"].index("Linux/Servers/Production")+1
-            select_combo("Move to folder",position);click("Move")
+            select_combo("Move to folder",position)
+            if find("Move to folder"):click("Move",find("Move to folder"))
             wait(lambda:workspace()["profiles"][0]["folder"]=="Linux/Servers/Production","Context move not persisted")
             result["profile_context_move_and_nested_creation"]=True
             drag(wait(lambda:find("Servers"),"Folder drag source absent"),wait(lambda:find("Archive"),"Folder drop target absent"))
@@ -514,7 +524,10 @@ with tempfile.TemporaryDirectory(prefix="rustremote-ssh-display-") as directory:
             assert mac["platform"]=="MacOs" and mac["options"]["protocol"]=="Vnc" and mac["simulation"]
             assert mac["port"]==5900 and mac["options"]["tunnel"]["host"]==mac["host"]
             result["apple_profile_preset_and_simulation_saved"]=True
-            exercise_discovery()
+            if os.environ.get("RUSTREMOTE_SSH_SFTP_ONLY") != "1":
+                exercise_discovery()
+            else:
+                result["discovery_excluded_by_ssh_sftp_scope"]=True
             click("RDP");wait(lambda:find("Connection settings"),"RDP form absent");text("Profile name","Windows lab");text("Host / IP address","windows.example.invalid");text("Username","Administrator");text("AD domain / realm","LAB");capture("rdp","Connection settings");click("Cancel")
             click("Tools");click("System information…")
             wait(lambda:find("System information"),"System information absent");capture("system","System information");close_window("System information")
@@ -532,6 +545,9 @@ with tempfile.TemporaryDirectory(prefix="rustremote-ssh-display-") as directory:
             pointer_click(terminal,1);capture("ssh")
             click("SFTP");click("Connect / Refresh SFTP")
             wait(lambda:"Authenticated SFTP listing" in field("SFTP status"),"Native SFTP absent")
+            progress=wait(lambda:find("Progression SFTP"),"SFTP progress absent")
+            assert re.match(r"[1-9][0-9]* entries$",progress.get_description()),progress.get_description()
+            result["sftp_listing_count_is_real_and_accessible"]=True
             upload=config.parent/"graphical-local";upload.mkdir();(upload/"docs").mkdir();(upload/"docs/readme.txt").write_text("Graphical folder transfer — local lab")
             (upload/"client-note.txt").write_text("Graphical upload — local lab")
             text("Local folder",str(upload));click("Refresh local folder")
@@ -546,11 +562,14 @@ with tempfile.TemporaryDirectory(prefix="rustremote-ssh-display-") as directory:
             # Physical single clicks must navigate without the context menu or Return.
             for _ in range(5):
                 remote_row=wait(lambda:next((n for n in walk(find("Remote files")) if n.get_role()==Atspi.Role.LABEL and n.get_name().startswith("docs ·")),None),"Remote docs absent")
+                if os.environ.get("RUSTREMOTE_DIAG_POINTER")=="1":capture("sftp-before-enter","SFTP — Linux lab")
+                while remote_row.get_role()!=Atspi.Role.LIST_ITEM:remote_row=remote_row.get_parent()
                 pointer_click(remote_row,1)
                 wait(lambda:any(n.get_role()==Atspi.Role.LABEL and n.get_name().startswith("readme.txt ·") for n in walk(find("Remote files"))),"Single click did not enter remote folder")
                 click("Remote parent folder")
                 wait(lambda:any(n.get_role()==Atspi.Role.LABEL and n.get_name().startswith("docs ·") for n in walk(find("Remote files"))),"Remote parent navigation failed")
                 local_row=wait(lambda:next((n for n in walk(find("Local files")) if n.get_role()==Atspi.Role.LABEL and n.get_name().startswith("docs ·")),None),"Local docs absent")
+                while local_row.get_role()!=Atspi.Role.LIST_ITEM:local_row=local_row.get_parent()
                 pointer_click(local_row,1)
                 wait(lambda:any(n.get_role()==Atspi.Role.LABEL and n.get_name().startswith("readme.txt ·") for n in walk(find("Local files"))),"Single click did not enter local folder")
                 click("Local parent folder")
@@ -576,11 +595,14 @@ with tempfile.TemporaryDirectory(prefix="rustremote-ssh-display-") as directory:
             assert (data/"drag-note.txt").read_bytes()==(upload/"drag-note.txt").read_bytes()
             wait(lambda:find("Save remote file") or any(n.get_role()==Atspi.Role.LABEL and n.get_name().startswith("drag-note.txt ·") for n in walk(find("Remote files"))),"Remote listing did not refresh after drag")
             result["sftp_graphical_drag_and_drop_upload"]=True
+            (data/"client-note.txt").chmod(0o755)
             row=select_row("client-note.txt");focus_window("SFTP — Linux lab");pointer_click(row,1);keypress("Return")
             wait(lambda:"Graphical upload" in field("Remote SFTP editor"),"Remote editor did not open")
             text("Remote SFTP editor","Edited remotely from the graphical browser")
             click("Save remote file")
             wait(lambda:(data/"client-note.txt").read_text()=="Edited remotely from the graphical browser","Remote edit was not saved")
+            assert (data/"client-note.txt").stat().st_mode & 0o777 == 0o755, "Remote edit changed permissions"
+            result["sftp_editor_preserves_permissions"]=True
             result["sftp_graphical_edit_readback"]=True
             download=config.parent/"graphical-download";download.mkdir();text("Local folder",str(download));click("Refresh local folder")
             node=find("Remote files");Atspi.Selection.clear_selection(node);select_row("client-note.txt");select_row("docs");click("← Download")
@@ -608,6 +630,17 @@ with tempfile.TemporaryDirectory(prefix="rustremote-ssh-display-") as directory:
             wait(lambda:(data/queued.name).exists(),"Persistent queue did not restart")
             assert (data/queued.name).read_bytes()==queued.read_bytes()
             result["sftp_persistent_queue_manual_restart_after_browser_close"]=True
+            wait(lambda:any(n.get_role()==Atspi.Role.LABEL and n.get_name().startswith("queued-after-reopen.txt ·") for n in walk(find("Remote files"))),"Queue refresh absent")
+            row=select_row("client-note.txt");focus_window("SFTP — Linux lab");pointer_click(row,1);keypress("Return")
+            wait(lambda:"Edited remotely" in field("Remote SFTP editor"),"Editor did not reopen")
+            text("Remote SFTP editor","Deliberately rejected write in local laboratory")
+            fault=data/".inject-write-failure";fault.write_text("local test only")
+            click("Save remote file")
+            wait(lambda:not fault.exists(),"Injected write failure not exercised")
+            wait(lambda:not list(data.glob(".rustremote-*")),"Failed editor write left a temporary file")
+            assert (data/"client-note.txt").read_text()=="Edited remotely from the graphical browser"
+            assert (data/"client-note.txt").stat().st_mode & 0o777 == 0o755
+            result["sftp_failed_save_preserves_original_and_cleans_temporary"]=True
             time.sleep(.3);capture("sftp","SFTP — Linux lab");click("Close SFTP browser")
             click("Settings");wait(lambda:find("Settings and security"),"Settings absent");capture("settings","Settings and security")
             click("SFTP transfer limits")

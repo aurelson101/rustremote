@@ -461,11 +461,20 @@ impl Connection {
                 OpenType::File,
             )
             .map_err(error)?;
-        for chunk in bytes.chunks(16384) {
-            budget.bytes(chunk.len())?;
-            file.write_all(chunk).map_err(error)?;
+        let result = (|| {
+            for chunk in bytes.chunks(16384) {
+                budget.bytes(chunk.len())?;
+                file.write_all(chunk).map_err(error)?;
+            }
+            file.close().map_err(error)
+        })();
+        drop(file);
+        // We own this name only after the exclusive open succeeded. Never unlink
+        // on an open collision; remove our partial temporary on cancellation/I/O failure.
+        if result.is_err() {
+            let _ = self.sftp.unlink(path);
         }
-        file.close().map_err(error)
+        result
     }
     fn deletion_plan(
         &self,
@@ -541,12 +550,32 @@ impl Connection {
                         "Le fichier distant a changé : rechargez-le avant d’enregistrer".into(),
                     );
                 }
+                let stat = self.sftp.lstat(&path).map_err(error)?;
+                if !stat.is_file() {
+                    return Err("Édition des liens et fichiers spéciaux refusée".into());
+                }
+                let mode = stat.perm.ok_or("Permissions distantes indisponibles")? & 0o777;
                 let tag = tempfile::NamedTempFile::new().map_err(error)?;
                 let temporary = path.with_file_name(format!(
                     ".rustremote-{}",
                     tag.path().file_name().unwrap().to_string_lossy()
                 ));
                 self.write_new(&temporary, &text, budget)?;
+                // Preserve ordinary permissions, never restore privileged mode bits.
+                if let Err(e) = self.sftp.setstat(
+                    &temporary,
+                    ssh2::FileStat {
+                        size: None,
+                        uid: None,
+                        gid: None,
+                        perm: Some(mode),
+                        atime: None,
+                        mtime: None,
+                    },
+                ) {
+                    let _ = self.sftp.unlink(&temporary);
+                    return Err(error(e));
+                }
                 if let Err(e) = self.sftp.rename(
                     &temporary,
                     &path,
@@ -929,6 +958,94 @@ impl Connection {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    #[ignore = "requires the ephemeral loopback fixture in test-ssh-sftp-local.py"]
+    fn remote_editor_preserves_permissions_and_cleans_failed_write() {
+        use std::os::unix::fs::PermissionsExt;
+        let root = PathBuf::from(std::env::var_os("RUSTREMOTE_SFTP_LAB_ROOT").expect("lab root"));
+        let profile_file =
+            PathBuf::from(std::env::var_os("RUSTREMOTE_SFTP_LAB_PROFILE").expect("lab profile"));
+        assert_eq!(root.file_name().unwrap(), "server-data");
+        assert!(root.parent().unwrap().starts_with(std::env::temp_dir()));
+        assert_eq!(profile_file.parent(), root.parent());
+        let profile: SessionProfile =
+            serde_json::from_slice(&fs::read(profile_file).unwrap()).unwrap();
+        assert_eq!(profile.host, "127.0.0.1");
+        assert!(profile.port > 1024);
+        let path = root.join("rust-editor-lab.sh");
+        let original = b"initial lab file".to_vec();
+        fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&path)
+            .unwrap()
+            .write_all(&original)
+            .unwrap();
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o755)).unwrap();
+        let connection = Connection::connect(&profile, None).unwrap();
+        let bytes = b"saved over real SFTP".to_vec();
+        let budget = || Budget::new(Arc::new(AtomicBool::new(false)));
+        connection
+            .run(
+                Operation::Save {
+                    path: "/rust-editor-lab.sh".into(),
+                    original: original.clone(),
+                    text: bytes.clone(),
+                },
+                &mut budget(),
+            )
+            .unwrap();
+        assert_eq!(fs::read(&path).unwrap(), bytes);
+        assert_eq!(
+            fs::metadata(&path).unwrap().permissions().mode() & 0o777,
+            0o755
+        );
+        fs::write(root.join(".inject-write-failure"), b"lab only").unwrap();
+        assert!(
+            connection
+                .run(
+                    Operation::Save {
+                        path: "/rust-editor-lab.sh".into(),
+                        original: bytes.clone(),
+                        text: b"rejected write".to_vec()
+                    },
+                    &mut budget()
+                )
+                .is_err()
+        );
+        assert!(
+            !root.join(".inject-write-failure").exists(),
+            "fault was exercised"
+        );
+        assert_eq!(fs::read(&path).unwrap(), bytes);
+        assert_eq!(
+            fs::metadata(&path).unwrap().permissions().mode() & 0o777,
+            0o755
+        );
+        assert!(!fs::read_dir(&root).unwrap().any(|entry| {
+            entry
+                .unwrap()
+                .file_name()
+                .to_string_lossy()
+                .starts_with(".rustremote-")
+        }));
+        assert!(
+            connection
+                .write_new(
+                    Path::new("/rust-editor-lab.sh"),
+                    b"collision",
+                    &mut budget()
+                )
+                .is_err()
+        );
+        assert_eq!(
+            fs::read(&path).unwrap(),
+            bytes,
+            "exclusive collision must not remove or replace the original"
+        );
+    }
+
     #[test]
     fn partial_publication_never_replaces_existing_files_and_progress_stops_on_cancel() {
         let directory = tempfile::tempdir().unwrap();

@@ -72,6 +72,12 @@ impl Browser {
         {
             return;
         }
+        if self.queue_editing.replace(true) {
+            self.status.set_text(&crate::i18n::text(
+                "Modification de la file en cours, réessayez après sa fin",
+            ));
+            return;
+        }
         let queue = self.queue.clone();
         let weak = Rc::downgrade(self);
         crate::dialogs::io(
@@ -85,16 +91,17 @@ impl Browser {
             },
             move |result| {
                 if let Some(s) = weak.upgrade() {
+                    s.queue_editing.set(false);
                     match result {
                         Ok(snapshot) => {
                             s.show_queue(snapshot);
                             if !s.queue_paused.get() {
                                 s.queue_auto.set(true);
                             }
-                            s.pump_queue();
                         }
                         Err(e) => s.status.set_text(&e),
                     }
+                    s.pump_queue();
                 }
             },
         );
@@ -104,6 +111,7 @@ impl Browser {
             && self.queue_ready.get()
             && self.queue_pending.get()
             && !self.busy.get()
+            && !self.queue_editing.get()
         {
             self.execute(None);
         }
@@ -111,6 +119,12 @@ impl Browser {
     fn edit_queue(self: &Rc<Self>, retry: bool) {
         if !self.queue_ready.get() {
             self.load_queue();
+            return;
+        }
+        if self.queue_editing.replace(true) {
+            self.status.set_text(&crate::i18n::text(
+                "Modification de la file en cours, réessayez après sa fin",
+            ));
             return;
         }
         let queue = self.queue.clone();
@@ -127,17 +141,18 @@ impl Browser {
             },
             move |result| {
                 if let Some(s) = weak.upgrade() {
+                    s.queue_editing.set(false);
                     match result {
                         Ok(snapshot) => {
                             s.show_queue(snapshot);
                             if retry {
                                 s.queue_paused.set(false);
                                 s.queue_auto.set(true);
-                                s.pump_queue();
                             }
                         }
                         Err(e) => s.status.set_text(&e),
                     }
+                    s.pump_queue();
                 }
             },
         );

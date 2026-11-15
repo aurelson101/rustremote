@@ -2,13 +2,32 @@
 
 **Règle :** le statut `DONE` exige résultat observable + commande de vérification enregistrée dans `MEMORY.md`. Si l'outil est indisponible, marquer `BLOCKED`, jamais `DONE`. Une seule tâche principale ouverte par agent.
 
+## Campagne 15 contrôles / 10 améliorations — 2026-11-15
+
+Dix améliorations livrées dans le code (cinq Linux, cinq prototype Windows), avec
+[15 points de contrôle et limites détaillés](VALIDATION-DEBUG15-2026-11-15.md).
+Éditeur Rust SFTP testé réellement en loopback : permissions0755 conservées,
+échec d’écriture injecté nettoyé et original protégé. Mutations de file admises
+une à la fois ; compteur accessible du listing corrigé. Sélecteurs du pilote GTK
+limités à leur dialogue et actionnés nativement.
+
+Windows Server2022 : run43700777708 PASS, huit tests et parcours CLI/GUI incluant
+une fenêtre540px, exclusion diagnostic/live et déconnexion. Modes clavier lus
+sans clonage de l’écran, resize refusé après arrêt, erreurs clipboard affichées.
+
+Rejeu GUI Linux SSH/SFTP PASS avec calage Xvfb explicite40px (pilote uniquement),
+y compris navigation physique répétée, transferts/édition/file/échec injecté et
+préférences/français après redémarrage. Aucun changement spéculatif de geste produit
+conservé. Windows11 reste non qualifié ; WIN-02 à WIN-08 non achevés.
+Pas de nouvelle AppImage/release dans cette campagne.
+
 ## Revue ciblée Linux / Windows — 2026-11-15
 
 - Linux : édition SFTP corrigée pour conserver les permissions ordinaires (000–777) avant remplacement atomique ; refus si permissions indisponibles. Les bits privilégiés ne sont pas restaurés. Propriétaire, ACL et attributs étendus ne sont pas conservés par ce remplacement : qualification et stratégie dédiée restent TODO.
-- Windows : validation ConPTY renforcée pour refuser un flux UTF-8 invalide, même contenant le marqueur attendu ; test unitaire local PASS. Revalidation native Windows de ce changement TODO.
-- Validation Linux TODO : le rejeu GUI natif bloque avant SFTP sur l’action « Move » ; qualifier le pilote AT-SPI/DropDown et atteindre l’assertion 0755. Les tests protocolaires loopback passent, sans valider l’éditeur Rust.
+- Windows : validation ConPTY renforcée pour refuser un flux UTF-8 invalide, même contenant le marqueur attendu ; test unitaire local PASS. Revalidation native Server2022 PASS (run43700777708).
+- Validation Linux DONE pour le parcours SSH/SFTP de cette campagne : sélecteur natif corrigé dans le pilote, calage Xvfb explicite, assertion0755 et échec de sauvegarde atteints. Voir le rapport debug15.
 - P0 Windows : terminer WIN-01 (rendu ANSI interactif, clavier, resize et arrêt), puis frontière OS et stockage sécurisé WIN-02/03 ; aucun MSI fonctionnel disponible.
-- P1 Linux : borner/sérialiser les écritures de file de transferts et qualifier les changements de profil/chiffrement avec files existantes ; endurance CPU/RAM et qualification KDE/Xfce/Cinnamon restent ouvertes.
+- P1 Linux : admission des mutations de file bornée DONE par navigateur. Migration des files après changement de profil/chiffrement, endurance CPU/RAM et qualification KDE/Xfce/Cinnamon restent ouvertes.
 - P1 distribution Windows : tester installation/mise à jour/désinstallation MSI et runtime avant WinGet ; MSIX/signature ensuite.
 
 ## Incrément Windows ANSI — 2026-11-15

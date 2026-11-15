@@ -156,6 +156,10 @@ with tempfile.TemporaryDirectory(prefix="rustremote-ssh-") as directory:
             return paramiko.SFTPAttributes.from_stat(os.fstat(self.readfile.fileno()))
 
         def write(self, offset, content):
+            fault = data/".inject-write-failure"
+            if getattr(self, "inject_failure", False) and fault.exists():
+                fault.unlink()
+                return paramiko.SFTP_FAILURE
             if offset < 0 or offset + len(content) > 2 * 1024 * 1024:
                 return paramiko.SFTP_PERMISSION_DENIED
             return super().write(offset, content)
@@ -201,6 +205,7 @@ with tempfile.TemporaryDirectory(prefix="rustremote-ssh-") as directory:
                 fd = os.open(self.path(name), flags | os.O_NOFOLLOW, 0o600)
                 handle = Handle(flags)
                 handle.slow = name.endswith("progress.txt")
+                handle.inject_failure = PurePosixPath(name).name.startswith(".rustremote-")
                 stream = os.fdopen(fd, "r+b" if flags & os.O_RDWR else "wb" if flags & os.O_WRONLY else "rb")
                 handle.readfile = stream
                 handle.writefile = stream
@@ -387,9 +392,16 @@ with tempfile.TemporaryDirectory(prefix="rustremote-ssh-") as directory:
             primary={"name":"SSH intégré — laboratoire","host":"127.0.0.1","port":port,"username":"lab","favorite":False,"folder":"Linux","platform":"Linux","simulation":False,"options":{"protocol":"Ssh","identity_file":str(base/"identity"),"agent":False,"known_hosts_file":str(gui_known),"config_file":"/dev/null"}}
             agent_profile=dict(primary,name="SSH Agent — laboratoire",options=dict(primary["options"],identity_file=None,agent=True))
             (config/"profiles.json").write_text(json.dumps({"version":1,"folders":["Linux"],"profiles":[primary,agent_profile]}))
-            gui=subprocess.run(["dbus-run-session","--","python3",str(Path(__file__).with_name("smoke-connected.py")),str(image),str(config.parent)],env=gui_env,timeout=600)
-            assert gui.returncode==0,"Parcours SSH intégré échoué"
-            summary["application_discovery_gui" if os.environ.get("RUSTREMOTE_DISCOVERY_ONLY")=="1" else "application_terminal_gui"]=True
+            if "--rust-editor-only" in sys.argv:
+                profile_file=base/"rust-editor-profile.json"
+                profile_file.write_text(json.dumps(primary));profile_file.chmod(0o600)
+                env=dict(gui_env,RUSTREMOTE_SFTP_LAB_ROOT=str(data),RUSTREMOTE_SFTP_LAB_PROFILE=str(profile_file))
+                subprocess.run(["cargo","test","--workspace","sftp::tests::remote_editor_preserves_permissions_and_cleans_failed_write","--","--ignored","--exact"],env=env,check=True,timeout=120)
+                summary["application_rust_sftp_editor_permissions_and_failed_write_cleanup"]=True
+            else:
+                gui=subprocess.run(["dbus-run-session","--","python3",str(Path(__file__).with_name("smoke-connected.py")),str(image),str(config.parent)],env=gui_env,timeout=600)
+                assert gui.returncode==0,"Parcours SSH intégré échoué"
+                summary["application_discovery_gui" if os.environ.get("RUSTREMOTE_DISCOVERY_ONLY")=="1" else "application_terminal_gui"]=True
         summary["success"] = True
     finally:
         if client:

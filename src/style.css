@@ -60,3 +60,5 @@ button { background-image: none; }
 .sftp-pane row { padding: 6px; border-radius: 4px; }
 .sftp-pane row:selected { background: #2d527e; color: white; }
 .sftp-pane > label { font-weight: bold; padding: 4px; }
+
+progressbar.sftp-progress text { color: #cbd5e1; }

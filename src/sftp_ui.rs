@@ -25,6 +25,7 @@ struct Browser {
     queue_store: Option<crate::store::Store>,
     queue: Arc<Mutex<Option<crate::transfers::Engine>>>,
     queue_loading: Cell<bool>,
+    queue_editing: Cell<bool>,
     queue_ready: Cell<bool>,
     queue_pending: Cell<bool>,
     queue_auto: Cell<bool>,
@@ -264,6 +265,9 @@ impl Browser {
                 match result{
                 Ok(Output::Entries{path,mut entries})=>{
                     state.path.set_text(&path.to_string_lossy());
+                    let count = crate::i18n::text("{} entrée(s)").replace("{}", &entries.len().to_string());
+                    state.progress_bar.set_text(Some(&count));
+                    state.progress_bar.update_property(&[gtk::accessible::Property::Description(&count)]);
                     entries.sort_by(|a,b| b.directory.cmp(&a.directory).then_with(||a.name.to_lowercase().cmp(&b.name.to_lowercase())).then_with(||a.name.cmp(&b.name)));
                     while let Some(child)=state.list.first_child(){state.list.remove(&child);}
                     state.selected.replace(None);
@@ -671,6 +675,7 @@ pub fn open(
     body.append(&status);
     let progress_bar = gtk::ProgressBar::new();
     progress_bar.set_show_text(true);
+    progress_bar.add_css_class("sftp-progress");
     progress_bar.update_property(&[gtk::accessible::Property::Label(&crate::i18n::text(
         "Progression SFTP",
     ))]);
@@ -783,6 +788,7 @@ pub fn open(
         queue_store,
         queue: Arc::new(Mutex::new(None)),
         queue_loading: Cell::new(false),
+        queue_editing: Cell::new(false),
         queue_ready: Cell::new(false),
         queue_pending: Cell::new(false),
         queue_auto: Cell::new(false),

@@ -991,3 +991,62 @@ encore sur Move, instrumentation nécessaire avant de revendiquer sa correction.
 Rejeu Windows Server2022 préparé sur branche debug/linux-windows-15, avec contrôle
 natif d’une fenêtre étroite et boutons dans les limites de la fenêtre. Ne pas
 confondre ces essais avec une qualification Windows11 ni un port complet.
+
+
+Campagne debug15 : Windows natif a79985eb385dead5af1706dc5d816d125b31674f,
+run43700777708 PASS. Huit tests et ConPTY CLI/GUI ; nouvelle fenêtre540px et contrôle
+exclusion diagnostic/live, restauration après arrêt vérifiés. Rapports téléchargés
+dans dist/windows-probe-validation/43700777708/. Windows11 toujours non disponible.
+
+Linux :55tests automatiques PASS,2ignorés (focus GTK et nouveau test SFTP réseau).
+Les2ignorés exécutés explicitement : focus sous fatal-warnings PASS ; fixture
+`python3 scripts/test-ssh-sftp-local.py --gui target/debug/rustremote --rust-editor-only`
+PASS, vraie Connection Rust :0755 préservé, échec write injecté, original intact,
+aucun temporaire distant résiduel. Profil/assertion uniquement127.0.0.1, racine
+server-data temporaire. Nouvelle injection dans Handle de la fixture locale.
+
+Dix améliorations et15points vérifiés listés dans docs/VALIDATION-DEBUG15-2026-11-15.md.
+L1permissions, L2temporaire en échec, L3admission mutation file max1, L4sélecteur
+GTK scope/action native/éléments visibles, L5compteur accessible+contraste ;
+W1resize après arrêt, W2modes sans cloner écran, W3exclusion diagnostic/live,
+W4erreurs clipboard visibles, W5FlowBox/scroll et fenêtre étroite.
+
+IMPORTANT : pas de résultat GUI Linux complet. Rejeu atteint CRUD/dossiers/DND,
+SSH, compteur et envoi graphique SFTP puis bloque sur clic physique dossier.
+Hypothèses de coordonnées/ombres/SCREEN/gestes capture non confirmées, essais
+retirés ; SCREEN a même renvoyé des coordonnées0,0 sur l’hôte. Garde les gestes
+produit existants. Sélecteur Move résolu via action AT-SPI au lieu du clic physique.
+Flag SSH/SFTP désormais appliqué à l’étape de découverte aussi ; menu contextuel
+Apple non requalifié dans cette campagne. Ne pas masquer l’échec du rejeu complet
+par le PASS backend. Aucun défaut de protocole observé ; cause du clic pas établie.
+Journaux /tmp/rustremote-debug15-{linux-tests,probe-tests,focus,editor,gui}.log.
+Les fichiers *-block.log conservent certains échecs de diagnostic.
+Pas de preuve d’absence de fuite mémoire, pas de périphériques/AD ni KDE qualifiés.
+Pas de nouvelle release/AppImage, pas de serveur réel contacté. Étape suivante :
+isoler le clic SFTP natif avec géométrie fiable/GTK portable, puis finir WIN-02/03.
+
+
+RÉSULTAT FINAL DU REJEU GUI SSH/SFTP : PASS (résout le blocage décrit ci-dessus).
+Commande : GDK_BACKEND=x11 GTK_THEME=Adwaita RUSTREMOTE_TEST_SFTP_POINTER_OFFSET=40
+RUSTREMOTE_GTK_FATAL_WARNINGS=1 RUSTREMOTE_ENGLISH_GUI=1 RUSTREMOTE_SSH_SFTP_ONLY=1
+python3 scripts/test-ssh-sftp-local.py --gui target/debug/rustremote.
+Calage40px limité au pilote Xvfb, mesuré par comparaison à la capture, défaut0,
+borne±128 ; aucun offset/contournement dans le produit. Gestes capture expérimentaux
+retirés. Le helper privilégie les éléments SHOWING et conserve le nœud dont l'action
+est valide ; l'ancienne seconde sélection pouvait remplacer le bouton par un label
+avec action copy seule, d'où StopIteration sur l'expander des limites SFTP.
+
+Log final /tmp/rustremote-debug15-gui-calibrated.log : success true pour CRUD/DND,
+menus Affichage, outil système/empreinte, SFTP compteur accessible, upload/download
+multiples, navigation single-click répétée5fois locale/distante sans gel, filtre,
+DND fichier, édition/0755, file persistée puis reprise manuelle, échec injecté sans
+altération original ni temporaire, limites sauvegardées et français après restart.
+Fixture success/services_stopped true ; aucune commande shell serveur (réponses
+simulées, protocole réel). Menu de découverte Apple volontairement hors scope.
+
+Nouveau test Rust de collision exclusive ajouté puis rejoué : PASS, ne supprime
+ni ne remplace le fichier existant. Focus GTK explicite PASS aussi. Rapport final
+15contrôles/10améliorations actualisé ; il décrit les limites Windows11/protocoles,
+ACL/xattrs/propriétaire, erreurs clipboard non injectées et endurance non qualifiée.
+Pas de nouvelle AppImage/release. Prochaine tâche : migration des files de profil
+et frontière OS/stockage Windows WIN-02/03, puis SSH/SFTP natifs Windows.
