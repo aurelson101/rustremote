@@ -485,3 +485,9 @@ et intégration des profils restent à faire. Le test passe avec stdout du paren
 redirigé : STARTF_USESTDHANDLES + handles nuls évitent son détournement hors PTY.
 Preuves dans validation/windows-probe.json ; pas de validation complète Windows11,
 DPI, AD ou matériel. La0.9.2 Linux est publiée avec quatre assets vérifiés.
+
+## Nettoyage distribution Linux — 2026-11-15 — DONE
+
+Anciens tags v0.5.0 à v0.9.1 supprimés sur GitHub après sauvegarde Git bundle
+vérifiée. Seuls le tag et la release v0.9.2 sont conservés ; les quatre assets
+sont inchangés. Vérifications Git/API et chemin de restauration dans MEMORY.md.

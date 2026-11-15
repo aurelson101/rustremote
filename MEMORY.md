@@ -1173,3 +1173,14 @@ known_hosts strict/agent/askpass Windows, puis port SFTP. Distinguer chemins dis
 POSIX des chemins Windows : inclure naïvement src/sftp.rs serait incorrect (join
 Windows, renameat2, O_NOFOLLOW et ssh_route Unix). RDP mstsc et MSI ensuite.
 Branche windows/native-profile-storage publiée ; sources Linux fonctionnelles conservées.
+
+## Nettoyage des tags Linux — 2026-11-15
+Demande explicite utilisateur : sept tags GitHub v0.5.0,v0.6.0,v0.7.0,
+v0.8.0,v0.8.1,v0.9.0,v0.9.1 supprimés atomiquement avec contrôle des SHA.
+Quatre anciens tags locaux supprimés ; v0.9.2 présent localement et sur GitHub.
+Une seule release existait déjà : v0.9.2, conservée avec ses quatre assets et
+métadonnées inchangés (comparaison exacte API avant/après). Aucun code modifié.
+Sauvegarde Git bundle complète vérifiée + manifest/result dans
+dist/release-backups/20261115T163930Z-retired-linux-tags/.
+Vérifications Git/API réussies ; aucun test Cargo requis pour cette opération.
+Prochaine tâche Windows inchangée : SSH/SFTP natifs, puis RDP et MSI.
