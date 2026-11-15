@@ -12,7 +12,7 @@ Les interfaces/protocoles Linux fonctionnels sont conservés.
 | Ordre | Lot | Priorité | Dépend de | Statut | Critère de passage |
 |---|---|---|---|---|---|
 | 0 | GTK-FOCUS | P0 | — | DONE | Focus libéré avant désactivation des champs ; test GTK4.8 avec fatal-warnings et rejeu GUI sans GtkText focus-out. |
-| 1 | WIN-01 : preuves GUI/terminal | P0 | GTK-FOCUS | IN PROGRESS | Sur Windows réel/VM dédiée : fenêtre GTK4 Rust empaquetable et prototype terminal ConPTY avec affichage ANSI/UTF-8, saisie, resize et arrêt propre, I/O hors GTK et tampons bornés. Choisir le rendu après ce PoC ; ConPTY ne fournit pas le widget graphique. |
+| 1 | WIN-01 : preuves GUI/terminal | P0 | GTK-FOCUS | PARTIAL | Sur Windows réel/VM dédiée : fenêtre GTK4 Rust empaquetable et prototype terminal ConPTY avec affichage ANSI/UTF-8, saisie, resize et arrêt propre, I/O hors GTK et tampons bornés. Choisir le rendu après ce PoC ; ConPTY ne fournit pas le widget graphique. |
 | 2 | WIN-02 : compilation et frontière OS | P0 | WIN-01 | TODO | Build Windows natif reproductible et job CI ; isoler dépendances VTE/Linux, chemins /usr/bin, sockets Unix, pidfd, permissions/flock. Modèles et tests communs compilent sur Linux/Windows ; pas de cfg dispersés dans les protocoles. |
 | 3 | WIN-03 : stockage et secrets | P0 | WIN-02 | TODO | Dossier de configuration Windows, fichiers atomiques/ACL privées/verrou interprocessus, coffre Windows Credential Manager ou backend keyring Windows validé. Conservation du chiffrement optionnel, export sans secrets, aucune clé/mot de passe dans argv ou logs. |
 | 4 | WIN-04 : SSH/SFTP natifs | P0 | WIN-03 | TODO | Terminal Windows via ConPTY et OpenSSH Windows ; routage/askpass/agent à adapter explicitement. SFTP libssh2 portable, chemins Windows/UNC/Unicode, transferts, collisions, édition, annulation, file persistante. known_hosts strict et refus des clés modifiées testés sur labo isolé. |
@@ -389,10 +389,18 @@ redimensionnement, processus système local et arrêt), lecture sur worker et so
 retenue64KiB maximum. Pas de connexion SSH réelle ni d'identifiant. Le rendu ANSI
 interactif et l'intégration au produit restent ouverts : ne pas qualifier le lot DONE
 sur le seul transport. Workflow natif Windows explicite, actions épinglées, rapports
-et exécutable de diagnostic ; aucun faux MSI/MSIX de produit complet.
+de diagnostic ; aucun faux MSI/MSIX de produit complet.
 
 L'ordre demandé est désormais : MVP Windows fonctionnel → MSI testé → WinGet →
 MSIX/signature. WinGet utilise des métadonnées et un hash d'installateur, et ne signe
 pas le programme à la place de l'éditeur. Choix entre dépôt communautaire et source
 privée à faire au moment de la distribution ; pas d'ouverture de PR communautaire
 avant livrable réel et validation. Référence : [manifestes WinGet](https://learn.microsoft.com/en-us/windows/package-manager/package/manifest).
+
+WIN-01 PARTIAL : [CI native Windows réussie](https://github.com/aurelson101/rustremote/actions/runs/43693375903)
+sur57f93fa : GTK4.24.1, Rust1.100.0 MSYS2 UCRT64, transport ConPTY UTF-8, resize et
+exit normal PASS, fenêtre GTK mappée PASS. Rendu terminal ANSI/saisie interactive
+et intégration des profils restent à faire. Le test passe avec stdout du parent
+redirigé : STARTF_USESTDHANDLES + handles nuls évitent son détournement hors PTY.
+Preuves dans validation/windows-probe.json ; pas de validation complète Windows11,
+DPI, AD ou matériel. La0.9.2 Linux est publiée avec quatre assets vérifiés.

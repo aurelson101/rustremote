@@ -122,6 +122,17 @@ Linux simulator checks the handshake, account rejection and pixels; **no physica
 Mac or macOS VM has been qualified**. The Apple handshake and SSH tunnel are tested
 in separate local labs; a complete real-Mac end-to-end test remains pending.
 
+## Windows port — work in progress
+
+An isolated [GTK4/ConPTY feasibility probe](experiments/windows-probe/README.md)
+starts the Windows work without changing the Linux implementation. Its
+[manual native Windows workflow](https://github.com/aurelson101/rustremote/actions/workflows/windows-probe.yml)
+checks the transport and GTK startup; it is not the complete application or a
+Windows installer. See the [ordered roadmap](docs/ROADMAP.md).
+
+The distribution priority is **functional Windows MVP → tested MSI → WinGet →
+MSIX and signing**. No WinGet manifest is submitted before a real installer exists.
+
 ## Linux compatibility
 
 The x86_64 AppImage is built in a **pinned Debian 12 userspace**, with an audited

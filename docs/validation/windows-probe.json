@@ -1,0 +1,56 @@
+{
+  "date": "2026-11-15",
+  "scope": "Windows feasibility probe, not the complete application",
+  "status": "partial",
+  "source_commit": "57f93fafd44b6349f85157dc4e470e5cf011d5e7",
+  "ci_run": "https://github.com/aurelson101/rustremote/actions/runs/43693375903",
+  "native_windows": {
+    "build": true,
+    "conpty_input_output_utf8_resize_and_exit": true,
+    "gtk_startup": true,
+    "transport_report": "CONPTY_OK: input/output UTF-8, resize 100x30, exit 0, 546 bytes, 45 ms",
+    "gui_report": "GUI_SMOKE_OK",
+    "environment": [
+      "rustc 1.100.0 (0ef1bc386 2026-11-09) (Rev1, Built by MSYS2 project)",
+      "binary: rustc",
+      "commit-hash: 0ef1bc386059596dada8fb65b50425aab2ea637a",
+      "commit-date: 2026-11-09",
+      "host: x86_64-pc-windows-gnu",
+      "release: 1.100.0",
+      "LLVM version: 23.1.5",
+      "cargo 1.100.0 (3acc79c0c 2026-11-05) (Rev1, Built by MSYS2 project)",
+      "4.24.1",
+      "mingw-w64-ucrt-x86_64-rust 1.100.0-1",
+      "mingw-w64-ucrt-x86_64-gtk4 4.24.1-1"
+    ]
+  },
+  "linux_frontend": {
+    "check": true,
+    "clippy_deny_warnings": true,
+    "gui_smoke": true,
+    "does_not_validate_conpty": true
+  },
+  "prior_failures": [
+    {
+      "run": 43691391385,
+      "cause": "ConPTY closure Result type inference; fixed explicitly"
+    },
+    {
+      "run": 43692050108,
+      "cause": "Marker missing; initial timing hypothesis"
+    },
+    {
+      "run": 43692887565,
+      "cause": "194 bytes of control output; redirected parent stdio copied into child; STARTF_USESTDHANDLES fixed this"
+    }
+  ],
+  "artifact": "Diagnostic reports only; no Windows installer or executable distributed",
+  "remaining": [
+    "Interactive ANSI terminal renderer and keyboard binding",
+    "Full application platform adapters/storage/secrets/SSH/SFTP/RDP",
+    "MSI installation, upgrade and removal qualification",
+    "Real installer URL and SHA256 before WinGet manifest",
+    "MSIX and signing later",
+    "Windows11 physical/DPI/AD/hardware/endurance qualification"
+  ]
+}

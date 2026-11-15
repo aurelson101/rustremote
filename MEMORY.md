@@ -5,7 +5,7 @@
 
 ## 1. État de référence
 
-- **Mise à jour :** 2026-11-15 — correctif focus GTK 0.9.2 local et priorisation Windows ; release GitHub actuelle 0.9.1.
+- **Mise à jour :** 2026-11-15 — 0.9.2 publiée/vérifiée ; preuve native Windows GTK4/ConPTY PASS, WIN-01 partiel, MSI/WinGet prioritaires.
 - **Dernier agent :** Codex ; cause GtkText reproduite, focus libéré avant désactivation, feuille de route Windows ordonnée.
 - **Phase :** P1 — terminal/SFTP natifs, MVP encore incomplet.
 - **État confirmé :** terminal SSH/série intégré VTE, SFTP natif ssh2/libssh2 ; RDP/VNC externes ; profils/import/export, dossiers et paramètres persistants.
@@ -803,3 +803,28 @@ les flux standard redirigés du parent dans le child ConPTY, même bInheritHandl
 STARTF_USESTDHANDLES avec les trois handles standard nuls force les handles ConPTY.
 Correctif ajouté ; l'attente bornée de flush reste utile mais n'était pas la cause
 principale du marqueur absent. Rejeu requis, ne pas déclarer la preuve validée encore.
+
+## Résultat de livraison et preuve Windows — 2026-11-15
+
+Release0.9.2 publiée sur845238f3fbe12cd8d05cdb37e7d1d75faa3b675d : AppImage, SHA256,
+ABI et build-packages retéléchargés et identiques aux locaux.0.9.1 préservée.
+https://github.com/aurelson101/rustremote/releases/tag/v0.9.2
+
+Quatrième CI43693375903 sur57f93fafd44b6349f85157dc4e470e5cf011d5e7 PASS après les
+correctifs. Rapport téléchargé : CONPTY_OK entrée/sortie UTF-8, resize100x30,
+exit0,546octets,45ms sur ce seul test (pas un benchmark). GUI_SMOKE_OK. Environnement
+natif x86_64-pc-windows-gnu, Rust1.100.0/MSYS2, GTK4.24.1. Aucun transcript ni secret
+journalisé. L'attente de flush ne suffisait pas : le correctif décisif était d'éviter
+la copie des stdio parent redirigés ; le test tee protège ce cas de régression.
+Artefact diagnostic uniquement, sans exe/MSI/MSIX et sans revendication Windows fini.
+
+WIN-01 PARTIAL. Prochaine tâche concrète : choisir/prouver le rendu ANSI interactif
+et brancher clavier/resize GUI sur ConPTY avant d'adapter les profils/stockage/coffre
+et SSH/SFTP/RDP. Ordre utilisateur : MVP Windows → MSI → WinGet → MSIX/signature.
+Ne pas soumettre un manifeste WinGet avant un MSI réel, public, hashé et qualifié.
+Pas d'infrastructure réelle ni de dépôt communautaire contacté par l'application.
+Le workflow est manuel et borné25min, permissions lecture et actions épinglées.
+Annotation CI : upload-artifact v4 Node20 est exécuté via Node24 ; passage à une
+version native Node24 à prévoir lors de maintenance (pas un échec de ce run).
+Le rapport HTML SignPath reste local, exclu de Git ; politiques de publication
+et licenceGPL inchangées. Preuves : docs/validation/windows-probe.json.
