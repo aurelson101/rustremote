@@ -40,6 +40,12 @@ déconnexion. WIN-01 reste PARTIAL pour la qualification Windows11, IME/DPI,
 polices/sélection, applications terminal plein écran et endurance. Validation Windows11, protocoles/profils/coffre, parité UI et MSI
 restent TODO ; ne pas confondre le prototype avec l’application complète.
 
+Dernière preuve native : [run43699123993](https://github.com/aurelson101/rustremote/actions/runs/43699123993)
+sur5cca68a,8tests et deux captures GTK Server2022 inspectées. Évidence/hash dans
+`docs/validation/windows-probe.json`. Windows11 sans VM disponible : simulations
+communes uniquement, pas de validation OS. v0.9.1 retirée après sauvegarde vérifiée,
+v0.9.2 conservée ; aucun MSI ni paquet Windows public livré.
+
 ## Priorité active : stabilisation GTK puis portage Windows
 
 Le correctif du focus GTK est prioritaire avant le portage. Windows n'est pas

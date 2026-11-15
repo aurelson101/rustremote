@@ -945,3 +945,28 @@ Sauvegarde v0.9.1 et vérification de la v0.9.2 préservée : dist/release-backu
 2026-11-15-before-retiring-0.9.1/manifest.json,5entrées hashées ; pas encore supprimé
 à cette note. Les tags historiques seront conservés. Nouveau rejeu natif à suivre
 avant publication des captures et du README.
+
+
+Second rejeu natif run43699123993 sur5cca68a4c72f29096dfac0c514811591e043fd68 PASS :
+8tests et tous les parcours ConPTY/GUI, y compris état stopped strict et captures.
+Rapports téléchargés dist/windows-probe-validation/43699123993 ; deux PNG natifs
+copiés et inspectés visuellement dans docs/screenshots/windows-server2022-{preview,
+terminal}.png, hashes dans docs/validation/windows-probe.json. Capture GTK de cette
+seule fenêtre, sans le bureau du runner, marqueur fixe et aucun serveur réel.
+Simulations GTK Linux refaites avec paramètres de police1.25 et2 : smoke/capture
+PASS (dist/windows-layout-lab/result.json). Ces paramètres ne prouvent pas le DPI
+physique effectif ni Windows11 ; aucune certification Windows11 revendiquée.
+README anglais actualisé avec état réel et captures natives ; l’ancien titre
+«Windows/RDP settings» précisait mal l’OS : renommé «RDP settings (Linux client)».
+
+Release v0.9.1 supprimée sur GitHub après sauvegarde/hash vérifiés. Les3anciens
+artefacts locaux0.9.1 archivés dans dist/release-backups/2026-11-15-before-retiring-
+0.9.1/local-artifacts/. v0.9.2 conservée ; pas de nouvelle release/MSI prétendue.
+Preuves de nettoyage cleanup-result.json et manifest.json dans ce même backup.
+Les tags historiques sont conservés, aucun force-push ni suppression source.
+
+Reste du portage complet : WIN-02/03 frontière OS/profils/stockage ACL/coffre,
+WIN-04 SSH/SFTP natifs, WIN-05 mstsc/redirections, UI complète et MSI/WinGet.
+WIN-01 reste PARTIAL pour Windows11 et qualification IME/polices/plein écran/endurance.
+Les deux modifications Linux antérieures src/sftp.rs et scripts/smoke-connected.py
+restent locales non committées, pour ne pas publier une validation GUI non atteinte.

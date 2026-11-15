@@ -24,7 +24,7 @@ and user-defined names retain their original language.
 
 ![English SFTP local and remote panes with persistent transfer queue](docs/screenshots/navigateur-sftp.png)
 
-### Windows / RDP session settings
+### RDP session settings (Linux client)
 
 ![English RDP profile editor](docs/screenshots/rdp-settings.png)
 
@@ -122,16 +122,38 @@ Linux simulator checks the handshake, account rejection and pixels; **no physica
 Mac or macOS VM has been qualified**. The Apple handshake and SSH tunnel are tested
 in separate local labs; a complete real-Mac end-to-end test remains pending.
 
-## Windows port — work in progress
+## Windows port — experimental terminal
 
-An isolated [GTK4/ConPTY feasibility probe](experiments/windows-probe/README.md)
-starts the Windows work without changing the Linux implementation. Its
-[manual native Windows workflow](https://github.com/aurelson101/rustremote/actions/workflows/windows-probe.yml)
-checks the transport and GTK startup; it is not the complete application or a
-Windows installer. See the [ordered roadmap](docs/ROADMAP.md).
+Targets: **Windows 11 x64** and **Windows Server 2022 x64 with Desktop Experience**.
+The complete Linux application has not been ported yet; Server Core is outside the
+GUI target. There is no Windows MSI/MSIX or WinGet package to download at this stage.
 
-The distribution priority is **functional Windows MVP → tested MSI → WinGet →
-MSIX and signing**. No WinGet manifest is submitted before a real installer exists.
+The isolated [GTK4/ConPTY prototype](experiments/windows-probe/README.md) provides
+a live local terminal: ANSI/UTF-8 display, Unicode/IME input routing, terminal keys,
+window resizing, selection/copy, confirmed paste (button, right click or Ctrl+Shift+V),
+and disconnect. Input queues and screen memory are bounded; a private Windows Job
+Object controls the session process tree. It starts only after an explicit click.
+
+Native **Server 2022** CI covers build/unit tests, streaming input/output, resize,
+normal exit/cancellation, and IM commit → ConPTY → GTK display → resize → disconnect.
+See the [validation evidence](docs/validation/windows-probe.json) and
+[manual native workflow](https://github.com/aurelson101/rustremote/actions/workflows/windows-probe.yml).
+Windows 11 remains unverified: local GTK layout simulations are not Windows OS,
+IME hardware, AD, peripheral or end-to-end protocol qualification.
+
+### Native Windows Server 2022 captures
+
+These are captures of the prototype's own GTK window on an ephemeral Windows CI
+runner, not mockups or screenshots of the complete Windows product.
+
+![Native Server 2022 ANSI preview](docs/screenshots/windows-server2022-preview.png)
+
+![Native Server 2022 live ConPTY terminal](docs/screenshots/windows-server2022-terminal.png)
+
+Still required: shared application/profile adapters, Windows storage/credential
+protection, native SSH/SFTP/RDP integration, full UI workflows and installer tests.
+The distribution order remains **functional Windows MVP → tested MSI → WinGet →
+MSIX and signing**. See the [ordered roadmap](docs/ROADMAP.md).
 
 ## Linux compatibility
 

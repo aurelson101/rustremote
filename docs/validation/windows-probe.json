@@ -2,13 +2,13 @@
   "date": "2026-11-15",
   "scope": "Windows feasibility probe, not the complete application",
   "status": "partial",
-  "source_commit": "a29f8f11fe49946f33302dcb6c470bd425a212cc",
-  "ci_run": "https://github.com/aurelson101/rustremote/actions/runs/43698455015",
+  "source_commit": "5cca68a4c72f29096dfac0c514811591e043fd68",
+  "ci_run": "https://github.com/aurelson101/rustremote/actions/runs/43699123993",
   "native_windows": {
     "build": true,
     "conpty_input_output_utf8_resize_and_exit": true,
     "gtk_startup": true,
-    "transport_report": "CONPTY_OK: input/output UTF-8, ANSI screen, resize 100x30, exit 0, 357 bytes, 78 ms",
+    "transport_report": "CONPTY_OK: input/output UTF-8, ANSI screen, resize 100x30, exit 0, 357 bytes, 60 ms",
     "gui_report": "GUI_SMOKE_OK",
     "environment": [
       "",
@@ -29,7 +29,8 @@
     "gtk_im_commit_display_resize_disconnect": true,
     "os": "Windows Server 2022, build 10.0.20348.5870",
     "live_transport_report": "LIVE_CONPTY_OK: streaming ANSI/UTF-8, input, resize, exit0, cancellation, private job lifecycle",
-    "live_gui_report": "GUI_LIVE_OK: IM commit, live ANSI display, window resize, disconnect"
+    "live_gui_report": "GUI_LIVE_OK: IM commit, live ANSI display, window resize, disconnect",
+    "tests_passed": 8
   },
   "linux_frontend": {
     "check": true,
@@ -52,7 +53,7 @@
       "cause": "194 bytes of control output; redirected parent stdio copied into child; STARTF_USESTDHANDLES fixed this"
     }
   ],
-  "artifact": "Diagnostic reports only; no Windows installer or executable distributed",
+  "artifact": "Diagnostic reports and own-window GTK screenshots; no installer or executable distributed",
   "remaining": [
     "Windows11 native VM, IME/selection/font/DPI/endurance and full-screen terminal applications qualification",
     "Full application platform adapters/storage/secrets/SSH/SFTP/RDP",
@@ -62,7 +63,23 @@
     "Windows11 physical/DPI/AD/hardware/endurance qualification"
   ],
   "previous_native_run": {
-    "source_commit": "57f93fafd44b6349f85157dc4e470e5cf011d5e7",
-    "ci_run": "https://github.com/aurelson101/rustremote/actions/runs/43693375903"
+    "source_commit": "a29f8f11fe49946f33302dcb6c470bd425a212cc",
+    "ci_run": "https://github.com/aurelson101/rustremote/actions/runs/43698455015"
+  },
+  "captures": [
+    {
+      "path": "docs/screenshots/windows-server2022-preview.png",
+      "sha256": "db6b54985f133f64584bf0ce69129efd6ec5b3b1d8c479cbcbd9eb3520535db9",
+      "native_os": "Windows Server 2022"
+    },
+    {
+      "path": "docs/screenshots/windows-server2022-terminal.png",
+      "sha256": "d1422efc6930d69e4c6a4484b43eea357a6f2c1b4ec390b256b9107f419a581e",
+      "native_os": "Windows Server 2022"
+    }
+  ],
+  "windows11": {
+    "native_validation": false,
+    "reason": "No dedicated Windows11 VM available; common GTK/model simulations do not certify Windows11"
   }
 }
