@@ -47,6 +47,7 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force dist/windows-probe | Out-Null
+          "RUSTREMOTE_LAB_PWSH=$PSHOME\pwsh.exe" | Add-Content -Path $env:GITHUB_ENV -Encoding utf8
           $client = [IO.Path]::GetFullPath('experiments/windows-probe/target/debug/OpenSSH/ssh.exe')
           $base = @('PATH','PATHEXT','TEMP','TMP','USERPROFILE','LOCALAPPDATA','APPDATA','COMSPEC','SYSTEMROOT','WINDIR')
           $reports = @()

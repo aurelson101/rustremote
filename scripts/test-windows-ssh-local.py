@@ -158,9 +158,11 @@ $rules = @($actual.GetAccessRules($true,$true,[Security.Principal.SecurityIdenti
 if (-not $actual.AreAccessRulesProtected -or $rules.Count -ne 1 -or $rules[0].IdentityReference -ne $owner) { throw 'Lab private-key DACL verification failed' }
 """
                 environment = dict(os.environ, RUSTREMOTE_LAB_KEY=str(key_path))
-                powershell = Path(os.environ["SystemRoot"]) / "System32/WindowsPowerShell/v1.0/powershell.exe"
+                powershell = Path(os.environ.get("RUSTREMOTE_LAB_PWSH", str(Path(os.environ["SystemRoot"]) / "System32/WindowsPowerShell/v1.0/powershell.exe")))
+                if not powershell.is_absolute() or not powershell.is_file():
+                    raise RuntimeError("A trusted absolute PowerShell path is required for the lab")
                 permissions = subprocess.run([str(powershell), "-NoProfile", "-NonInteractive", "-Command", acl_script],
-                                             env=environment, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=20)
+                                             env=environment, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=60)
                 if permissions.returncode:
                     raise RuntimeError("Private lab key ACL setup failed: " + permissions.stderr.decode("utf-8", errors="replace")[-1000:])
             else:
