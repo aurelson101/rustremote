@@ -389,6 +389,22 @@ fn build(
         p.fill(None);
         p.tabs.set_current_page(Some(1));
     });
+    let connect = action("Connect selected", &bar, &panel, |p| {
+        let Some(row) = p.list.selected_row() else {
+            p.status.set_text("Select a connection first");
+            return;
+        };
+        let profile = p.data.borrow().profiles.get(row.index() as usize).cloned();
+        if let Some(profile) = profile
+            && let Some(parent) = p.window.upgrade()
+        {
+            match open_terminal(&parent, profile) {
+                Ok(()) => {}
+                Err(error) => p.status.set_text(&error),
+            }
+        }
+    });
+    connect.set_sensitive(cfg!(windows));
     action("Edit selected", &bar, &panel, |p| {
         if let Some(row) = p.list.selected_row() {
             p.fill(Some(row.index() as usize));
@@ -1008,4 +1024,67 @@ pub fn smoke(parent: &gtk::ApplicationWindow, result: Rc<Cell<bool>>, capture: b
             });
         },
     );
+}
+
+fn open_terminal(parent: &gtk::ApplicationWindow, profile: SessionProfile) -> Result<(), String> {
+    crate::ssh_launch::arguments(&profile)?;
+    let app = parent.application().ok_or("Application unavailable")?;
+    if app.windows().len() >= 18 {
+        return Err(
+            "Close an existing session before opening another (16 remote windows maximum)".into(),
+        );
+    }
+    let body = gtk::Box::new(gtk::Orientation::Vertical, 12);
+    body.set_margin_top(16);
+    body.set_margin_bottom(16);
+    body.set_margin_start(16);
+    body.set_margin_end(16);
+    let status = gtk::Label::new(Some(
+        "SSH uses strict known_hosts validation. Unknown or changed host keys are refused.
+Apple/macOS SSH uses this same encrypted transport.",
+    ));
+    status.set_wrap(true);
+    body.append(&status);
+    let screen = gtk::Label::new(None);
+    screen.set_widget_name("ansi-screen");
+    screen.set_xalign(0.0);
+    screen.set_yalign(0.0);
+    screen.set_selectable(true);
+    let viewport = gtk::ScrolledWindow::builder()
+        .hexpand(true)
+        .vexpand(true)
+        .min_content_height(260)
+        .child(&screen)
+        .build();
+    body.append(&viewport);
+    let window = gtk::ApplicationWindow::builder()
+        .application(&app)
+        .title(format!("RustRemote — SSH — {}", profile.name))
+        .default_width(920)
+        .default_height(680)
+        .child(&body)
+        .build();
+    let diagnostic = gtk::Button::with_label("Reserved"); // Keeps the existing exclusive-session control; not displayed.
+    window.present();
+    crate::live_ui::attach(
+        &body,
+        &screen,
+        &viewport,
+        &status,
+        &window,
+        crate::live_ui::Options {
+            target: crate::ssh_launch::Target::Ssh(Box::new(profile)),
+            auto_start: true,
+            enabled: false,
+            capture: false,
+            result: Rc::new(Cell::new(false)),
+        },
+        &diagnostic,
+    );
+    // Callbacks use weak controls. Keep the diagnostic guard alive for this window's lifetime.
+    window.connect_close_request(move |_| {
+        let _ = &diagnostic;
+        gtk::glib::Propagation::Proceed
+    });
+    Ok(())
 }

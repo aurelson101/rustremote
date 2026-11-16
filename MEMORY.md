@@ -1184,3 +1184,22 @@ Sauvegarde Git bundle complète vérifiée + manifest/result dans
 dist/release-backups/20261115T163930Z-retired-linux-tags/.
 Vérifications Git/API réussies ; aucun test Cargo requis pour cette opération.
 Prochaine tâche Windows inchangée : SSH/SFTP natifs, puis RDP et MSI.
+
+## WIN-04 SSH Windows et Apple — en cours (2026-11-16)
+Bouton Connect selected relié aux profils SSH (MacOs inclus) et à ConPTY existant.
+Transport local conservé. SSH sans shell intermédiaire, argv Windows quotés,
+known_hosts strict, forwardings/ProxyCommand/LocalCommand désactivés, pas de
+Match exec via config implicite (-F none ; config personnalisée refusée explicitement).
+Askpass Windows : profil/référence seuls dans environnement privé du processus,
+secret lu dans Credential Manager et transmis sur stdout du helper OpenSSH ;
+refus de confirmation d’hôte/agent et des prompts non prévus. Clé protégée : secret
+traité comme passphrase, sans fallback password vers le serveur. Aucun secret argv.
+Client officiel OpenSSH10.4p1-Preview épinglé/hash vérifié en laboratoire CI,
+sinon client système ; runtime pas redistribué dans les artefacts de diagnostic.
+Deux tests de politique/quoting (Apple inclus) PASS ;14tests prototype PASS,
+Clippy Linux prototype PASS. Fixture Paramiko locale vérifiée : vrai protocole,
+password, UTF8, PTY et resize, sans compte/shell système ni serveur réel.
+Natif Windows encore à compiler/exécuter. Nouveau labo CI mot de passe et clé
+chiffrée Unicode/espaces, refus mauvais secret et clé d’hôte inconnue/modifiée.
+Apple désigne ici un profil SSH simulé : ne pas prétendre un Mac/ARD réel qualifié.
+SFTP, RDP mstsc, VNC/Apple graphique et MSI restent ouverts.

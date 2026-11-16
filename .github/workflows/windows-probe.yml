@@ -33,6 +33,7 @@ jobs:
             mingw-w64-ucrt-x86_64-rust
             mingw-w64-ucrt-x86_64-gtk4
             mingw-w64-ucrt-x86_64-pkgconf
+            mingw-w64-ucrt-x86_64-python-paramiko
       - name: Native operating system and architecture
         shell: pwsh
         run: |
@@ -49,6 +50,18 @@ jobs:
           cargo test --locked -p rustremote-core --no-default-features | tee dist/windows-probe/core-tests.txt
       - name: Build native Windows probe
         run: cargo build --locked --manifest-path experiments/windows-probe/Cargo.toml
+      - name: Prepare pinned official OpenSSH client for loopback qualification
+        shell: pwsh
+        run: |
+          $archive = Join-Path $env:RUNNER_TEMP 'rustremote-openssh.zip'
+          Invoke-WebRequest -Uri 'https://github.com/PowerShell/Win32-OpenSSH/releases/download/10.4.0.0p1-Preview/OpenSSH-Win64.zip' -OutFile $archive
+          if ((Get-FileHash $archive -Algorithm SHA256).Hash.ToLowerInvariant() -ne 'b67ff8becd203502190ec42ac7787c24c2cd3325ed7700485fe7a1c83d2a7957') { throw 'OpenSSH SHA256 mismatch' }
+          $extract = Join-Path $env:RUNNER_TEMP 'rustremote-openssh-runtime'
+          Expand-Archive -Path $archive -DestinationPath $extract
+          $runtime = 'experiments/windows-probe/target/debug/OpenSSH'
+          New-Item -ItemType Directory -Force $runtime | Out-Null
+          Copy-Item (Join-Path $extract 'OpenSSH-Win64/*') $runtime -Recurse
+          'OpenSSH 10.4.0.0p1-Preview; SHA256 b67ff8becd203502190ec42ac7787c24c2cd3325ed7700485fe7a1c83d2a7957; official PowerShell/Win32-OpenSSH; CI only, no binary redistribution' | Set-Content dist/windows-probe/openssh-source.txt
       - name: ANSI screen and output validation tests
         run: |
           set -o pipefail
@@ -65,6 +78,10 @@ jobs:
         run: |
           set -o pipefail
           experiments/windows-probe/target/debug/rustremote-windows-probe.exe --self-test-live | tee dist/windows-probe/live-conpty.txt
+      - name: Real loopback SSH and simulated Apple profile
+        run: |
+          set -o pipefail
+          python scripts/test-windows-ssh-local.py --probe experiments/windows-probe/target/debug/rustremote-windows-probe.exe | tee dist/windows-probe/ssh-loopback.json
       - name: GTK Windows startup
         run: |
           set -o pipefail

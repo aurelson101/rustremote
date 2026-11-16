@@ -7,7 +7,9 @@ use std::{
     time::Duration,
 };
 
-pub struct SmokeOptions {
+pub struct Options {
+    pub target: crate::ssh_launch::Target,
+    pub auto_start: bool,
     pub enabled: bool,
     pub capture: bool,
     pub result: Rc<Cell<bool>>,
@@ -19,7 +21,7 @@ pub fn attach(
     viewport: &gtk::ScrolledWindow,
     status: &gtk::Label,
     window: &gtk::ApplicationWindow,
-    smoke: SmokeOptions,
+    smoke: Options,
     diagnostic: &gtk::Button,
 ) {
     let session: Rc<RefCell<Option<Session>>> = Rc::new(RefCell::new(None));
@@ -30,7 +32,14 @@ pub fn attach(
         .column_spacing(8)
         .row_spacing(8)
         .build();
-    let start = gtk::Button::with_label("Open local terminal");
+    let start = gtk::Button::with_label(
+        if matches!(smoke.target, crate::ssh_launch::Target::Local) {
+            "Open local terminal"
+        } else {
+            "Connect SSH"
+        },
+    );
+    let launch_target = smoke.target.clone();
     start.set_sensitive(cfg!(windows));
     let stop = gtk::Button::with_label("Disconnect");
     stop.set_sensitive(false);
@@ -79,7 +88,7 @@ pub fn attach(
         {
             return;
         }
-        match Session::start() {
+        match Session::start_target(launch_target.clone()) {
             Ok(value) => {
                 *sessions.borrow_mut() = Some(value);
                 button.set_sensitive(false);
@@ -279,6 +288,9 @@ pub fn attach(
         sessions.borrow_mut().take(); // Signals stop without joining on GTK.
         gtk::glib::Propagation::Proceed
     });
+    if smoke.auto_start && !smoke.enabled {
+        start.emit_clicked();
+    }
     if smoke.enabled {
         let capture_ui = smoke.capture;
         let smoke_ok = smoke.result;

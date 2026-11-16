@@ -18,13 +18,13 @@ use windows_sys::Win32::{
             SetInformationJobObject,
         },
         Pipes::CreatePipe,
-        SystemInformation::GetSystemDirectoryW,
         Threading::{
-            CREATE_SUSPENDED, CreateProcessW, DeleteProcThreadAttributeList,
-            EXTENDED_STARTUPINFO_PRESENT, GetExitCodeProcess, InitializeProcThreadAttributeList,
-            LPPROC_THREAD_ATTRIBUTE_LIST, PROC_THREAD_ATTRIBUTE_PSEUDOCONSOLE, PROCESS_INFORMATION,
-            ResumeThread, STARTF_USESTDHANDLES, STARTUPINFOEXW, TerminateProcess,
-            UpdateProcThreadAttribute, WaitForSingleObject,
+            CREATE_SUSPENDED, CREATE_UNICODE_ENVIRONMENT, CreateProcessW,
+            DeleteProcThreadAttributeList, EXTENDED_STARTUPINFO_PRESENT, GetExitCodeProcess,
+            InitializeProcThreadAttributeList, LPPROC_THREAD_ATTRIBUTE_LIST,
+            PROC_THREAD_ATTRIBUTE_PSEUDOCONSOLE, PROCESS_INFORMATION, ResumeThread,
+            STARTF_USESTDHANDLES, STARTUPINFOEXW, TerminateProcess, UpdateProcThreadAttribute,
+            WaitForSingleObject,
         },
     },
 };
@@ -115,7 +115,7 @@ impl Drop for Child {
         }
     }
 }
-fn spawn(console: HPCON) -> Result<Child, String> {
+fn spawn(console: HPCON, target: &crate::ssh_launch::Target) -> Result<Child, String> {
     // Assign suspended child before it can spawn descendants. Closing the private
     // job kills only this session tree, including when the GUI process exits.
     let raw_job = unsafe { CreateJobObjectW(null(), null()) };
@@ -137,22 +137,48 @@ fn spawn(console: HPCON) -> Result<Child, String> {
         return Err(os_error("SetInformationJobObject"));
     }
     let attributes = Attributes::new(console)?;
-    let mut directory = vec![0u16; 32768];
-    let len =
-        unsafe { GetSystemDirectoryW(directory.as_mut_ptr(), directory.len() as u32) } as usize;
-    if len == 0 || len >= directory.len() {
-        return Err(os_error("System directory"));
+    let directory = crate::win_ssh::system_directory()?;
+    let (program, args, profile) = match target {
+        crate::ssh_launch::Target::Local => (
+            directory.join("cmd.exe"),
+            vec!["/d".into(), "/q".into()],
+            None,
+        ),
+        crate::ssh_launch::Target::Ssh(profile) => (
+            crate::win_ssh::client_path()?,
+            crate::ssh_launch::arguments(profile)?,
+            Some(profile.as_ref()),
+        ),
+    };
+    if !program.is_file() {
+        return Err(
+            "Windows OpenSSH client is unavailable; install the OpenSSH Client optional feature"
+                .into(),
+        );
     }
-    directory.truncate(len);
-    let mut cwd = directory.clone();
-    cwd.push(0);
-    directory.extend("\\cmd.exe".encode_utf16());
-    let mut exe = directory.clone();
-    exe.push(0);
-    let mut command: Vec<u16> = format!("\"{}\" /d /q", String::from_utf16_lossy(&directory))
-        .encode_utf16()
-        .chain([0])
-        .collect();
+    let program_text = program
+        .to_str()
+        .ok_or("Windows executable path is not Unicode")?;
+    let exe = crate::win_storage::wide(&program)?;
+    let cwd = crate::win_storage::wide(&directory)?;
+    let mut words = vec![crate::ssh_launch::quote(program_text)?];
+    for argument in args {
+        words.push(if matches!(target, crate::ssh_launch::Target::Local) {
+            argument
+        } else {
+            crate::ssh_launch::quote(&argument)?
+        });
+    }
+    let command_text = words.join(" ");
+    let mut command: Vec<u16> = command_text.encode_utf16().chain([0]).collect();
+    if command.len() > 32767 {
+        return Err("Windows SSH command exceeds its budget".into());
+    }
+    let environment = if profile.is_some() {
+        Some(crate::win_ssh::environment(profile)?)
+    } else {
+        None
+    };
     let mut startup = STARTUPINFOEXW::default();
     startup.StartupInfo.cb = size_of::<STARTUPINFOEXW>() as u32;
     // Without this flag, Windows may copy redirected parent stdio (e.g. CI tee)
@@ -167,8 +193,10 @@ fn spawn(console: HPCON) -> Result<Child, String> {
             null(),
             null(),
             0,
-            EXTENDED_STARTUPINFO_PRESENT | CREATE_SUSPENDED,
-            null(),
+            EXTENDED_STARTUPINFO_PRESENT | CREATE_SUSPENDED | CREATE_UNICODE_ENVIRONMENT,
+            environment
+                .as_ref()
+                .map_or(null(), |value| value.as_ptr().cast()),
             cwd.as_ptr(),
             &startup.StartupInfo,
             &mut information,
@@ -245,7 +273,7 @@ pub fn run() -> Result<crate::ProbeResult, String> {
         Ok((data, overflow))
     });
     let operation: Result<(), String> = (|| {
-        let child = spawn(console.0)?;
+        let child = spawn(console.0, &crate::ssh_launch::Target::Local)?;
         if unsafe { ResizePseudoConsole(console.0, COORD { X: 100, Y: 30 }) } < 0 {
             return Err("ConPTY resize failed".into());
         }
@@ -287,6 +315,7 @@ pub fn run() -> Result<crate::ProbeResult, String> {
 
 pub fn run_live(
     commands: std::sync::mpsc::Receiver<crate::live::Command>,
+    target: crate::ssh_launch::Target,
     state: std::sync::Arc<std::sync::Mutex<crate::live::State>>,
     stop: std::sync::Arc<std::sync::atomic::AtomicBool>,
 ) -> Result<String, String> {
@@ -343,16 +372,26 @@ pub fn run_live(
         Ok(())
     });
     let operation: Result<String, String> = (|| {
-        let child = spawn(console.0)?;
+        let child = spawn(console.0, &target)?;
         {
             let mut state = state.lock().map_err(|_| "Terminal state interrupted")?;
-            state.status = "Local CMD — running".into();
+            state.status = match &target {
+                crate::ssh_launch::Target::Local => "Local CMD — running".into(),
+                crate::ssh_launch::Target::Ssh(profile) => {
+                    format!("SSH — {} — running", profile.name)
+                }
+            };
             state.revision = state.revision.wrapping_add(1);
         }
         let mut dimensions = (80, 24);
         loop {
             if stop.load(Ordering::Acquire) {
-                return Ok("Local terminal stopped".into());
+                return Ok(if matches!(target, crate::ssh_launch::Target::Local) {
+                    "Local terminal stopped"
+                } else {
+                    "SSH terminal stopped"
+                }
+                .into());
             }
             if unsafe { WaitForSingleObject(child.process.as_raw_handle(), 0) } == WAIT_OBJECT_0 {
                 let mut code = 0;
@@ -360,7 +399,14 @@ pub fn run_live(
                     return Err(os_error("GetExitCodeProcess"));
                 }
                 // Let ConHost flush while its output is still drained.
-                return Ok(format!("Local terminal exited ({code})"));
+                return Ok(format!(
+                    "{} exited ({code})",
+                    if matches!(target, crate::ssh_launch::Target::Local) {
+                        "Local terminal"
+                    } else {
+                        "SSH terminal"
+                    }
+                ));
             }
             if reader.is_finished() || writer.is_finished() {
                 return Err("Terminal I/O worker stopped".into());

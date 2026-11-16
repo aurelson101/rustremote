@@ -56,7 +56,15 @@ pub struct Session {
 }
 
 impl Session {
+    #[cfg(windows)]
     pub fn start() -> Result<Self, String> {
+        Self::start_target(crate::ssh_launch::Target::Local)
+    }
+
+    pub fn start_target(target: crate::ssh_launch::Target) -> Result<Self, String> {
+        if let crate::ssh_launch::Target::Ssh(profile) = &target {
+            crate::ssh_launch::arguments(profile)?;
+        }
         let (tx, rx) = mpsc::sync_channel(32);
         let state = Arc::new(Mutex::new(State::new()));
         let stop = Arc::new(AtomicBool::new(false));
@@ -66,10 +74,10 @@ impl Session {
             .name("windows-terminal".into())
             .spawn(move || {
                 #[cfg(windows)]
-                let result = crate::conpty::run_live(rx, worker_state.clone(), worker_stop);
+                let result = crate::conpty::run_live(rx, target, worker_state.clone(), worker_stop);
                 #[cfg(not(windows))]
                 let result: Result<String, String> = {
-                    drop((rx, worker_stop));
+                    drop((rx, worker_stop, target));
                     Err("Interactive ConPTY requires Windows".into())
                 };
                 if let Ok(mut state) = worker_state.lock() {

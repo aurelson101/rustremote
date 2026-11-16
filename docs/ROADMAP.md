@@ -17,7 +17,9 @@ import/export, sauvegarde hors GTK et bouton Enregistrer hors défilement.
 sur source26702dc : interface/coffre réels Server2022 x64 et Windows11 ARM64 avec
 binaire x64 émulé,12 tests prototype/service et parcours GUI temporaire. Sélecteurs
 natifs de fichiers/clic physique non pilotés. Prochaine tâche :WIN-04 SSH/SFTP.
-Lancement SSH/SFTP/RDP et MSI restent à intégrer et qualifier.
+SSH Windows (profils Apple inclus) raccordé à ConPTY et au coffre, en validation
+native ; configuration implicite et acceptation silencieuse d’hôte refusées.
+SFTP/RDP, Apple graphique et MSI restent à intégrer et qualifier.
 Windows11 x64 matériel, périphériques, DPI/IME et endurance restent non qualifiés.
 
 ## Campagne 15 contrôles / 10 améliorations — 2026-11-15
@@ -96,7 +98,7 @@ Les interfaces/protocoles Linux fonctionnels sont conservés.
 | 1 | WIN-01 : preuves GUI/terminal | P0 | GTK-FOCUS | PARTIAL | Sur Windows réel/VM dédiée : fenêtre GTK4 Rust empaquetable et prototype terminal ConPTY avec affichage ANSI/UTF-8, saisie, resize et arrêt propre, I/O hors GTK et tampons bornés. Choisir le rendu après ce PoC ; ConPTY ne fournit pas le widget graphique. |
 | 2 | WIN-02 : compilation et frontière OS | P0 | WIN-01 | PARTIAL | Build Windows natif reproductible et job CI ; isoler dépendances VTE/Linux, chemins /usr/bin, sockets Unix, pidfd, permissions/flock. Modèles et tests communs compilent sur Linux/Windows ; pas de cfg dispersés dans les protocoles. |
 | 3 | WIN-03 : stockage et secrets | P0 | WIN-02 | PARTIAL | Dossier de configuration Windows, fichiers atomiques/ACL privées/verrou interprocessus, coffre Windows Credential Manager ou backend keyring Windows validé. Conservation du chiffrement optionnel, export sans secrets, aucune clé/mot de passe dans argv ou logs. |
-| 4 | WIN-04 : SSH/SFTP natifs | P0 | WIN-03 | TODO | Terminal Windows via ConPTY et OpenSSH Windows ; routage/askpass/agent à adapter explicitement. SFTP libssh2 portable, chemins Windows/UNC/Unicode, transferts, collisions, édition, annulation, file persistante. known_hosts strict et refus des clés modifiées testés sur labo isolé. |
+| 4 | WIN-04 : SSH/SFTP natifs | P0 | WIN-03 | PARTIAL | Terminal Windows via ConPTY et OpenSSH Windows ; routage/askpass/agent à adapter explicitement. SFTP libssh2 portable, chemins Windows/UNC/Unicode, transferts, collisions, édition, annulation, file persistante. known_hosts strict et refus des clés modifiées testés sur labo isolé. |
 | 5 | WIN-05 : RDP Windows | P1 | WIN-03 | TODO | Client système mstsc via profils .rdp, domaine/NLA/certificat, taille/moniteurs, son et redirections opt-in. Prompt natif/coffre pour les secrets ; jamais de mot de passe en ligne de commande. Clipboard texte/fichiers/dossiers et déconnexion vérifiés en labo Windows autorisé. |
 | 6 | WIN-06 : ergonomie et outils | P1 | WIN-04, WIN-05 | TODO | Dossiers/profils/import-export, glisser-déposer, copier-coller, DPI125–200%, tests UI Automation Windows (AT-SPI reste Linux), multi-écrans et commandes ping/tracert adaptés ; résolution de noms Windows sans getent. Linux reste couvert par les tests. |
 | 7 | WIN-07 : paquet et qualification | P1 | WIN-06 | TODO | ZIP de test autonome puis MSI en priorité : runtime GTK/DLL, icônes, installation compte standard, mise à jour/désinstallation, GUID UpgradeCode stable et ProductCode/version corrects ; profils préservés. Profil utilisateur et secrets préservés à la mise à jour. |

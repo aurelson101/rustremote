@@ -9,10 +9,13 @@ mod live_ui;
 mod probe_output;
 mod profile_service;
 mod profile_ui;
+mod ssh_launch;
 mod terminal;
 mod terminal_keys;
 #[cfg(windows)]
 mod win_credentials;
+#[cfg(windows)]
+mod win_ssh;
 #[cfg(windows)]
 mod win_storage;
 
@@ -32,6 +35,10 @@ fn probe() -> Result<ProbeResult, String> {
     }
 }
 fn main() -> std::process::ExitCode {
+    #[cfg(windows)]
+    if std::env::var_os(win_ssh::PROFILE_ENV).is_some() {
+        return win_ssh::askpass();
+    }
     let args: Vec<String> = std::env::args().collect();
     if args.iter().any(|a| a == "--self-test") {
         return match probe() {
@@ -47,6 +54,23 @@ fn main() -> std::process::ExitCode {
     }
     if args.iter().any(|a| a == "--self-test-live") {
         return match live::self_test() {
+            Ok(report) => {
+                println!("{report}");
+                std::process::ExitCode::SUCCESS
+            }
+            Err(error) => {
+                eprintln!("{error}");
+                std::process::ExitCode::FAILURE
+            }
+        };
+    }
+    if args.iter().any(|a| a == "--self-test-ssh") {
+        #[cfg(windows)]
+        let result = win_ssh::self_test();
+        #[cfg(not(windows))]
+        let result: Result<String, String> =
+            Err("SSH native qualification requires Windows".into());
+        return match result {
             Ok(report) => {
                 println!("{report}");
                 std::process::ExitCode::SUCCESS
@@ -166,7 +190,7 @@ fn main() -> std::process::ExitCode {
         body.append(&run);
         let shell = gtk::ScrolledWindow::builder().hscrollbar_policy(gtk::PolicyType::Never).child(&body).build();
         let window = gtk::ApplicationWindow::builder().application(app).title("RustRemote Windows probe").default_width(760).default_height(600).child(&shell).build();
-        live_ui::attach(&body, &screen, &viewport, &status, &window, live_ui::SmokeOptions { enabled: smoke_live, capture: capture_ui, result: seen.clone() }, &run);
+        live_ui::attach(&body, &screen, &viewport, &status, &window, live_ui::Options { target: ssh_launch::Target::Local, auto_start:false, enabled: smoke_live, capture: capture_ui, result: seen.clone() }, &run);
         profile_ui::attach(&body, &window, &status);
         window.present();
         if smoke_profiles { profile_ui::smoke(&window, seen.clone(), capture_ui); }
