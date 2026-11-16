@@ -205,3 +205,22 @@ This qualifies SSH/SFTP loopback transport and GUI workflows, storage/vault,
 ConPTY, RDP private configuration and the options GUI. It does **not** qualify
 a native RDP session, RDP clipboard/devices, physical Windows 11 x64, or a real Mac.
 The earlier pending/failure notes above are historical, not the final result.
+
+### RDP profile password — DPAPI integration
+The launcher now reads the profile-bound password from Credential Manager,
+encodes UTF-16LE and applies current-user DPAPI before writing `password 51:b:`
+to the private temporary `.rdp`. It does not write/replace TERMSRV credentials.
+Without a stored password, Windows prompts. A missing reference or another
+account/domain/host/port fails closed. Policies may still require native input.
+No plaintext password is written to the launch file, argv, environment, exports
+or reports. The file is removed on normal controller close; a crash may leave
+a private encrypted file in the temporary directory.
+
+[run43859093575](https://github.com/aurelson101/rustremote/actions/runs/43859093575)
+passes on Server 2022 and Windows 11 ARM64/x64 emulation: Unicode/emoji password
+through the real vault, DPAPI decrypt/readback, tamper rejection, scope checks,
+plaintext absence, ACL and cleanup. This does not validate remote authentication.
+A subsequent test opens the protected file with `mstsc /edit`, checks only
+computer-name controls of its owned PID, skips password controls and logs no
+native window text. A loopback listener guards against unexpected connection
+attempts. Even that test qualifies file loading, not an RDP session.

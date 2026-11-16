@@ -163,11 +163,12 @@ runner, not mockups or screenshots of the complete Windows product.
 ![Native Server 2022 live ConPTY terminal](docs/screenshots/windows-server2022-terminal.png)
 
 The Windows prototype also has an experimental mstsc adapter and an RDP options
-dialog (display, domain, audio, printers and monitors). Windows requests the
-password; native session and clipboard qualification remain pending.
+dialog (display, domain, audio, printers and monitors). Profile passwords are
+read from Credential Manager and passed as current-user DPAPI ciphertext in a
+private temporary launch file; Windows policies may still request a prompt.
+Native session and clipboard qualification remain pending.
 
-Still required: final native SFTP/RDP validation, automatic RDP credential handling
-and graphical Apple/VNC integration, remaining application adapters, full UI workflows and
+Still required: RDP session/clipboard validation and graphical Apple/VNC integration, remaining application adapters, full UI workflows and
 installer/dependency-security tests.
 The distribution order remains **functional Windows MVP → tested MSI → WinGet →
 MSIX and signing**. See the [ordered roadmap](docs/ROADMAP.md).

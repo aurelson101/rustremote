@@ -541,3 +541,8 @@ WIN-05 incrément password : lecture du coffre et injection chiffrée DPAPI dans
 le fichier temporaire mstsc, sans écraser le coffre Windows TERMSRV. Tests
 natifs étendus en cours ; ne pas qualifier l’authentification mstsc par le seul
 roundtrip DPAPI. Domaine/compte/port restent liés au secret du profil.
+
+Password du profil viaDPAPI : run43859093575 SUCCESS sur les deux plateformes
+Windows (Win11ARM x64émulé). Encodage/chiffrement/coffre/scope/ACL/nettoyage
+validés. Chargement dans mstsc /edit en qualification séparée ; session RDP et
+presse-papiers restent non qualifiés, Apple/VNC et MSI non livrés.

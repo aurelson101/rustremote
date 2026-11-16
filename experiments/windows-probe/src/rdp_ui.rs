@@ -163,6 +163,15 @@ pub fn open(parent: &gtk::ApplicationWindow, profile: SessionProfile) -> Result<
     body.set_margin_bottom(16);
     body.set_margin_start(16);
     body.set_margin_end(16);
+    if let ProtocolOptions::Rdp { domain, .. } = &profile.options {
+        let destination = gtk::Label::new(Some(&format!(
+            "Target: {} / port {}\nAccount: {} · Domain: {}",
+            profile.host, profile.port, profile.username, domain
+        )));
+        destination.set_wrap(true);
+        destination.set_selectable(true);
+        body.append(&destination);
+    }
     let status = gtk::Label::new(Some(
         "A saved profile password is passed encrypted for your Windows account; otherwise Windows requests it. Close the native RDP window to disconnect. This controller never terminates other mstsc sessions.",
     ));

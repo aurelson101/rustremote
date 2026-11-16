@@ -188,7 +188,7 @@ expiration sont distinguées pour ne pas présenter un inventaire partiel comme 
 Le secret reste référencé dans le JSON et conservé dans Credential Manager.
 Pour le lancement, une copie UTF16 en mémoire effaçable est protégée par DPAPI
 current-user, puis seule la valeur chiffrée est écrite dans le fichier .rdp
-éphémère à ACL privée. Les entrées TERMSRV existantes ne sont pas modifiées.
+éphémère à ACL privée. RustRemote n’écrit ni ne remplace d’entrée TERMSRV.
 Le fichier est retiré à la fermeture normale du contrôleur ; un crash peut
 laisser le fichier chiffré privé. DPAPI ne constitue pas une séparation contre
 un autre processus du même utilisateur ou un administrateur. Aucun secret

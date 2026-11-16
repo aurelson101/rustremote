@@ -1406,3 +1406,14 @@ password51, contrôle Win32 limité au PID lancé et aux contrôles de nom d’h
 (non password), messages bornés ; aucun texte natif capturé/loggé. Garde socket
 127.0.0.1 refuse toute tentative de connexion pendant ce test. Processus possédé
 fermé par RAII. Valide le format/chargement natif, PAS l’authentification RDP.
+
+Preuve DPAPI password source106120e : run43859093575 SUCCESS Server2022 x64 +
+Win11 ARM64/x64 émulé ; tous scénarios coffre/protection/tamper/Unicode/scope/
+absenceplaintext/ACL/cleanup PASS, régressions SSH/SFTP/GUI PASS. Artefact
+Server2022 téléchargé dist/windows-probe-validation/43859093575/windows-2022/.
+Run43859823574 source83ec74e en attente pour mstsc /edit natif, garde127.0.0.1,
+validation champordinateur parmessagesWin32 bornés (pas de clavier simulé/secret
+saisi/texte loggé). Le contrôleur affiche désormais hôte/port/compte/domaine
+avant Launch. Root63tests/2ignored et prototype23tests/1ignored PASS,
+fmt/check/clippy PASS côtéLinux. Ne pas annoncer une session RDP/authentification
+réussie tant que seul le fichier et son éditeur sont testés.
