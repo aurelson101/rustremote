@@ -1480,3 +1480,34 @@ password51 fonctionne : codec/éditeur seuls étaient validés. Ajout diagnostic
 UIA en lecture seule sur les seuls enfants mstsc du client laboratoire : flags
 fenêtre/connect/password/error, pas de valeur éditable ni texte publié ; lecture
 numérique de DisablePasswordSaving, sans modifier de politique.
+
+Reprise : run43874095141 (c2503ee) FAIL avantTCP ; native_ui owned_client_count1,
+ui_flags1, DisablePasswordSaving null. run43874979151 (496f066) reproduit : aucune
+Static native, Button id0 uniquement. Aucun diagnostic ne prouve encore la cause ;
+ne pas annoncer le passwordRDP fonctionnel. SyntaxWarning échappementPS corrigé
+par rawstring. Extension diagnostic aux seuls popups liés aux fenêtres mstsc
+possédées (GetLastActivePopup), aucun clic/texte/valeur de credential publié.
+Timeout actor : kill+communicate sur le seul processus créé avant unwind, évite
+Popen.__exit__ bloquant et permet finally de retirer le Root fixture.
+Workflow : étape NLA continue-on-error avec id, puis garde finale always/outcome
+failure =>exit1 ; SSH/SFTP/GUI restent exécutables sans masquer le défautRDP.
+Python -Werror py_compile et diff --check PASS ; fixture TLS/CredSSP locale PASS
+après ces changements (compte/password égalité, pas de certstore modifié).
+Sourcecc974eb/run43875877350 Server2022 lancé pour qualifier cette garde et les
+diagnostics. README/prototype/ROADMAP précisent l’échec connu. Aucun MSI/release.
+
+Résultat43875877350/cc974eb : garde finale FAIL comme attendu (NLA timeout avant
+TCP, mêmes flags ; suivi popup n’identifie aucun dialogue supplémentaire).
+Toutes les autres étapes natives PASS : build/tests, stockage/coffre, RDP config
++mstsc /edit, ConPTY, SSH password/clé chiffrée/refus mauvaispassword/host inconnu
+ou changé, SFTPCLI transferts/édition atomique/permissions, SFTPGUI navigation/
+transfert/édition/delete, GTK startup/terminal/profils. Ne pas confondre conclusion
+success de l’étape continue-on-error avec son outcome failure : garde finale
+teste bien outcome et rend le workflow rouge. Root fixture nettoyé sans erreur.
+Rapport local dist/windows-probe-validation/43875877350/windows-2022 ; logs
+/tmp/rustremote-rdp-nla-eighth.log. Pas de rejouage Win11ARM de cette branche
+en échec ; précédentes preuves restent listées plus haut.
+Prochaine tâche WIN-05 : identifier pourquoi mstsc reste avant TCP (contexte
+interactif/broker ou méthode d’auth native à établir), puis obtenir une vraie
+preuve CredSSP avant qualification bureau/clipboard et MSI. Aucune cause non
+observée déclarée corrigée, aucune politique Windows ni entrée TERMSRV modifiée.

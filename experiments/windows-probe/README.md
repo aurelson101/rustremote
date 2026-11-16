@@ -224,3 +224,13 @@ A subsequent test opens the protected file with `mstsc /edit`, checks only
 computer-name controls of its owned PID, skips password controls and logs no
 native window text. A loopback listener guards against unexpected connection
 attempts. Even that test qualifies file loading, not an RDP session.
+
+The subsequent native TLS/CredSSP loopback test currently fails before TCP
+connection on Server 2022. A stored profile password must **not** be advertised
+as working native automatic authentication yet. Diagnostics inspect only owned
+client windows and publish fixed flags/categories, never field values or text.
+The Python peer authenticates its generated fake account successfully in the
+local positive control. Its CA is installed only on a disposable Windows CI
+runner, then removed by exact fingerprint; no RDP warnings are accepted.
+The workflow continues other protocol checks after this failure and fails a
+final RDP gate, so a green job cannot conceal failed native authentication.

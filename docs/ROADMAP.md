@@ -551,3 +551,17 @@ mstsc /edit : PASS Server2022 et Win11ARM/x64émulé, sources/runs dansMEMORY.
 Labo CredSSP/TLS natif en préparation : simulation sur127.0.0.1 et compte fictif,
 certificat de test temporaire uniquement sur CI éphémère, sans bureau Windows
 ni compte système. Fixture Python locale PASS ; authentification native en attente.
+
+WIN-05 toujours PARTIAL : runs43874095141 et43874979151 échouent avant tout TCP
+RDP surServer2022. DisablePasswordSaving absent ; fenêtre client présente mais
+dialogue bloquant non identifié. Codec DPAPI et éditeur ne prouvent pas le login.
+Diagnostic sans valeurs/champs secrets, popup uniquement si lié à une fenêtre
+mstsc possédée. Watchdog du processus labo borné pour laisser nettoyer le certificat.
+CI continue désormais SSH/SFTP/GUI après échec NLA, puis garde finale en échec :
+ne pas publier de MSI qualifié sur la seule réussite des autres protocoles.
+
+Run43875877350/cc974eb Server2022 : SSH/SFTP CLI+GUI, coffre, ConPTY et profils
+PASS ; NLA natif toujours FAIL avant TCP. Garde finale vérifiée en échec malgré
+la poursuite des autres étapes. Prochain incrément : identifier le blocage natif
+avant connexion, puis valider CredSSP et bureau/clipboard avant MSI. Aucun nouveau
+tag/release ; qualification Win11ARM de ces changements reste à effectuer.

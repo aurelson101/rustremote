@@ -166,7 +166,10 @@ The Windows prototype also has an experimental mstsc adapter and an RDP options
 dialog (display, domain, audio, printers and monitors). Profile passwords are
 read from Credential Manager and passed as current-user DPAPI ciphertext in a
 private temporary launch file; Windows policies may still request a prompt.
-Native session and clipboard qualification remain pending.
+Automatic authentication is **not yet qualified**: the Server 2022 loopback
+CredSSP test currently stalls before any TCP connection. DPAPI readback and
+`mstsc /edit` tests validate storage and file loading only. Native sessions and
+clipboard qualification remain pending.
 
 Still required: RDP session/clipboard validation and graphical Apple/VNC integration, remaining application adapters, full UI workflows and
 installer/dependency-security tests.
