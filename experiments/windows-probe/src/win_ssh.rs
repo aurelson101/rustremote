@@ -241,7 +241,16 @@ pub fn self_test() -> Result<String, String> {
                 if input.expect_reject && snapshot.status == "SSH terminal exited (255)" {
                     return Ok("WINDOWS_SSH_REJECT_OK: unauthenticated or host-trust failure closed the session".into());
                 }
-                return Err(format!("SSH lab stopped: {}", snapshot.status));
+                let compact: String = text
+                    .chars()
+                    .filter(|c| !c.is_whitespace() && !c.is_control())
+                    .collect();
+                let sanitized = compact.replace(&input.secret, "[REDACTED]");
+                return Err(format!(
+                    "SSH lab stopped: {}; diagnostic={}",
+                    snapshot.status,
+                    sanitized.chars().take(1800).collect::<String>()
+                ));
             }
         }
         std::thread::sleep(std::time::Duration::from_millis(25));
