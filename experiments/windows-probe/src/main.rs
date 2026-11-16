@@ -16,6 +16,8 @@ mod sftp;
 mod sftp_lab;
 #[path = "../../../src/sftp_platform.rs"]
 mod sftp_platform;
+#[path = "../../../src/sftp_replace.rs"]
+mod sftp_replace;
 mod profiles {
     pub use rustremote_core::profiles::*;
 }

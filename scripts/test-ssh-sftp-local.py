@@ -3,6 +3,7 @@
 Prérequis de test : python3-paramiko, openssh-client. Ne teste pas un moteur Rust.
 """
 import errno
+import importlib.util
 import json
 import logging
 import os
@@ -16,6 +17,9 @@ import sys
 import secrets
 
 import paramiko
+_spec = importlib.util.spec_from_file_location("sftp_lab_server", Path(__file__).with_name("sftp-lab-server.py"))
+_sftp_protocol = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(_sftp_protocol)
 
 os.umask(0o077)
 # Ne pas conserver de trames ni de clés : uniquement des compteurs d'événements.
@@ -222,7 +226,15 @@ with tempfile.TemporaryDirectory(prefix="rustremote-ssh-") as directory:
 
         def rename(self, old, new):
             try:
+                if self.path(new).exists(): return paramiko.SFTP_FAILURE
                 self.path(old).rename(self.path(new))
+                return paramiko.SFTP_OK
+            except OSError as error:
+                return paramiko.SFTPServer.convert_errno(error.errno)
+
+        def posix_rename(self, old, new):
+            try:
+                self.path(old).replace(self.path(new))
                 return paramiko.SFTP_OK
             except OSError as error:
                 return paramiko.SFTPServer.convert_errno(error.errno)
@@ -250,7 +262,6 @@ with tempfile.TemporaryDirectory(prefix="rustremote-ssh-") as directory:
             except OSError as error:
                 return paramiko.SFTPServer.convert_errno(error.errno)
 
-        posix_rename = rename
 
     listener = socket.socket()
     listener.bind(("127.0.0.1", 0))
@@ -313,7 +324,7 @@ with tempfile.TemporaryDirectory(prefix="rustremote-ssh-") as directory:
             transport = paramiko.Transport(connection)
             transports.append(transport)
             transport.add_server_key(host)
-            transport.set_subsystem_handler("sftp", paramiko.SFTPServer, Files)
+            transport.set_subsystem_handler("sftp", _sftp_protocol.ProtocolServer, Files)
             try:
                 handler=Server();handler.transport=transport
                 transport.start_server(server=handler)

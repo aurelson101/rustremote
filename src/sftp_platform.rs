@@ -121,6 +121,16 @@ pub fn validate_local(path: &Path) -> io::Result<()> {
         return Err(io::Error::other("Absolute local path required"));
     }
     for component in path.components() {
+        if let Component::Prefix(prefix) = component
+            && !matches!(
+                prefix.kind(),
+                std::path::Prefix::Disk(_) | std::path::Prefix::UNC(_, _)
+            )
+        {
+            return Err(io::Error::other(
+                "Windows device namespace paths are refused",
+            ));
+        }
         if let Component::Normal(value) = component {
             let value = value
                 .to_str()

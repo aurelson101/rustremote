@@ -359,7 +359,7 @@ impl Connection {
             Ok(())
         })();
         if let Err(message) = keys
-            && password.is_none()
+            && (cfg!(windows) || password.is_none())
         {
             return Err(message);
         }
@@ -572,13 +572,13 @@ impl Connection {
                     let _ = self.sftp.unlink(&temporary);
                     return Err(error(e));
                 }
-                if let Err(e) = self.sftp.rename(
-                    &temporary,
-                    &path,
-                    Some(RenameFlags::ATOMIC | RenameFlags::OVERWRITE),
-                ) {
+                if let Err(e) =
+                    crate::sftp_replace::replace(&self._session, &temporary, &path, || {
+                        budget.check()
+                    })
+                {
                     let _ = self.sftp.unlink(&temporary);
-                    return Err(error(e));
+                    return Err(e);
                 }
                 Ok(Output::Text { path, bytes: text })
             }

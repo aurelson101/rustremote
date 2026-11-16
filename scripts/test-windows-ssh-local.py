@@ -91,7 +91,7 @@ class Server:
             handler = Session(self.case)
             handler.case = self.case
             if self.sftp_root is not None:
-                transport.set_subsystem_handler("sftp", paramiko.SFTPServer, _files.Files, root=self.sftp_root)
+                transport.set_subsystem_handler("sftp", _files.ProtocolServer, _files.Files, root=self.sftp_root)
             try:
                 transport.start_server(server=handler)
                 channel = transport.accept(12)

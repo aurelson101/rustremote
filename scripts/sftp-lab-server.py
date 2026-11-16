@@ -155,3 +155,17 @@ class Handle(paramiko.SFTPHandle):
 
     def chattr(self, attr):
         return self.files.chattr("/" + self.path.relative_to(self.files.root).as_posix(), attr)
+
+
+class ProtocolServer(paramiko.SFTPServer):
+    """Advertise exactly the POSIX extension implemented by this lab."""
+    def _send_server_version(self):
+        kind, data = self._read_packet()
+        if kind != 1 or len(data) != 4:
+            raise paramiko.SSHException("Invalid SFTP lab INIT")
+        message = paramiko.Message()
+        message.add_int(3)
+        message.add_string("posix-rename@openssh.com")
+        message.add_string("1")
+        self._send_packet(2, message)
+        return int.from_bytes(data, "big")
