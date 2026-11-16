@@ -389,6 +389,12 @@ fn build(
         p.fill(None);
         p.tabs.set_current_page(Some(1));
     });
+    action("New Apple SSH", &bar, &panel, |p| {
+        p.fill(None);
+        p.name.set_text("Apple SSH");
+        p.platform.set_selected(3);
+        p.tabs.set_current_page(Some(1));
+    });
     let connect = action("Connect selected", &bar, &panel, |p| {
         let Some(row) = p.list.selected_row() else {
             p.status.set_text("Select a connection first");
@@ -820,8 +826,7 @@ pub fn smoke(parent: &gtk::ApplicationWindow, result: Rc<Cell<bool>>, capture: b
                             if !panel.data.borrow().folders.contains(&"Linux/Lab".into()) {
                                 return Err(panel.status.text().into());
                             }
-                            panel.fill(None);
-                            panel.tabs.set_current_page(Some(1));
+                            click(&window, "New Apple SSH")?;
                             panel.name.set_text("SSH lab");
                             panel.host.set_text("127.0.0.1");
                             panel.user.set_text("lab");
@@ -840,8 +845,15 @@ pub fn smoke(parent: &gtk::ApplicationWindow, result: Rc<Cell<bool>>, capture: b
                                 .profiles
                                 .first()
                                 .and_then(|p| p.credential_ref.clone());
-                            if reference.is_none() {
-                                return Err(panel.status.text().into());
+                            if reference.is_none()
+                                || panel
+                                    .data
+                                    .borrow()
+                                    .profiles
+                                    .first()
+                                    .is_none_or(|p| p.platform != Platform::MacOs)
+                            {
+                                return Err("Apple preset or credential persistence failed".into());
                             }
                             panel.name.set_text("SSH renamed");
                             panel.favorite.set_active(true);
