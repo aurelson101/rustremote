@@ -1,6 +1,12 @@
 name: Windows feasibility probe
 on:
   workflow_dispatch:
+    inputs:
+      target:
+        description: Native qualification target (both for final validation)
+        type: choice
+        default: both
+        options: [both, windows-2022, windows-11-arm]
 permissions:
   contents: read
 concurrency:
@@ -11,7 +17,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        runner: [windows-2022, windows-11-arm]
+        runner: ${{ fromJSON(inputs.target == 'windows-2022' && '["windows-2022"]' || inputs.target == 'windows-11-arm' && '["windows-11-arm"]' || '["windows-2022","windows-11-arm"]') }}
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 25
     defaults:
