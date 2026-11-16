@@ -726,7 +726,7 @@ pub fn laboratory() -> Result<bool, String> {
         let secret=if cfg!(windows){None}else{Some(secret.clone())};
         let (window,browser)=match build(&parent,profile.clone(),secret) {Ok(value)=>value,Err(error)=>{eprintln!("{error}");app.quit();return;}};
         let temporary=temporary.clone();let mut phase=0;let started=std::time::Instant::now();
-        let app=app.clone();let passed=seen.clone();let mut ticks=0;
+        let app=app.clone();let passed=seen.clone();let mut ticks=0;let mut capture_frame=-1;
         gtk::glib::timeout_add_local(Duration::from_millis(50),move || {
             ticks+=1;
             if started.elapsed()>Duration::from_secs(45) {
