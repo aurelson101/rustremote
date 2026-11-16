@@ -307,7 +307,7 @@ def verify_fixture(peer, root, password):
 
 
 def native_window_flags(parent, root):
-    script="""$ErrorActionPreference='Stop'
+    script=r"""$ErrorActionPreference='Stop'
 Add-Type -AssemblyName UIAutomationClient
 $children=@(Get-CimInstance Win32_Process -Filter ("ParentProcessId="+$env:RUSTREMOTE_NLA_PARENT+" AND Name='mstsc.exe'"))
 $flags=0
@@ -326,9 +326,38 @@ if($control.Current.Name -match 'invalid|corrupt|connection file'){$flags=$flags
 }}
 }
 $policy=(Get-ItemProperty -LiteralPath 'HKLM:\SOFTWARE\Policies\Microsoft\Windows NT\Terminal Services' -Name DisablePasswordSaving -ErrorAction SilentlyContinue).DisablePasswordSaving
-@{owned_client_count=$children.Count;ui_flags=$flags;disable_password_saving=$policy}|ConvertTo-Json -Compress
+@{owned_client_count=$children.Count;ui_flags=$flags;disable_password_saving=$policy;pids=@($children|ForEach-Object{$_.ProcessId})}|ConvertTo-Json -Compress
 """
-    return json.loads(powershell(script,root,extra={"RUSTREMOTE_NLA_PARENT":str(parent)}))
+    result=json.loads(powershell(script,root,extra={"RUSTREMOTE_NLA_PARENT":str(parent)}))
+    pids=set(result.pop("pids"))
+    # UIA can omit legacy mstsc dialogs. Inspect only Static labels in owned windows,
+    # publishing fixed categories and numeric button IDs, never their text/values.
+    import ctypes
+    from ctypes import wintypes
+    user=ctypes.WinDLL("user32",use_last_error=True)
+    callback=ctypes.WINFUNCTYPE(wintypes.BOOL,wintypes.HWND,wintypes.LPARAM)
+    user.SendMessageTimeoutW.argtypes=[wintypes.HWND,wintypes.UINT,ctypes.c_size_t,ctypes.c_ssize_t,wintypes.UINT,wintypes.UINT,ctypes.POINTER(ctypes.c_size_t)]
+    categories=set();buttons=set();classes=set()
+    words=("publisher","trust","credential","password","connect","error","invalid","identify","identity","security","certificate","remote","desktop","session","license","policy","authentication","version","computer","blocked")
+    @callback
+    def top(window,unused):
+        pid=wintypes.DWORD();user.GetWindowThreadProcessId(window,ctypes.byref(pid))
+        if pid.value not in pids:return True
+        @callback
+        def child(control,unused):
+            name=ctypes.create_unicode_buffer(128);user.GetClassNameW(control,name,len(name))
+            if name.value not in ("Static","Button"):return True
+            classes.add(name.value)
+            if name.value=="Button":buttons.add(user.GetDlgCtrlID(control));return True
+            text=ctypes.create_unicode_buffer(4096);length=ctypes.c_size_t()
+            user.SendMessageTimeoutW(control,0x000D,len(text),ctypes.cast(text,ctypes.c_void_p).value,3,50,ctypes.byref(length))
+            categories.update(word for word in words if word in text.value.lower())
+            return True
+        user.EnumChildWindows(window,child,0)
+        return True
+    user.EnumWindows(top,0)
+    result.update(static_categories=sorted(categories),button_ids=sorted(buttons),control_classes=sorted(classes))
+    return result
 
 
 def main():
