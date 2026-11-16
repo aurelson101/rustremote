@@ -1331,3 +1331,14 @@ désactive les contrôles et réveille le worker au repos ; elle ne peut plus ê
 réinitialisée par une nouvelle action. Quota global16workers, y compris connexions
 en cours de fermeture/résolution DNS, libéré par RAII ; aucune attente join GTK.
 Snapshot attend désormais une frame peinte (même méthode que profile_ui).
+
+Reprise finale : source194dc84 poussée ; qualification finale demandée sur les
+deux runners : https://github.com/aurelson101/rustremote/actions/runs/43851363955
+État vérifié : queued, aucun job alloué. Ne pas annoncer le résultat futur.
+Le runcf0ce0d43850695265 était également queued ; tentative d’annulation renvoie
+« completed » mais lectures API restent queued (état distant incohérent).
+Prototype GUI Linux source194dc84 PASS après stop définitif/quota16workers et
+capture d’une frame, log/tmp/rustremote-windows-sftp-gui-linux.log.
+Avant MSI : attendre/inspecter43851363955, télécharger artefacts et confirmer
+SFTP GUI fatal-warnings +captures ; Server2022 transport seul déjà prouvé, puis
+implémenter mstsc, Apple/VNC et intégrer le produit. Aucun commit de release/tag.
