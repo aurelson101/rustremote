@@ -30,6 +30,53 @@ jobs:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
           persist-credentials: false
+      - name: Prepare pinned official OpenSSH client for loopback qualification
+        shell: pwsh
+        run: |
+          $archive = Join-Path $env:RUNNER_TEMP 'rustremote-openssh.zip'
+          Invoke-WebRequest -Uri 'https://github.com/PowerShell/Win32-OpenSSH/releases/download/10.4.0.0p1-Preview/OpenSSH-Win64.zip' -OutFile $archive
+          if ((Get-FileHash $archive -Algorithm SHA256).Hash.ToLowerInvariant() -ne 'b67ff8becd203502190ec42ac7787c24c2cd3325ed7700485fe7a1c83d2a7957') { throw 'OpenSSH SHA256 mismatch' }
+          $extract = Join-Path $env:RUNNER_TEMP 'rustremote-openssh-runtime'
+          Expand-Archive -Path $archive -DestinationPath $extract
+          $runtime = 'experiments/windows-probe/target/debug/OpenSSH'
+          New-Item -ItemType Directory -Force $runtime | Out-Null
+          Copy-Item (Join-Path $extract 'OpenSSH-Win64/*') $runtime -Recurse
+          'OpenSSH 10.4.0.0p1-Preview; SHA256 b67ff8becd203502190ec42ac7787c24c2cd3325ed7700485fe7a1c83d2a7957; official PowerShell/Win32-OpenSSH; CI only, no binary redistribution' | Set-Content dist/windows-probe/openssh-source.txt
+      - name: OpenSSH native startup environment preflight
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist/windows-probe | Out-Null
+          $client = [IO.Path]::GetFullPath('experiments/windows-probe/target/debug/OpenSSH/ssh.exe')
+          $base = @('PATH','PATHEXT','TEMP','TMP','USERPROFILE','LOCALAPPDATA','APPDATA','COMSPEC','SYSTEMROOT','WINDIR')
+          $reports = @()
+          foreach ($mode in @('full','minimal','programdata','username','windows-base')) {
+            $info = [Diagnostics.ProcessStartInfo]::new($client)
+            $info.UseShellExecute = $false
+            $info.CreateNoWindow = $true
+            $info.RedirectStandardOutput = $true
+            $info.RedirectStandardError = $true
+            $info.RedirectStandardInput = $true
+            $info.ArgumentList.Add('-V')
+            if ($mode -ne 'full') {
+              $names = $base
+              if ($mode -eq 'programdata') { $names += @('PROGRAMDATA','ALLUSERSPROFILE') }
+              if ($mode -eq 'username') { $names += @('USERNAME','USERDOMAIN') }
+              if ($mode -eq 'windows-base') { $names += @('PROGRAMDATA','ALLUSERSPROFILE','USERNAME','USERDOMAIN','HOMEDRIVE','HOMEPATH','OS','PROCESSOR_ARCHITECTURE') }
+              $info.Environment.Clear()
+              foreach ($name in $names) { $value = [Environment]::GetEnvironmentVariable($name); if ($null -ne $value) { $info.Environment[$name] = $value } }
+            }
+            $process = [Diagnostics.Process]::Start($info)
+            $process.StandardInput.Close()
+            if (-not $process.WaitForExit(5000)) { $process.Kill(); $process.WaitForExit(); throw 'OpenSSH version preflight timed out' }
+            $reports += @{ mode = $mode; exit = $process.ExitCode; stdout = $process.StandardOutput.ReadToEnd(); stderr = $process.StandardError.ReadToEnd() }
+            $process.Dispose()
+          }
+          $reports | ConvertTo-Json | Set-Content dist/windows-probe/client-startup.json
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: client-startup-${{ matrix.runner }}
+          path: dist/windows-probe/client-startup.json
+          retention-days: 7
       - uses: msys2/setup-msys2@ec48f7c5447b3140e2b088413ae3a55687bccb6e
         with:
           msystem: UCRT64
@@ -56,18 +103,6 @@ jobs:
           cargo test --locked -p rustremote-core --no-default-features | tee dist/windows-probe/core-tests.txt
       - name: Build native Windows probe
         run: cargo build --locked --manifest-path experiments/windows-probe/Cargo.toml
-      - name: Prepare pinned official OpenSSH client for loopback qualification
-        shell: pwsh
-        run: |
-          $archive = Join-Path $env:RUNNER_TEMP 'rustremote-openssh.zip'
-          Invoke-WebRequest -Uri 'https://github.com/PowerShell/Win32-OpenSSH/releases/download/10.4.0.0p1-Preview/OpenSSH-Win64.zip' -OutFile $archive
-          if ((Get-FileHash $archive -Algorithm SHA256).Hash.ToLowerInvariant() -ne 'b67ff8becd203502190ec42ac7787c24c2cd3325ed7700485fe7a1c83d2a7957') { throw 'OpenSSH SHA256 mismatch' }
-          $extract = Join-Path $env:RUNNER_TEMP 'rustremote-openssh-runtime'
-          Expand-Archive -Path $archive -DestinationPath $extract
-          $runtime = 'experiments/windows-probe/target/debug/OpenSSH'
-          New-Item -ItemType Directory -Force $runtime | Out-Null
-          Copy-Item (Join-Path $extract 'OpenSSH-Win64/*') $runtime -Recurse
-          'OpenSSH 10.4.0.0p1-Preview; SHA256 b67ff8becd203502190ec42ac7787c24c2cd3325ed7700485fe7a1c83d2a7957; official PowerShell/Win32-OpenSSH; CI only, no binary redistribution' | Set-Content dist/windows-probe/openssh-source.txt
       - name: ANSI screen and output validation tests
         run: |
           set -o pipefail
