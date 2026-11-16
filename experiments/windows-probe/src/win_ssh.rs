@@ -45,6 +45,8 @@ pub fn environment(profile: Option<&SessionProfile>) -> Result<Vec<u16>, String>
         "USERPROFILE",
         "LOCALAPPDATA",
         "APPDATA",
+        "PROGRAMDATA",
+        "ALLUSERSPROFILE",
         "COMSPEC",
     ] {
         if let Some(value) = std::env::var_os(name) {

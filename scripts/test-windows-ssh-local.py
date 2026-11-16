@@ -181,7 +181,7 @@ def main():
                     if result.returncode or ("WINDOWS_SSH_REJECT_OK" if reject else "WINDOWS_SSH_OK") not in result.stdout:
                         # No secret enters this fixed BatchMode preflight. It diagnoses before authentication.
                         client = probe.parent / "OpenSSH" / "ssh.exe"
-                        keep = ("PATH", "PATHEXT", "TEMP", "TMP", "USERPROFILE", "LOCALAPPDATA", "APPDATA", "COMSPEC", "SYSTEMROOT", "WINDIR")
+                        keep = ("PATH", "PATHEXT", "TEMP", "TMP", "USERPROFILE", "LOCALAPPDATA", "APPDATA", "COMSPEC", "SYSTEMROOT", "WINDIR", "PROGRAMDATA", "ALLUSERSPROFILE")
                         environment = {key: value for key, value in os.environ.items() if key.upper() in keep}
                         command = [str(client), "-vv", "-F", "none", "-oBatchMode=yes", "-oIdentityFile=none", "-oIdentityAgent=none",
                                    "-oStrictHostKeyChecking=yes", "-oConnectTimeout=5", '-oUserKnownHostsFile="' + str(trust_path).replace(chr(92), "/") + '"',

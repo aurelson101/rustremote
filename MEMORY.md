@@ -1224,3 +1224,10 @@ Rejeu GUI SSH/SFTP complet PASS, success/services_stopped true dans
 Windows SSH toujours en debug : client natif quitte255 sans sortie ; préflight
 BatchMode lui aussi silencieux avec environnement minimal. Ne pas annoncer corrigé.
 Prochaine tâche : identifier l’initialisation native OpenSSH puis finaliser WIN-04.
+
+WIN-04 cause de démarrage trouvée : préflight43817036780 client-startup.json
+(binaire officiel10.4, avant MSYS2). -V : environnement complet exit0 ; minimal
+exit255 sans stdout/stderr ; ajout PROGRAMDATA+ALLUSERSPROFILE exit0 ; ajout des
+seuls USERNAME/USERDOMAIN reste255. Restauration de ces2variables infrastructure
+non secrètes dans le lanceur. Pas de suppression de STARTF_USESTDHANDLES, ni de
+modification du contrôle known_hosts pour masquer l’échec. Labo natif à rejouer.
