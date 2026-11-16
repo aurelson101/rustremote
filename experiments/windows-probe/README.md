@@ -178,3 +178,22 @@ runtime libraries are not redistributed. Review/update their security advisories
 and package licenses before any MSI build. Defaults remain16MiB/128entries/8levels/
 30seconds; Windows queue persistence, resumable GUI controls, drag-and-drop,
 configurable limits and physical/DPI/IME/UNC qualification remain future work.
+
+## Experimental mstsc adapter
+
+`Connect selected` accepts RDP profiles; `RDP options…` edits fixed/automatic/scaled
+resolution, fullscreen/monitors, audio, microphone, printers and clipboard.
+The worker writes a private UTF-16 `.rdp` and invokes only the Windows system
+client, without a shell. Windows prompts for credentials; automatic reuse of the
+profile's stored RDP password is not implemented. Certificate failures refuse
+connection; unsupported SHA256 pins are refused. Clipboard is opt-in for both
+text and files, because this adapter cannot enforce text-only transfer. General
+drive/USB/serial redirection remains off. Actual file/folder clipboard transfer
+and device behavior are **not yet qualified**.
+
+The controller retains its private file until closed. Close the native RDP client
+to disconnect; mstsc may hand off to another instance, which RustRemote will not
+terminate. `--self-test-rdp` checks system-client presence, configuration ACL/UTF16
+and cleanup without launching a connection. The options GUI persistence and two
+configuration tests pass locally; native Windows CI/session validation is pending.
+Properties follow [Microsoft's reference](https://learn.microsoft.com/en-us/azure/virtual-desktop/rdp-properties).

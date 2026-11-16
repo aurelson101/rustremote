@@ -9,6 +9,8 @@ mod live_ui;
 mod probe_output;
 mod profile_service;
 mod profile_ui;
+mod rdp;
+mod rdp_ui;
 #[allow(dead_code)]
 #[path = "../../../src/sftp.rs"]
 mod sftp;
@@ -106,6 +108,23 @@ fn main() -> std::process::ExitCode {
         #[cfg(not(windows))]
         let result: Result<String, String> =
             Err("SSH native qualification requires Windows".into());
+        return match result {
+            Ok(report) => {
+                println!("{report}");
+                std::process::ExitCode::SUCCESS
+            }
+            Err(error) => {
+                eprintln!("{error}");
+                std::process::ExitCode::FAILURE
+            }
+        };
+    }
+    if args.iter().any(|a| a == "--self-test-rdp") {
+        #[cfg(windows)]
+        let result = rdp::self_test();
+        #[cfg(not(windows))]
+        let result: Result<String, String> =
+            Err("Native RDP configuration test requires Windows".into());
         return match result {
             Ok(report) => {
                 println!("{report}");

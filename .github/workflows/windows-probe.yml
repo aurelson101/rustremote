@@ -116,6 +116,10 @@ jobs:
         run: |
           set -o pipefail
           experiments/windows-probe/target/debug/rustremote-windows-probe.exe --self-test-storage | tee dist/windows-probe/storage.txt
+      - name: RDP private configuration qualification (no network)
+        run: |
+          set -o pipefail
+          experiments/windows-probe/target/debug/rustremote-windows-probe.exe --self-test-rdp | tee dist/windows-probe/rdp-config.txt
       - name: Local ConPTY input-output and resize
         run: |
           set -o pipefail

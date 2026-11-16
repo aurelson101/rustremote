@@ -103,7 +103,7 @@ Les interfaces/protocoles Linux fonctionnels sont conservés.
 | 2 | WIN-02 : compilation et frontière OS | P0 | WIN-01 | PARTIAL | Build Windows natif reproductible et job CI ; isoler dépendances VTE/Linux, chemins /usr/bin, sockets Unix, pidfd, permissions/flock. Modèles et tests communs compilent sur Linux/Windows ; pas de cfg dispersés dans les protocoles. |
 | 3 | WIN-03 : stockage et secrets | P0 | WIN-02 | PARTIAL | Dossier de configuration Windows, fichiers atomiques/ACL privées/verrou interprocessus, coffre Windows Credential Manager ou backend keyring Windows validé. Conservation du chiffrement optionnel, export sans secrets, aucune clé/mot de passe dans argv ou logs. |
 | 4 | WIN-04 : SSH/SFTP natifs | P0 | WIN-03 | PARTIAL | Terminal Windows via ConPTY et OpenSSH Windows ; routage/askpass/agent à adapter explicitement. SFTP libssh2 portable, chemins Windows/UNC/Unicode, transferts, collisions, édition, annulation, file persistante. known_hosts strict et refus des clés modifiées testés sur labo isolé. |
-| 5 | WIN-05 : RDP Windows | P1 | WIN-03 | TODO | Client système mstsc via profils .rdp, domaine/NLA/certificat, taille/moniteurs, son et redirections opt-in. Prompt natif/coffre pour les secrets ; jamais de mot de passe en ligne de commande. Clipboard texte/fichiers/dossiers et déconnexion vérifiés en labo Windows autorisé. |
+| 5 | WIN-05 : RDP Windows | P1 | WIN-03 | PARTIAL | Client système mstsc via profils .rdp, domaine/NLA/certificat, taille/moniteurs, son et redirections opt-in. Prompt natif/coffre pour les secrets ; jamais de mot de passe en ligne de commande. Clipboard texte/fichiers/dossiers et déconnexion vérifiés en labo Windows autorisé. |
 | 6 | WIN-06 : ergonomie et outils | P1 | WIN-04, WIN-05 | TODO | Dossiers/profils/import-export, glisser-déposer, copier-coller, DPI125–200%, tests UI Automation Windows (AT-SPI reste Linux), multi-écrans et commandes ping/tracert adaptés ; résolution de noms Windows sans getent. Linux reste couvert par les tests. |
 | 7 | WIN-07 : paquet et qualification | P1 | WIN-06 | TODO | ZIP de test autonome puis MSI en priorité : runtime GTK/DLL, icônes, installation compte standard, mise à jour/désinstallation, GUID UpgradeCode stable et ProductCode/version corrects ; profils préservés. Profil utilisateur et secrets préservés à la mise à jour. |
 | 8 | WIN-08 : distribution/signature | P1 | WIN-07 | TODO | Après MSI validé : manifeste WinGet avec URL immuable/SHA256 du MSI réel, installation silencieuse et désinstallation testées ; aucune soumission de manifeste fictif. MSIX/Store et signature viennent ensuite. SignPath soumis à admission et provenance CI/approbation manuelle/MFA. Aucun certificat ni compte fictif, aucune garantie d'absence de faux positifs. |
@@ -518,3 +518,15 @@ explicitement négociée ; simulateur standard renforcé et tests Linux réseau/
 PASS. Navigateur Windows implémenté ; parcours réseau GUI termine sans critical
 IME après focus-out explicite. Capture de frame encore en validation, qualification
 Windows11 ARM à rejouer ; état PARTIAL, pas de MSI. Références dans MEMORY.md.
+
+## WIN-05 — adaptateur mstsc et options — PARTIAL
+Prototype : fichier .rdp UTF16 privé, client système sans shell, domaine,
+résolution fixe/auto/scaling, audio/micro/imprimantes/moniteurs configurables et
+sauvegardés. Authentification certificat stricte ; pins non pris en charge refusés.
+Clipboard mstsc nécessite opt-in texte+fichiers, aucune conversion silencieuse
+du profil texte seul. Pas de redirection générale des lecteurs. Mot de passe
+demandé par Windows : réutilisation automatique du secret du profil non intégrée.
+Deux tests et parcours GUI des options (persist/export/import) PASS sur Linux ;
+CLI Windows sans réseau ajouté en CI. Session RDP native, clipboard/fichiers/
+dossiers, authentification AD et périphériques non qualifiés. SFTP final reste
+en file GitHub sans runner ; aucun MSI, Apple/VNC Windows encore ouvert.

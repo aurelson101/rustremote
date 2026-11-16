@@ -1342,3 +1342,31 @@ capture d’une frame, log/tmp/rustremote-windows-sftp-gui-linux.log.
 Avant MSI : attendre/inspecter43851363955, télécharger artefacts et confirmer
 SFTP GUI fatal-warnings +captures ; Server2022 transport seul déjà prouvé, puis
 implémenter mstsc, Apple/VNC et intégrer le produit. Aucun commit de release/tag.
+
+## WIN-05 — incrément RDP mstsc (2026-11-16)
+rdp.rs construit une configuration strictement validée, refuse simulation/pin
+SHA256 non applicable et clipboard texte seul (mstsc ne garantit pas cette
+séparation). UTF16 BOM/ACL actuelle privée, exécutable GetSystemDirectoryW/mstsc,
+aucun shell/password argv/env/fichier, aucun credential TERMSRV écrasé. Secret
+profil PAS réutilisé automatiquement : prompt Windows explicite. Worker garde
+le fichier jusqu’à fermeture du contrôleur (mstsc peut broker vers autreprocess),
+annulation avant lancement et kill seulement du processus possédé. Il faut
+fermer le client natif pour déconnecter une session brokerisée ; ne pas prétendre
+contrôle de toutes les sessions mstsc. Aucun serveur contacté par l’agent.
+
+rdp_ui.rs ajoute options persistées (taille/auto/scaling/fullscreen/multimon/IDs/
+audio/micro/printers/clipboard), contrôles dans scroll et boutons fixes, focus
+retiré avant sauvegarde/fermeture. Bouton RDP options dans profile_ui et Connect
+selected dispatch RDP/SSH. Test GUI profil phases50/51 modifie moniteurs0,1/audio/
+imprimantes/clipboard puis vérifie modèle et export/import. PASS sous Xvfb/D-Bus/
+HOME/XDG privés +portalGTK, journal/tmp/rustremote-rdp-options-ui.log. Deux tests
+rdp::tests PASS, prototype23PASS/1ignored, root63PASS/2ignored, fmt/check/clippy
+PASS. Pas de test de session Windows, clipboard, AD, son/impression/multimon réel.
+
+CI --self-test-rdp vérifie client système présent et fichier privé UTF16/ACL/
+cleanup SANS lancer mstsc ni réseau. Source précédente194dc84 run43851363955
+toujours queued sansjobs lors de reprise. Aucun résultat natif inventé.
+Référence paramètres : https://learn.microsoft.com/en-us/azure/virtual-desktop/rdp-properties
+Prochaine étape : qualification native SFTP/RDP config, puis intégration sûre
+du password RDP et labo RDP ; Apple/VNC/tunnel et MSI ensuite, pas de paquet
+non fonctionnel à publier pour masquer les limites.

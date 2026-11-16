@@ -10,7 +10,7 @@ use std::{
 };
 use zeroize::Zeroizing;
 
-fn worker<T: Send + 'static>(
+pub(crate) fn worker<T: Send + 'static>(
     job: impl FnOnce() -> Result<T, String> + Send + 'static,
     done: impl FnOnce(Result<T, String>) + 'static,
 ) {
@@ -427,6 +427,38 @@ fn build(
         }
     });
     sftp.set_sensitive(cfg!(windows));
+    action("RDP options…", &bar, &panel, |p| {
+        let Some(row) = p.list.selected_row() else {
+            p.status.set_text("Select an RDP profile");
+            return;
+        };
+        let index = row.index() as usize;
+        let Some(profile) = p.data.borrow().profiles.get(index).cloned() else {
+            return;
+        };
+        if !matches!(profile.options, ProtocolOptions::Rdp { .. }) {
+            p.status.set_text("Select an RDP profile");
+            return;
+        }
+        if let Some(parent) = p.window.upgrade() {
+            let expected = profile.clone();
+            let weak = Rc::downgrade(p);
+            crate::rdp_ui::options(&parent, profile, move |updated| {
+                if let Some(p) = weak.upgrade()
+                    && !p.busy.get()
+                {
+                    let mut data = p.data.borrow().clone();
+                    if data.profiles.get(index) == Some(&expected) {
+                        data.profiles[index] = updated;
+                        p.persist(data, None);
+                    } else {
+                        p.status
+                            .set_text("Profile changed; reload before saving RDP options");
+                    }
+                }
+            });
+        }
+    });
     action("Edit selected", &bar, &panel, |p| {
         if let Some(row) = p.list.selected_row() {
             p.fill(Some(row.index() as usize));
@@ -944,6 +976,59 @@ pub fn smoke(parent: &gtk::ApplicationWindow, result: Rc<Cell<bool>>, capture: b
                             if panel.data.borrow().profiles.len() != 2 {
                                 return Err(panel.status.text().into());
                             }
+                            panel.tabs.set_current_page(Some(0));
+                            panel.list.select_row(panel.list.row_at_index(1).as_ref());
+                            click(&window, "RDP options…")?;
+                            phase = 50;
+                        }
+                        50 => {
+                            let Some(dialog) = gtk::Window::list_toplevels().iter().find_map(|w| {
+                                w.clone()
+                                    .downcast::<gtk::Dialog>()
+                                    .ok()
+                                    .filter(|d| d.title().is_some_and(|t| t == "RDP options"))
+                            }) else {
+                                return Ok(());
+                            };
+                            fn configure(widget: &gtk::Widget) {
+                                if let Some(check) = widget.downcast_ref::<gtk::CheckButton>()
+                                    && check.label().is_some_and(|t| {
+                                        t == "Use multiple monitors"
+                                            || t == "Allow clipboard (text and files with mstsc)"
+                                            || t == "Redirect local printers"
+                                    })
+                                {
+                                    check.set_active(true);
+                                }
+                                if widget.widget_name() == "rdp-monitors"
+                                    && let Some(entry) = widget.downcast_ref::<gtk::Entry>()
+                                {
+                                    entry.set_text("0,1");
+                                }
+                                if widget.widget_name() == "rdp-audio"
+                                    && let Some(audio) = widget.downcast_ref::<gtk::DropDown>()
+                                {
+                                    audio.set_selected(0);
+                                }
+                                let mut child = widget.first_child();
+                                while let Some(w) = child {
+                                    configure(&w);
+                                    child = w.next_sibling();
+                                }
+                            }
+                            configure(dialog.upcast_ref());
+                            dialog.response(gtk::ResponseType::Ok);
+                            phase = 51;
+                        }
+                        51 => {
+                            let data = panel.data.borrow();
+                            let profile = data.profiles.get(1).ok_or("RDP profile disappeared")?;
+                            if !matches!(&profile.options,ProtocolOptions::Rdp{clipboard:true,clipboard_files:true,settings,..} if settings.multi_monitor&&settings.monitors==[0,1]&&settings.printers&&settings.audio_mode==0)
+                            {
+                                return Err("RDP option save failed".into());
+                            }
+                            crate::rdp::configuration(profile)?;
+                            drop(data);
                             panel.tabs.set_current_page(Some(2));
                             panel.folder_source.set_text("Linux");
                             panel.folder_destination.set_text("Archive");
@@ -1068,6 +1153,9 @@ pub fn smoke(parent: &gtk::ApplicationWindow, result: Rc<Cell<bool>>, capture: b
 }
 
 fn open_terminal(parent: &gtk::ApplicationWindow, profile: SessionProfile) -> Result<(), String> {
+    if matches!(profile.options, ProtocolOptions::Rdp { .. }) {
+        return crate::rdp_ui::open(parent, profile);
+    }
     crate::ssh_launch::arguments(&profile)?;
     let app = parent.application().ok_or("Application unavailable")?;
     if app.windows().len() >= 18 {
