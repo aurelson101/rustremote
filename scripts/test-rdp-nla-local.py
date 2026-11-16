@@ -98,14 +98,15 @@ class ExistingLabCertificate(RuntimeError):
     pass
 
 
-def powershell(script, root, thumb=""):
+def powershell(script, root, thumb="", extra=None):
     path=Path(os.environ.get("RUSTREMOTE_LAB_PWSH",str(Path(os.environ.get("SystemRoot","C:/Windows"))/"System32/WindowsPowerShell/v1.0/powershell.exe")))
     if not path.is_absolute() or not path.is_file(): raise RuntimeError("Trusted PowerShell unavailable")
     result=subprocess.run([str(path),"-NoProfile","-NonInteractive","-Command",script],
-                          env=dict(os.environ,RUSTREMOTE_NLA_ROOT=str(root),RUSTREMOTE_NLA_THUMB=thumb),
+                          env=dict(os.environ,RUSTREMOTE_NLA_ROOT=str(root),RUSTREMOTE_NLA_THUMB=thumb,**(extra or {})),
                           capture_output=True,text=True,timeout=30)
     if result.returncode==17: raise ExistingLabCertificate("Fixture certificate already existed")
     if result.returncode: raise RuntimeError("Private laboratory setup or certificate cleanup failed")
+    return result.stdout
 
 
 def secure_folder(root):
@@ -305,6 +306,31 @@ def verify_fixture(peer, root, password):
         assert client.complete
 
 
+def native_window_flags(parent, root):
+    script="""$ErrorActionPreference='Stop'
+Add-Type -AssemblyName UIAutomationClient
+$children=@(Get-CimInstance Win32_Process -Filter ("ParentProcessId="+$env:RUSTREMOTE_NLA_PARENT+" AND Name='mstsc.exe'"))
+$flags=0
+foreach($process in $children){
+$condition=[Windows.Automation.PropertyCondition]::new([Windows.Automation.AutomationElement]::ProcessIdProperty,[int]$process.ProcessId)
+$windows=[Windows.Automation.AutomationElement]::RootElement.FindAll([Windows.Automation.TreeScope]::Children,$condition)
+foreach($window in $windows){
+$flags=$flags -bor 1
+$controls=$window.FindAll([Windows.Automation.TreeScope]::Descendants,[Windows.Automation.Condition]::TrueCondition)
+foreach($control in $controls){
+if($control.Current.IsPassword){$flags=$flags -bor 2;continue}
+if($control.Current.ControlType -eq [Windows.Automation.ControlType]::Button -and $control.Current.Name -match 'Connect'){$flags=$flags -bor 4}
+if($control.Current.ControlType -eq [Windows.Automation.ControlType]::Text){
+if($control.Current.Name -match 'credential|password'){$flags=$flags -bor 8}
+if($control.Current.Name -match 'invalid|corrupt|connection file'){$flags=$flags -bor 16}}
+}}
+}
+$policy=(Get-ItemProperty -LiteralPath 'HKLM:\SOFTWARE\Policies\Microsoft\Windows NT\Terminal Services' -Name DisablePasswordSaving -ErrorAction SilentlyContinue).DisablePasswordSaving
+@{owned_client_count=$children.Count;ui_flags=$flags;disable_password_saving=$policy}|ConvertTo-Json -Compress
+"""
+    return json.loads(powershell(script,root,extra={"RUSTREMOTE_NLA_PARENT":str(parent)}))
+
+
 def main():
     global CURRENT_STAGE, FAILURE_STAGE
     parser=argparse.ArgumentParser();parser.add_argument("--verify-fixture",action="store_true");parser.add_argument("--native",type=Path);parser.add_argument("--fetch-deps",action="store_true");args=parser.parse_args()
@@ -336,9 +362,15 @@ def main():
                 profile=dict(name="CredSSP loopback lab",host="127.0.0.1",port=peer.port,username=USER,favorite=False,
                     options=dict(protocol="Rdp",domain=DOMAIN,width=1280,height=720,fullscreen=False,clipboard=False,clipboard_files=False))
                 CURRENT_STAGE="native-client"
-                result=subprocess.run([str(args.native.resolve(strict=True)),"--self-test-rdp-nla"],
-                    input=json.dumps(dict(profile=profile,secret=password,state=str(root/"rdp-nla-state.json"))),
-                    text=True,encoding="utf-8",capture_output=True,timeout=40)
+                command=[str(args.native.resolve(strict=True)),"--self-test-rdp-nla"]
+                with subprocess.Popen(command,stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,encoding="utf-8") as process:
+                    try:
+                        stdout,stderr=process.communicate(json.dumps(dict(profile=profile,secret=password,state=str(root/"rdp-nla-state.json"))),timeout=5)
+                    except subprocess.TimeoutExpired:
+                        try:peer.state["native_ui"]=native_window_flags(process.pid,root)
+                        except Exception as error:peer.state["ui_probe_error"]=type(error).__name__
+                        stdout,stderr=process.communicate(timeout=35)
+                    result=subprocess.CompletedProcess(command,process.returncode,stdout,stderr)
                 peer.state["native_exit"]=result.returncode
                 if result.returncode:raise RuntimeError("Native RDP lab client did not complete")
             peer.close()

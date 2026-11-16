@@ -1472,3 +1472,11 @@ maintenant la fenêtre du seul PID certutil lancé, sujet fixture exact +emprein
 SHA1 complète, avant action IDYES ; aucun prompt RDP/credential accepté. Refus si
 identité non reconnue, aucune capture ni texte de fenêtre publié. Même garde
 GITHUB_ACTIONS et compteCI jetable, CurrentUser seulement. Timeout reste bloquant.
+
+NLA run43871943860 : setup certificat franchi (confirmation exacte fixture),
+nettoyage du Root vérifié sans erreur. Échec authentification réel : client natif
+exit0 après gardeaccept25s, aucune connexion TCP tentée. Ne pas annoncer que le
+password51 fonctionne : codec/éditeur seuls étaient validés. Ajout diagnostic
+UIA en lecture seule sur les seuls enfants mstsc du client laboratoire : flags
+fenêtre/connect/password/error, pas de valeur éditable ni texte publié ; lecture
+numérique de DisablePasswordSaving, sans modifier de politique.
