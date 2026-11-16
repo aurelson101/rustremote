@@ -1417,3 +1417,30 @@ saisi/texte loggé). Le contrôleur affiche désormais hôte/port/compte/domaine
 avant Launch. Root63tests/2ignored et prototype23tests/1ignored PASS,
 fmt/check/clippy PASS côtéLinux. Ne pas annoncer une session RDP/authentification
 réussie tant que seul le fichier et son éditeur sont testés.
+
+## Qualification native /edit et nouveau labo NLA
+Sourceeb42642 : Server2022 run43860943978 SUCCESS ; Win11ARM/x64émulé
+run43861826692 SUCCESS. mstsc /edit charge le fichier chiffré, contrôle du bon
+champ ordinateur/PID et zéro tentative TCP sur garde loopback. Ce n’est toujours
+pas un login RDP. Artefact Server2022 dans dist/windows-probe-validation/
+43860943978/windows-2022/.
+
+En cours : scripts/test-rdp-nla-local.py +rdp::nla_lab, compte fictif fixe
+RRTEST/rr-lab, IPv4loopback et état privé borné, production launcher utilisé avec
+secret du coffre. Simulateur X224/TLS1.2/CredSSPv6/NTLMv2 seulement, aucun bureau
+ni compte système Windows. pyspnego0.12.4 MIT, wheel SHA256 épinglé téléchargé
+dans TemporaryDirectory (pas de dépendance runtime applicative). Validation
+purement locale Python PASS : compte +passwordUnicode transmis, aucune mutation
+du trousseau/certstore de ce poste Linux.
+
+Test natif autorisé uniquement sur runner GitHubWindows éphémère : public CA de
+test unique ajouté au Root CurrentUser, aucun certificat machine modifié, suppression
+exacte par empreinte contrôlée en finally, conservation des autres certs. Clé TLS
+et hash NTLM fictifs dans dossier privé ; aucun token ou password loggé. Aucun
+OS account/TermService/firewall modifié. Certificat expirant2h, runner jetable ;
+ne pas exécuter ce mode sur un poste personnel. pyspnego n’assure pas le framing
+TCP des flights TLS : pré-handshake OpenSSL BIO existant par records bornés,
+pas d’attente arbitraire ni crypto maison ; test fixture reproduit PASS.
+Erreur initiale Python TypeError(cipherNone) avec records isolés dans step, corrigée
+par ce pré-handshake ; SyntaxError concatPS corrigée avant commit. Résultat
+natif NLA à obtenir, ne pas qualifier password mstsc réel par seuleDPAPI.

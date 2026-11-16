@@ -120,6 +120,10 @@ jobs:
         run: |
           set -o pipefail
           experiments/windows-probe/target/debug/rustremote-windows-probe.exe --self-test-rdp | tee dist/windows-probe/rdp-config.txt
+      - name: Native RDP CredSSP loopback credentials (simulation, no desktop)
+        run: |
+          set -o pipefail
+          python scripts/test-rdp-nla-local.py --fetch-deps --native experiments/windows-probe/target/debug/rustremote-windows-probe.exe | tee dist/windows-probe/rdp-nla.json
       - name: Local ConPTY input-output and resize
         run: |
           set -o pipefail

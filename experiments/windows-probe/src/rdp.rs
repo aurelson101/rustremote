@@ -493,3 +493,120 @@ mod tests {
         assert!(configuration(&p).is_err());
     }
 }
+
+/// Ephemeral native-client lab: only a fixed fake account and literal loopback peer.
+#[cfg(windows)]
+pub fn nla_lab() -> Result<String, String> {
+    use std::{
+        io::Read,
+        path::PathBuf,
+        time::{Duration, Instant},
+    };
+    use zeroize::{Zeroize, Zeroizing};
+    #[derive(serde::Deserialize)]
+    #[serde(deny_unknown_fields)]
+    struct Input {
+        profile: SessionProfile,
+        secret: String,
+        state: PathBuf,
+    }
+    impl Drop for Input {
+        fn drop(&mut self) {
+            self.secret.zeroize();
+        }
+    }
+    let mut bytes = Zeroizing::new(Vec::new());
+    std::io::stdin()
+        .lock()
+        .take(32769)
+        .read_to_end(&mut bytes)
+        .map_err(|_| "RDP lab stdin unavailable")?;
+    if bytes.len() > 32768 {
+        return Err("RDP lab input exceeds budget".into());
+    }
+    let mut input: Input = serde_json::from_slice(&bytes).map_err(|_| "Invalid RDP lab input")?;
+    bytes.zeroize();
+    input.profile.validate()?;
+    if input.profile.host != "127.0.0.1"
+        || input.profile.port < 1024
+        || input.profile.username != "rr-lab"
+        || input.profile.credential_ref.is_some()
+        || !matches!(&input.profile.options,ProtocolOptions::Rdp{domain,clipboard:false,clipboard_files:false,settings,..} if domain=="RRTEST"&&!settings.microphone&&!settings.printers)
+    {
+        return Err("Only the fixed fake loopback RDP laboratory is allowed".into());
+    }
+    if !matches!(input.state.components().next(),Some(std::path::Component::Prefix(prefix)) if matches!(prefix.kind(),std::path::Prefix::Disk(_)))
+    {
+        return Err("RDP lab state requires a local drive path".into());
+    }
+    crate::sftp_platform::validate_local(&input.state).map_err(|_| "Unsafe RDP lab state file")?;
+    let folder = input.state.parent().ok_or("RDP lab state folder missing")?;
+    if input
+        .state
+        .file_name()
+        .is_none_or(|name| name != "rdp-nla-state.json")
+        || folder
+            .file_name()
+            .and_then(|v| v.to_str())
+            .is_none_or(|v| !v.starts_with("RustRemote NLA "))
+    {
+        return Err("RDP lab state must be in its private temporary fixture".into());
+    }
+    let parent = folder
+        .parent()
+        .ok_or("RDP lab temporary parent unavailable")?
+        .canonicalize()
+        .map_err(|_| "RDP lab temporary parent unavailable")?;
+    let temporary = std::env::temp_dir()
+        .canonicalize()
+        .map_err(|_| "System temporary folder unavailable")?;
+    if parent != temporary {
+        return Err("RDP lab state is outside the system temporary folder".into());
+    }
+    let backend = crate::profile_service::laboratory()?;
+    let mut profile = input.profile.clone();
+    profile.credential_ref = Some(backend.credential_write(&profile, &input.secret)?);
+    input.secret.zeroize();
+    let (stop, receiver) = std::sync::mpsc::channel();
+    let worker = std::thread::Builder::new()
+        .name("rdp-nla-fixture".into())
+        .spawn(move || launch(profile, receiver))
+        .map_err(|_| "Cannot start RDP lab client")?;
+    let deadline = Instant::now() + Duration::from_secs(25);
+    #[derive(serde::Deserialize)]
+    #[serde(deny_unknown_fields)]
+    struct State {
+        done: bool,
+    }
+    let outcome = (|| {
+        while Instant::now() < deadline {
+            match crate::sftp_platform::read(&input.state, false) {
+                Ok(file) => {
+                    let mut data = Vec::new();
+                    file.take(129)
+                        .read_to_end(&mut data)
+                        .map_err(|_| "RDP lab state unavailable")?;
+                    if data.len() > 128 {
+                        return Err("RDP lab state exceeds budget".into());
+                    }
+                    let state: State =
+                        serde_json::from_slice(&data).map_err(|_| "Invalid RDP lab state")?;
+                    if state.done {
+                        return Ok(());
+                    }
+                }
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+                Err(_) => return Err("Unsafe or unavailable RDP lab state".into()),
+            }
+            if worker.is_finished() {
+                return Err("RDP lab client exited before peer completion".into());
+            }
+            std::thread::sleep(Duration::from_millis(50));
+        }
+        Err("RDP lab timed out before peer completion".into())
+    })();
+    let _ = stop.send(());
+    worker.join().map_err(|_| "RDP lab worker interrupted")??;
+    outcome?;
+    Ok("WINDOWS_RDP_NLA_CLIENT_STOPPED: peer outcome must be verified by the simulator; no desktop session qualified".into())
+}

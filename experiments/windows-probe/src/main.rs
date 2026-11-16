@@ -119,6 +119,22 @@ fn main() -> std::process::ExitCode {
             }
         };
     }
+    if args.iter().any(|a| a == "--self-test-rdp-nla") {
+        #[cfg(windows)]
+        let result = rdp::nla_lab();
+        #[cfg(not(windows))]
+        let result: Result<String, String> = Err("Native RDP NLA lab requires Windows".into());
+        return match result {
+            Ok(report) => {
+                println!("{report}");
+                std::process::ExitCode::SUCCESS
+            }
+            Err(error) => {
+                eprintln!("{error}");
+                std::process::ExitCode::FAILURE
+            }
+        };
+    }
     if args.iter().any(|a| a == "--self-test-rdp") {
         #[cfg(windows)]
         let result = rdp::self_test();

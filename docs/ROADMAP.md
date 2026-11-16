@@ -546,3 +546,8 @@ Password du profil viaDPAPI : run43859093575 SUCCESS sur les deux plateformes
 Windows (Win11ARM x64émulé). Encodage/chiffrement/coffre/scope/ACL/nettoyage
 validés. Chargement dans mstsc /edit en qualification séparée ; session RDP et
 presse-papiers restent non qualifiés, Apple/VNC et MSI non livrés.
+
+mstsc /edit : PASS Server2022 et Win11ARM/x64émulé, sources/runs dansMEMORY.
+Labo CredSSP/TLS natif en préparation : simulation sur127.0.0.1 et compte fictif,
+certificat de test temporaire uniquement sur CI éphémère, sans bureau Windows
+ni compte système. Fixture Python locale PASS ; authentification native en attente.
