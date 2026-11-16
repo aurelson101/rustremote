@@ -206,11 +206,21 @@ pub fn self_test() -> Result<String, String> {
         return Err("RDP private fixture retained".into());
     }
     password_fixture(profile)?;
-    Ok("WINDOWS_RDP_CONFIG_OK: system client found; private ACL/UTF16 config, profile-scoped vault password, current-user DPAPI roundtrip/tamper rejection, plaintext absence and cleanup; no process launched, no network or RDP session tested".into())
+    Ok("WINDOWS_RDP_CONFIG_OK: system client found; private ACL/UTF16 config, profile-scoped vault password, current-user DPAPI roundtrip/tamper rejection, plaintext absence and cleanup; native mstsc /edit parsed private profile without connection attempts; no RDP session tested".into())
 }
 #[cfg(windows)]
 fn password_fixture(mut profile: SessionProfile) -> Result<(), String> {
     use zeroize::Zeroizing;
+    let listener = std::net::TcpListener::bind("127.0.0.1:0")
+        .map_err(|_| "Cannot reserve RDP offline guard")?;
+    listener
+        .set_nonblocking(true)
+        .map_err(|_| "Cannot configure RDP offline guard")?;
+    profile.host = "127.0.0.1".into();
+    profile.port = listener
+        .local_addr()
+        .map_err(|_| "RDP guard address unavailable")?
+        .port();
     if protected_from_profile(&profile)?.is_some() {
         return Err("Unexpected RDP fixture credential".into());
     }
@@ -285,6 +295,7 @@ fn password_fixture(mut profile: SessionProfile) -> Result<(), String> {
             return Err("RDP password escaped its profile scope".into());
         }
     }
+    edit_fixture(&path, &format!("127.0.0.1:{}", profile.port), &listener)?;
     profile.credential_ref = Some(crate::win_storage::new_reference()?);
     if protected_from_profile(&profile).is_ok() {
         return Err("Missing RDP profile credential did not fail closed".into());
@@ -299,6 +310,134 @@ fn password_fixture(mut profile: SessionProfile) -> Result<(), String> {
         return Err("Protected RDP launch file retained".into());
     }
     Ok(())
+}
+#[cfg(windows)]
+fn edit_fixture(
+    path: &std::path::Path,
+    expected: &str,
+    listener: &std::net::TcpListener,
+) -> Result<(), String> {
+    use std::{
+        os::windows::process::CommandExt,
+        time::{Duration, Instant},
+    };
+    use windows_sys::Win32::{
+        Foundation::{HWND, LPARAM},
+        UI::WindowsAndMessaging::{
+            EnumChildWindows, EnumWindows, GWL_STYLE, GetClassNameW, GetWindowLongPtrW,
+            GetWindowThreadProcessId, IsWindowVisible, SMTO_ABORTIFHUNG, SMTO_BLOCK,
+            SendMessageTimeoutW, WM_GETTEXT,
+        },
+    };
+    struct Client(std::process::Child);
+    impl Drop for Client {
+        fn drop(&mut self) {
+            if !matches!(self.0.try_wait(), Ok(Some(_))) {
+                let _ = self.0.kill();
+                let _ = self.0.wait();
+            }
+        }
+    }
+    struct Probe {
+        pid: u32,
+        expected: Vec<u16>,
+        matched: bool,
+        visited: usize,
+    }
+    unsafe extern "system" fn child(window: HWND, parameter: LPARAM) -> i32 {
+        let probe = unsafe { &mut *(parameter as *mut Probe) };
+        probe.visited += 1;
+        if probe.visited > 128 {
+            return 0;
+        }
+        // Only the owned editor's computer-name controls; never inspect password controls.
+        let mut class = [0u16; 64];
+        let length = unsafe { GetClassNameW(window, class.as_mut_ptr(), class.len() as i32) };
+        let kind = String::from_utf16_lossy(&class[..length.max(0) as usize]);
+        if matches!(kind.as_str(), "Edit" | "ComboBox" | "ComboBoxEx32")
+            && unsafe { IsWindowVisible(window) } != 0
+            && unsafe { GetWindowLongPtrW(window, GWL_STYLE) } & 0x20 == 0
+        {
+            let mut text = zeroize::Zeroizing::new([0u16; 512]);
+            let mut length = 0usize;
+            if unsafe {
+                SendMessageTimeoutW(
+                    window,
+                    WM_GETTEXT,
+                    text.len(),
+                    text.as_mut_ptr() as LPARAM,
+                    SMTO_ABORTIFHUNG | SMTO_BLOCK,
+                    30,
+                    &mut length,
+                )
+            } != 0
+                && length > 0
+                && length < text.len()
+                && text[..length] == probe.expected[..]
+            {
+                probe.matched = true;
+                return 0;
+            }
+        }
+        1
+    }
+    unsafe extern "system" fn top(window: HWND, parameter: LPARAM) -> i32 {
+        let expected_pid = unsafe { (*(parameter as *const Probe)).pid };
+        let mut pid = 0;
+        unsafe {
+            GetWindowThreadProcessId(window, &mut pid);
+        }
+        if pid == expected_pid && unsafe { IsWindowVisible(window) } != 0 {
+            unsafe {
+                EnumChildWindows(window, Some(child), parameter);
+            }
+        }
+        1
+    }
+    let process = std::process::Command::new(client()?)
+        .arg("/edit")
+        .arg(path)
+        .creation_flags(0x08000000)
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .spawn()
+        .map_err(|_| "Cannot open native RDP settings")?;
+    let mut owned = Client(process);
+    let mut probe = Probe {
+        pid: owned.0.id(),
+        expected: expected.encode_utf16().collect(),
+        matched: false,
+        visited: 0,
+    };
+    let deadline = Instant::now() + Duration::from_secs(15);
+    while Instant::now() < deadline {
+        match listener.accept() {
+            Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {}
+            _ => return Err("mstsc /edit unexpectedly attempted a connection".into()),
+        }
+        probe.visited = 0;
+        unsafe {
+            EnumWindows(Some(top), (&mut probe as *mut Probe) as LPARAM);
+        }
+        if probe.matched {
+            drop(owned);
+            return match listener.accept() {
+                Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => Ok(()),
+                _ => Err("mstsc editor unexpectedly attempted a connection".into()),
+            };
+        }
+        if owned
+            .0
+            .try_wait()
+            .map_err(|_| "Cannot inspect native RDP editor")?
+            .is_some()
+        {
+            return Err("Native RDP editor exited before loading the profile".into());
+        }
+        std::thread::sleep(Duration::from_millis(50));
+    }
+    Err("Native RDP settings did not load the private profile".into())
 }
 #[cfg(test)]
 mod tests {

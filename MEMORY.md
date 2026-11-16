@@ -1400,3 +1400,9 @@ CLI --self-test-rdp étendu : coffre réel pour secret aléatoire Unicode/emoji,
 ACL, absence du plaintext UTF16 dans fichier, DPAPI roundtrip/tamper, mauvais
 compte/domaine/port et référence manquante, cleanup ; aucun processus RDP ni
 réseau. Clippy prototype Linux PASS ; qualification Windows à lancer.
+
+Qualification supplémentaire préparée : mstsc /edit charge le fichier privé avec
+password51, contrôle Win32 limité au PID lancé et aux contrôles de nom d’hôte
+(non password), messages bornés ; aucun texte natif capturé/loggé. Garde socket
+127.0.0.1 refuse toute tentative de connexion pendant ce test. Processus possédé
+fermé par RAII. Valide le format/chargement natif, PAS l’authentification RDP.
