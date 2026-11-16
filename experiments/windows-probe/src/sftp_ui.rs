@@ -772,8 +772,13 @@ pub fn laboratory() -> Result<bool, String> {
                 11=>{if let Some(dialog)=dialog("Remote UTF-8 editor"){dialog.response(gtk::ResponseType::Cancel);click("Remote parent");phase=12;}},
                 12=>{if !select(true,"dossier été",false){return gtk::glib::ControlFlow::Continue;}click("Delete remote…");phase=13;},
                 13=>{if let Some(dialog)=gtk::Window::list_toplevels().iter().find_map(|w|w.clone().downcast::<gtk::MessageDialog>().ok()){dialog.response(gtk::ResponseType::Ok);phase=14;}},
-                _=>{
+                14=>{
                     if !browser.remote_entries.borrow().is_empty(){return gtk::glib::ControlFlow::Continue;}
+                    capture_frame=window.frame_clock().map_or(-1,|clock|clock.frame_counter());
+                    window.queue_draw();phase=15;
+                }
+                _=>{
+                    if window.frame_clock().is_none_or(|clock|clock.frame_counter()<=capture_frame){return gtk::glib::ControlFlow::Continue;}
                     if let Err(error)=crate::capture::window(&window,std::path::Path::new("dist/windows-probe/sftp-gui.png")){eprintln!("{error}");}else if ticks>5 {passed.set(true);println!("WINDOWS_SFTP_GUI_OK: widget activation, local/remote directory navigation, folder upload/download, binary readback, remote edit/save, confirmed recursive deletion; GTK ticks={ticks}");}
                     window.close();app.quit();return gtk::glib::ControlFlow::Break;
                 }
