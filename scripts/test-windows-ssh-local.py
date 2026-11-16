@@ -179,8 +179,19 @@ def main():
                                             input=json.dumps(dict(profile=profile, secret=secret, expect_reject=reject)),
                                             text=True, encoding="utf-8", capture_output=True, timeout=35)
                     if result.returncode or ("WINDOWS_SSH_REJECT_OK" if reject else "WINDOWS_SSH_OK") not in result.stdout:
-                        # Never echo the input, generated secrets or raw terminal output to a log.
-                        raise RuntimeError(f"Native SSH case {name} failed (exit {result.returncode}): " + result.stderr[-1000:])
+                        # No secret enters this fixed BatchMode preflight. It diagnoses before authentication.
+                        client = probe.parent / "OpenSSH" / "ssh.exe"
+                        keep = ("PATH", "PATHEXT", "TEMP", "TMP", "USERPROFILE", "LOCALAPPDATA", "APPDATA", "COMSPEC", "SYSTEMROOT", "WINDIR")
+                        environment = {key: value for key, value in os.environ.items() if key.upper() in keep}
+                        command = [str(client), "-vv", "-F", "none", "-oBatchMode=yes", "-oIdentityFile=none", "-oIdentityAgent=none",
+                                   "-oStrictHostKeyChecking=yes", "-oConnectTimeout=5", '-oUserKnownHostsFile="' + str(trust_path).replace(chr(92), "/") + '"',
+                                   "-p", str(server.port), "-l", "lab@realm.example", "--", "127.0.0.1"]
+                        try:
+                            diagnostic = subprocess.run(command, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                                        env=environment, timeout=10, encoding="utf-8", errors="replace").stderr[-2500:]
+                        except subprocess.TimeoutExpired:
+                            diagnostic = "BatchMode preflight timed out"
+                        raise RuntimeError(f"Native SSH case {name} failed (exit {result.returncode}): " + result.stderr[-2000:] + "\nBatchMode diagnostic: " + diagnostic)
                     state = server.case.state.copy()
                     if name in ("changed_host", "unknown_host"):
                         assert state["password_ok"] + state["password_rejected"] + state["key_ok"] + state["key_rejected"] == 0
