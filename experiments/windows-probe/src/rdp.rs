@@ -60,7 +60,9 @@ pub fn launch(profile: SessionProfile, stop: std::sync::mpsc::Receiver<()>) -> R
         return Ok(());
     }
     let client = client()?;
-    let (_temporary, path) = prepare(&content)?;
+    let protected = protected_from_profile(&profile)?;
+    let (_temporary, path) = prepare(&content, protected.as_deref().map(Vec::as_slice))?;
+    drop(protected);
     if !matches!(stop.try_recv(), Err(std::sync::mpsc::TryRecvError::Empty)) {
         return Ok(());
     }
@@ -110,9 +112,58 @@ fn client() -> Result<std::path::PathBuf, String> {
     Ok(client)
 }
 #[cfg(windows)]
-fn prepare(content: &str) -> Result<(tempfile::TempDir, std::path::PathBuf), String> {
+fn protected_from_profile(
+    profile: &SessionProfile,
+) -> Result<Option<zeroize::Zeroizing<Vec<u8>>>, String> {
+    let secret = crate::win_credentials::read(profile)?;
+    if profile.credential_ref.is_some() && secret.is_none() {
+        return Err("The RDP profile password is missing from Windows Credential Manager".into());
+    }
+    secret
+        .as_ref()
+        .map(|value| protect_password(value))
+        .transpose()
+}
+#[cfg(windows)]
+fn protect_password(secret: &str) -> Result<zeroize::Zeroizing<Vec<u8>>, String> {
+    if secret.is_empty() || secret.len() > 2048 || secret.contains(['\0', '\r', '\n']) {
+        return Err(
+            "RDP password must contain 1–2048 UTF-8 bytes and no NUL or line breaks".into(),
+        );
+    }
+    let bytes = zeroize::Zeroizing::new(
+        secret
+            .encode_utf16()
+            .flat_map(u16::to_le_bytes)
+            .collect::<Vec<_>>(),
+    );
+    crate::win_storage::crypt(&bytes, true)
+}
+#[cfg(windows)]
+fn prepare(
+    content: &str,
+    protected: Option<&[u8]>,
+) -> Result<(tempfile::TempDir, std::path::PathBuf), String> {
     use std::io::Write;
+    let mut content = zeroize::Zeroizing::new(content.to_owned());
+    if let Some(bytes) = protected {
+        if bytes.is_empty() || bytes.len() > 16384 {
+            return Err("Protected RDP password exceeds its budget".into());
+        }
+        use std::fmt::Write;
+        *content = content.replace(
+            "prompt for credentials:i:1\r\n",
+            "prompt for credentials:i:0\r\n",
+        );
+        content.push_str("password 51:b:");
+        for byte in bytes {
+            write!(content, "{byte:02X}").map_err(|_| "Cannot encode protected RDP password")?;
+        }
+        content.push_str("\r\n");
+    }
     let temporary = tempfile::tempdir().map_err(|_| "Cannot prepare RDP session")?;
+    crate::sftp_platform::validate_local(temporary.path())
+        .map_err(|_| "Unsafe RDP temporary folder")?;
     let private = temporary.path().join("session");
     crate::win_storage::private_directory(&private)?;
     let path = private.join("connection.rdp");
@@ -135,7 +186,7 @@ pub fn self_test() -> Result<String, String> {
     let _client = client()?;
     let profile:SessionProfile=serde_json::from_value(serde_json::json!({"name":"RDP offline lab","host":"::1","port":3389,"username":"lab","favorite":false,"options":{"protocol":"Rdp","domain":"LAB","width":1280,"height":720,"fullscreen":false,"clipboard":false,"clipboard_files":false}})).map_err(|_|"Invalid RDP fixture")?;
     let content = configuration(&profile)?;
-    let (temporary, path) = prepare(&content)?;
+    let (temporary, path) = prepare(&content, None)?;
     let file =
         crate::sftp_platform::read(&path, false).map_err(|_| "Cannot read private RDP fixture")?;
     crate::win_storage::validate_key_acl(&file)?;
@@ -154,7 +205,100 @@ pub fn self_test() -> Result<String, String> {
     if path.exists() {
         return Err("RDP private fixture retained".into());
     }
-    Ok("WINDOWS_RDP_CONFIG_OK: system client found; private ACL/UTF16 config roundtrip and cleanup; no process launched, no network or RDP session tested".into())
+    password_fixture(profile)?;
+    Ok("WINDOWS_RDP_CONFIG_OK: system client found; private ACL/UTF16 config, profile-scoped vault password, current-user DPAPI roundtrip/tamper rejection, plaintext absence and cleanup; no process launched, no network or RDP session tested".into())
+}
+#[cfg(windows)]
+fn password_fixture(mut profile: SessionProfile) -> Result<(), String> {
+    use zeroize::Zeroizing;
+    if protected_from_profile(&profile)?.is_some() {
+        return Err("Unexpected RDP fixture credential".into());
+    }
+    let backend = crate::profile_service::laboratory()?;
+    let secret = Zeroizing::new(format!("{}é漢🔒", crate::win_storage::new_reference()?));
+    profile.credential_ref = Some(backend.credential_write(&profile, &secret)?);
+    let protected = protected_from_profile(&profile)?.ok_or("RDP fixture vault lookup failed")?;
+    let content = configuration(&profile)?;
+    let (temporary, path) = prepare(&content, Some(&protected))?;
+    let file =
+        crate::sftp_platform::read(&path, false).map_err(|_| "RDP password fixture unavailable")?;
+    crate::win_storage::validate_key_acl(&file)?;
+    drop(file);
+    let bytes = Zeroizing::new(std::fs::read(&path).map_err(|_| "RDP fixture readback failed")?);
+    let raw = Zeroizing::new(
+        secret
+            .encode_utf16()
+            .flat_map(u16::to_le_bytes)
+            .collect::<Vec<_>>(),
+    );
+    if bytes
+        .windows(raw.len())
+        .any(|chunk| chunk == raw.as_slice())
+    {
+        return Err("Plaintext password written to RDP file".into());
+    }
+    let units = bytes
+        .chunks_exact(2)
+        .map(|b| u16::from_le_bytes([b[0], b[1]]))
+        .collect::<Vec<_>>();
+    let document = Zeroizing::new(String::from_utf16(&units).map_err(|_| "Invalid RDP UTF16")?);
+    let cipher = document
+        .lines()
+        .find_map(|line| line.strip_prefix("password 51:b:"))
+        .ok_or("Protected RDP password missing")?;
+    if cipher.len() % 2 != 0
+        || cipher.len() > 32768
+        || document.contains(profile.credential_ref.as_ref().unwrap())
+        || !document.contains("prompt for credentials:i:0")
+    {
+        return Err("Invalid protected RDP launch file".into());
+    }
+    let mut decoded = Zeroizing::new(Vec::new());
+    for offset in (0..cipher.len()).step_by(2) {
+        decoded.push(
+            u8::from_str_radix(&cipher[offset..offset + 2], 16)
+                .map_err(|_| "Invalid RDP protected encoding")?,
+        );
+    }
+    let clear = crate::win_storage::crypt(&decoded, false)?;
+    if clear.as_slice() != raw.as_slice() {
+        return Err("RDP password Unicode roundtrip failed".into());
+    }
+    if let Some(last) = decoded.last_mut() {
+        *last ^= 1;
+    }
+    if crate::win_storage::crypt(&decoded, false).is_ok() {
+        return Err("Tampered RDP password was accepted".into());
+    }
+    for kind in 0..3 {
+        let mut changed = profile.clone();
+        match kind {
+            0 => changed.username = "another-account".into(),
+            1 => changed.port = 3390,
+            _ => {
+                if let ProtocolOptions::Rdp { domain, .. } = &mut changed.options {
+                    *domain = "OTHER".into();
+                }
+            }
+        }
+        if protected_from_profile(&changed).is_ok() {
+            return Err("RDP password escaped its profile scope".into());
+        }
+    }
+    profile.credential_ref = Some(crate::win_storage::new_reference()?);
+    if protected_from_profile(&profile).is_ok() {
+        return Err("Missing RDP profile credential did not fail closed".into());
+    }
+    if protect_password("").is_ok() || protect_password("bad\0value").is_ok() {
+        return Err("Invalid RDP password accepted".into());
+    }
+    temporary
+        .close()
+        .map_err(|_| "RDP password fixture cleanup failed")?;
+    if path.exists() {
+        return Err("Protected RDP launch file retained".into());
+    }
+    Ok(())
 }
 #[cfg(test)]
 mod tests {

@@ -80,7 +80,7 @@ pub fn options(
     }
     form.append(&monitors);
     let note = gtk::Label::new(Some(
-        "NLA/CredSSP and strict certificate validation are enabled. Drive, USB, smart-card and serial redirection remain disabled. Text-only clipboard and SHA256 certificate pins cannot be enforced by this adapter. Windows asks for the password; automatic use of a saved profile password is not integrated yet.",
+        "NLA/CredSSP and strict certificate validation are enabled. Drive, USB, smart-card and serial redirection remain disabled. Text-only clipboard and SHA256 certificate pins cannot be enforced by this adapter. A saved profile password is read from Windows Credential Manager and encrypted with current-user DPAPI in the private temporary launch file. Windows policies may still require a prompt.",
     ));
     note.set_wrap(true);
     form.append(&note);
@@ -164,7 +164,7 @@ pub fn open(parent: &gtk::ApplicationWindow, profile: SessionProfile) -> Result<
     body.set_margin_start(16);
     body.set_margin_end(16);
     let status = gtk::Label::new(Some(
-        "The Windows Remote Desktop client will request your password. Close its native window to disconnect; this controller never terminates other mstsc sessions.",
+        "A saved profile password is passed encrypted for your Windows account; otherwise Windows requests it. Close the native RDP window to disconnect. This controller never terminates other mstsc sessions.",
     ));
     status.set_wrap(true);
     body.append(&status);

@@ -1386,3 +1386,17 @@ Artefacts téléchargés dans dist/windows-probe-validation/43852937335/
 {windows-2022,windows-11-arm}, JSON résultat vérifié pour SSH/SFTP/GUI et PNG
 Server2022 inspecté. Prochaine étape RDP : credential depuis profil et labo de
 session isolé, puis Apple/VNC/tunnel Windows et packaging/runtime/MSI.
+
+## WIN-05 mot de passe du profil — préparation en cours
+rdp.rs lit le secret via Credential Manager avec scope existant (compte/domaine/
+hôte/port). UTF16LE protégé DPAPI current-user, password51 hex dans fichier .rdp
+éphémère privé seulement ; aucune écriture TERMSRV ni mot de passe argv/env/log.
+Sans référence : prompt natif ; référence manquante/mauvais scope : refus explicite.
+Nettoyage normal par TempDir ; crash peut laisser un fichier chiffré/ACL privée,
+ce n’est pas une garantie d’effacement physique. Politiques Windows peuvent
+forcer un prompt. WinStorage::crypt devient pub(crate), réutilisation du DPAPI
+existant sans nouveau crypto ni dépendance.
+CLI --self-test-rdp étendu : coffre réel pour secret aléatoire Unicode/emoji,
+ACL, absence du plaintext UTF16 dans fichier, DPAPI roundtrip/tamper, mauvais
+compte/domaine/port et référence manquante, cleanup ; aucun processus RDP ni
+réseau. Clippy prototype Linux PASS ; qualification Windows à lancer.

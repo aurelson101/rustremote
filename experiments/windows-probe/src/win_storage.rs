@@ -309,7 +309,7 @@ fn handle(
     Ok(unsafe { OwnedHandle::from_raw_handle(raw) })
 }
 
-fn crypt(bytes: &[u8], protect: bool) -> Result<Zeroizing<Vec<u8>>, String> {
+pub(crate) fn crypt(bytes: &[u8], protect: bool) -> Result<Zeroizing<Vec<u8>>, String> {
     if bytes.len() > MAX_STORED {
         return Err("DPAPI input exceeds profile budget".into());
     }

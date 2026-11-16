@@ -183,3 +183,13 @@ Le permis global de découverte limite à un scan réel par processus. Il est li
 Les résultats sont invalidés lors des changements de cible/mode, le job est annulé
 et une réponse de génération obsolète est ignorée. Fin normale, annulation et
 expiration sont distinguées pour ne pas présenter un inventaire partiel comme complet.
+
+## Lancement mstsc Windows (prototype)
+Le secret reste référencé dans le JSON et conservé dans Credential Manager.
+Pour le lancement, une copie UTF16 en mémoire effaçable est protégée par DPAPI
+current-user, puis seule la valeur chiffrée est écrite dans le fichier .rdp
+éphémère à ACL privée. Les entrées TERMSRV existantes ne sont pas modifiées.
+Le fichier est retiré à la fermeture normale du contrôleur ; un crash peut
+laisser le fichier chiffré privé. DPAPI ne constitue pas une séparation contre
+un autre processus du même utilisateur ou un administrateur. Aucun secret
+clair n’est ajouté aux exports, arguments, variables d’environnement ou logs.

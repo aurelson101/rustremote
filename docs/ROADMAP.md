@@ -536,3 +536,8 @@ Preuve native bcfcff1 : run43852937335 SUCCESS Server2022 x64 +Win11 ARM64/x64
 PASS. Configuration privée .rdp et persistance GUI des options PASS ; pas de
 session RDP ni de validation du clipboard/périphériques. WIN-04 conserve ses
 limites queue/reprise GUI ; WIN-05 reste PARTIAL avant Apple/VNC et MSI.
+
+WIN-05 incrément password : lecture du coffre et injection chiffrée DPAPI dans
+le fichier temporaire mstsc, sans écraser le coffre Windows TERMSRV. Tests
+natifs étendus en cours ; ne pas qualifier l’authentification mstsc par le seul
+roundtrip DPAPI. Domaine/compte/port restent liés au secret du profil.
