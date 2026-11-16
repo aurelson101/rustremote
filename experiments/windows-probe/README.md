@@ -1,7 +1,8 @@
 # RustRemote Windows feasibility probe
 
-Isolated Rust/GTK4 + native ConPTY transport experiment for WIN-01. This is not the
-complete Windows application, SSH client, MSI or MSIX installer.
+Rust/GTK4 Windows integration preview: local ConPTY terminal, saved profiles and
+OpenSSH connections, including macOS/Apple SSH profiles. This is not yet the complete
+Windows application, SFTP browser, RDP/VNC client, MSI or MSIX installer.
 It reuses `rustremote-core` profile models; Linux keeps its existing VTE and protocol adapters.
 GPL-3.0-only; root LICENSE/NOTICE apply.
 
@@ -19,7 +20,7 @@ persistent profile manager: SSH/RDP metadata, domains, SSH file pickers, nested
 logical folders, edit/delete, favorites, JSON import/export and optional DPAPI.
 Password fields write references to Windows Credential Manager; no password is
 exported. Closing during a save is refused until the worker commits or reports
-an error. Profile editing does not yet launch a remote connection. Its successful output is parsed into the same
+an error. “Connect selected” opens an SSH terminal for an SSH profile. RDP/VNC launch is not yet connected. Its successful output is parsed into the same
 selectable GTK/Pango screen, with ANSI colors, bold/italic/underline, cursor and
 Unicode cells. The initial preview is a snapshot. “Open local terminal” starts a real local CMD
 session on Windows: live ANSI display, Unicode/IME input, terminal keys, measured
@@ -114,3 +115,33 @@ passed on both runners, including 12 prototype/service tests and the temporary G
 profile/vault workflow with fatal GTK warnings. Save stays outside the scrolled
 form. Native file chooser interaction, physical input and remote protocol launch
 remain outside this qualification. No MSI has been produced.
+
+## SSH integration qualification — 2026-11-16
+
+[run43822234477](https://github.com/aurelson101/rustremote/actions/runs/43822234477),
+source `6de7344`, passed on Server 2022 x64 and Windows 11 ARM64 with x64 emulation.
+The real loopback SSH laboratory verifies password authentication from Credential
+Manager through askpass, encrypted RSA key authentication with Unicode/spaced file
+paths, terminal UTF-8, PTY resize and cancellation. Wrong passwords are refused;
+unknown/changed host keys are refused before any authentication request.
+The Apple profile talks to a simulated SSH peer, not a real Mac or an ARD server.
+
+The launch policy invokes an absolute trusted OpenSSH path, with no intermediate
+shell. A bundled `OpenSSH/ssh.exe` beside the application takes precedence over the
+Windows system client. CI uses the official Win32-OpenSSH 10.4.0.0p1-Preview package,
+verified by SHA256; its source/version is recorded. CI artifacts contain reports
+and own-window screenshots, not binaries or runtime redistribution. Inbox clients
+and hardware-specific behavior have not been separately qualified.
+
+Host verification is strict; existing/default or explicitly selected `known_hosts`
+is required. Unknown keys must first be verified and added by the user. Forwarding,
+agent forwarding and local commands are disabled. Implicit config is disabled with
+`-F none`; custom config and ProxyJump are explicitly refused in this increment.
+Agent usage remains to qualify. A selected private key uses public-key authentication
+only, so its passphrase is never retried as a server password. Stored SSH secrets
+are limited to 1000 UTF-8 bytes. Passwords enter neither argv nor environment: only
+profile metadata and a scoped vault reference are passed to the askpass helper.
+
+The connection flow is wired to the profile manager; the network qualification
+exercises the transport through the CLI rather than physical Windows GUI input.
+SFTP, RDP, Apple graphical sharing, hardware/DPI/endurance and MSI remain open.

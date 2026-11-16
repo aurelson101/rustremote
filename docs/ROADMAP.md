@@ -17,8 +17,12 @@ import/export, sauvegarde hors GTK et bouton Enregistrer hors défilement.
 sur source26702dc : interface/coffre réels Server2022 x64 et Windows11 ARM64 avec
 binaire x64 émulé,12 tests prototype/service et parcours GUI temporaire. Sélecteurs
 natifs de fichiers/clic physique non pilotés. Prochaine tâche :WIN-04 SSH/SFTP.
-SSH Windows (profils Apple inclus) raccordé à ConPTY et au coffre, en validation
-native ; configuration implicite et acceptation silencieuse d’hôte refusées.
+SSH Windows (profils Apple inclus) raccordé à ConPTY et au coffre ;
+[CI43822234477 PASS](https://github.com/aurelson101/rustremote/actions/runs/43822234477)
+sur source6de7344 : Server2022 x64 et Windows11 ARM64 avec binaire x64 émulé,
+mot de passe/coffre, clé chiffrée Unicode/espaces, UTF8, resize, annulation et refus
+mauvais secret/hôte inconnu/modifié. Pair SSH Apple simulé, pas de Mac réel.
+Config personnalisée/ProxyJump refusés ; agent et clic physique restent à qualifier.
 SFTP/RDP, Apple graphique et MSI restent à intégrer et qualifier.
 Windows11 x64 matériel, périphériques, DPI/IME et endurance restent non qualifiés.
 

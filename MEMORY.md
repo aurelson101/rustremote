@@ -6,7 +6,7 @@
 ## 1. État de référence
 
 - **Mise à jour :** 2026-11-15 — 0.9.2 publiée/vérifiée ; preuve native Windows GTK4/ConPTY PASS, WIN-01 partiel, MSI/WinGet prioritaires.
-- **Dernier agent :** Codex ; gestionnaire de profils Windows relié au stockage/coffre, qualifié Server2022 x64 et Windows11 ARM64 avec émulation x64.
+- **Dernier agent :** Codex ; SSH Windows/Apple simulé relié à ConPTY/coffre, qualifié Server2022 x64 et Windows11 ARM64 avec émulation x64 ; alerte portal ancienne traitée.
 - **Phase :** P1 — terminal/SFTP natifs, MVP encore incomplet.
 - **État confirmé :** terminal SSH/série intégré VTE, SFTP natif ssh2/libssh2 ; RDP/VNC externes ; profils/import/export, dossiers et paramètres persistants.
 - **Code existant :** package Rust/GTK4, ui/dialogs/profiles/store/simulation/icons ; scripts AppImage, GTK et laboratoires réseau/PTY.
@@ -1231,3 +1231,46 @@ exit255 sans stdout/stderr ; ajout PROGRAMDATA+ALLUSERSPROFILE exit0 ; ajout des
 seuls USERNAME/USERDOMAIN reste255. Restauration de ces2variables infrastructure
 non secrètes dans le lanceur. Pas de suppression de STARTF_USESTDHANDLES, ni de
 modification du contrôle known_hosts pour masquer l’échec. Labo natif à rejouer.
+
+## WIN-04 SSH Windows/Apple — preuve finale 2026-11-16
+Source6de7344, run43822234477 SUCCESS :
+https://github.com/aurelson101/rustremote/actions/runs/43822234477
+Server2022 x64 et Windows11 ARM64 (binaire x64 émulé) :7tests core,14tests prototype,
+stockage/coffre, ConPTY local et GUI existantes PASS. SSH loopback réel PASS pour
+password du coffre via askpass, clé RSA chiffrée dans chemin Unicode/espaces,
+UTF8/PTY/window-change et annulation ; mauvais mot de passe refusé. Hôte inconnu
+et clé modifiée : zéro tentative d’authentification sur le serveur de laboratoire.
+Paramiko5.1.0, aucun compte système ni shell réel. Profile MacOs simulé, pas de Mac
+physique ni ARD/VNC qualifié. Artefacts téléchargés dans
+ dist/windows-probe-validation/43822234477/{windows-2022,windows-11-arm}/.
+
+Bugs identifiés/corrigés : environnement minimal omettait PROGRAMDATA et
+ALLUSERSPROFILE ; OpenSSH quittait255 sans sortie même sur -V. Comparaison full/
+minimal/programdata prouvée dans client-startup.json run43817036780, puis correction
+sans copie de secrets d’environnement. Sur Win11, icacls conservait une ACE explicite
+OWNER RIGHTS ajoutée par MSYS2 ; DACL de la clé générée entièrement remplacée et
+vérifiée. PowerShell absent du PATH MSYS2 puis ancien PS lent sous ARM : usage du
+chemin absolu de PowerShell natif fourni par le runner. Ne jamais appliquer cette
+routine automatiquement aux clés utilisateur ; elle concerne uniquement la fixture.
+Run43816732378 échoué sur dossier diagnostic déplacé trop tôt, mkdir corrigé.
+Runs intermédiaires annulés quand remplacés ; aucun échec final masqué.
+
+Lanceur : ssh_launch.rs (argv/quotage/politique), win_ssh.rs (environnement/askpass/
+labo), conpty.rs/live.rs/live_ui.rs et bouton Connect selected dans profile_ui.rs.
+Nouveau preset New Apple SSH explicite ; modèle MacOs conservé. Aucun secret argv/
+environnement/log ; environnement contient seulement métadonnées/référence coffre.
+UserKnownHosts strict, -F none, pas de ProxyCommand/LocalCommand/forwardings.
+Config personnalisée refusée clairement ; clé sélectionnée interdit fallback password
+pour ne pas envoyer une passphrase au serveur. Agent non qualifié. Fenêtres distantes
+bornées à16. Authentification et I/O hors GTK ; job privé tue seulement sa descendance.
+
+Linux :61 tests PASS,2ignored ; fmt/check/clippy PASS ; prototype14tests et Clippy
+PASS. Rejeu SSH/SFTP GUI privé après isolation du portail GTK PASS (journal cité
+ci-dessus). La qualification SSH Windows est CLI/transport ; connexion GUI câblée
+mais souris physique, sélecteurs Windows, onboarding d’empreinte, agent, clavier/DPI
+et endurance restent ouverts. Client CI officiel OpenSSH10.4 vérifié par SHA256,
+non redistribué dans les artefacts. Pas de MSI ni nouvelle AppImage/release.
+
+Prochaine tâche : SFTP Windows avec chemins POSIX distants distincts des chemins
+locaux/UNC et anti-reparse ; puis mstsc, Apple/VNC avec tunnel et MSI. WIN-04 reste
+PARTIAL. Ne pas annoncer le portage Windows complet.
