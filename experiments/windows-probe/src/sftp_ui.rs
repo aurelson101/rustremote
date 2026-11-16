@@ -8,13 +8,32 @@ use std::{
     rc::Rc,
     sync::{
         Arc,
-        atomic::{AtomicBool, Ordering},
+        atomic::{AtomicBool, AtomicUsize, Ordering},
         mpsc,
     },
     time::Duration,
 };
 
+static WORKERS: AtomicUsize = AtomicUsize::new(0);
+struct WorkerPermit;
+impl WorkerPermit {
+    fn acquire() -> Result<Self, String> {
+        WORKERS
+            .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |count| {
+                (count < 16).then_some(count + 1)
+            })
+            .map_err(|_| "SFTP worker limit reached; wait for closed connections to stop")?;
+        Ok(Self)
+    }
+}
+impl Drop for WorkerPermit {
+    fn drop(&mut self) {
+        WORKERS.fetch_sub(1, Ordering::Relaxed);
+    }
+}
+
 enum Command {
+    Stop,
     Local(PathBuf),
     Remote(Operation, PathBuf),
 }
@@ -41,10 +60,9 @@ struct Browser {
 }
 impl Browser {
     fn send(&self, command: Command) {
-        if self.busy.get() {
+        if self.busy.get() || self.cancel.load(Ordering::Relaxed) {
             return;
         }
-        self.cancel.store(false, Ordering::Relaxed);
         self.progress.reset();
         if self.tx.try_send(command).is_err() {
             self.status
@@ -188,9 +206,11 @@ fn build(
     let progress = Arc::new(sftp::Progress::default());
     let stopped = cancel.clone();
     let meter = progress.clone();
+    let permit = WorkerPermit::acquire()?;
     std::thread::Builder::new()
         .name("windows-sftp".into())
         .spawn(move || {
+            let _permit = permit;
             let connection = match connect(&profile, laboratory_secret) {
                 Ok(connection) => connection,
                 Err(error) => {
@@ -214,6 +234,7 @@ fn build(
                     break;
                 }
                 let result = match command {
+                    Command::Stop => break,
                     Command::Local(path) => local_entries(path),
                     Command::Remote(operation, refresh) => {
                         let mut budget = Budget::new(stopped.clone()).track(meter.clone());
@@ -418,6 +439,11 @@ fn build(
     cancel_button.connect_clicked(move |_| {
         stopped.store(true, Ordering::Relaxed);
         if let Some(b) = weak.upgrade() {
+            if let Some(window) = b.window.upgrade() {
+                gtk::prelude::GtkWindowExt::set_focus(&window, None::<&gtk::Widget>);
+            }
+            b.controls.set_sensitive(false);
+            let _ = b.tx.try_send(Command::Stop);
             b.status
                 .set_text("Cancellation requested; close and reconnect after completion");
         }
@@ -738,7 +764,7 @@ pub fn laboratory() -> Result<bool, String> {
                     if let Some(button)=widget.downcast_ref::<gtk::Button>() && button.label().is_some_and(|label|label==title){return Some(button.clone());}
                     let mut child=widget.first_child();while let Some(widget)=child {if let Some(button)=find(&widget,title){return Some(button);}child=widget.next_sibling();}None
                 }
-                if let Some(button)=find(browser.controls.upcast_ref(),title){button.emit_clicked();true}else{false}
+                if let Some(button)=find(window.upcast_ref(),title){button.emit_clicked();true}else{false}
             };
             let select=|remote:bool,name:&str,activate:bool|->bool {
                 let (list,entries)=if remote{(&browser.remote,&browser.remote_entries)}else{(&browser.local,&browser.local_entries)};
@@ -779,7 +805,7 @@ pub fn laboratory() -> Result<bool, String> {
                 }
                 _=>{
                     if window.frame_clock().is_none_or(|clock|clock.frame_counter()<=capture_frame){return gtk::glib::ControlFlow::Continue;}
-                    if let Err(error)=crate::capture::window(&window,std::path::Path::new("dist/windows-probe/sftp-gui.png")){eprintln!("{error}");}else if ticks>5 {passed.set(true);println!("WINDOWS_SFTP_GUI_OK: widget activation, local/remote directory navigation, folder upload/download, binary readback, remote edit/save, confirmed recursive deletion; GTK ticks={ticks}");}
+                    if let Err(error)=crate::capture::window(&window,std::path::Path::new("dist/windows-probe/sftp-gui.png")){eprintln!("{error}");}else if ticks>5 && click("Cancel operation / disconnect") && browser.cancel.load(Ordering::Relaxed) && !browser.controls.is_sensitive() {passed.set(true);println!("WINDOWS_SFTP_GUI_OK: widget activation, local/remote directory navigation, folder upload/download, binary readback, remote edit/save, confirmed recursive deletion, sticky disconnect; GTK ticks={ticks}");}
                     window.close();app.quit();return gtk::glib::ControlFlow::Break;
                 }
             }

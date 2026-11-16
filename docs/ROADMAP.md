@@ -511,3 +511,10 @@ Backend Linux partagé avec une frontière fichiers Windows et laboratoire réel
 loopback (transferts binaires/dossiers Unicode, édition/conflit, permissions,
 annulation et refus des liens/collisions). Fixture Python PASS ; qualification
 native Windows et interface graphique SFTP restent à terminer. Aucun MSI publié.
+
+WIN-04 SFTP progrès : transport natif Server2022 PASS (5scénarios,
+run43830077411). Édition Linux/Windows corrigée avec extension POSIX atomique
+explicitement négociée ; simulateur standard renforcé et tests Linux réseau/GUI
+PASS. Navigateur Windows implémenté ; parcours réseau GUI termine sans critical
+IME après focus-out explicite. Capture de frame encore en validation, qualification
+Windows11 ARM à rejouer ; état PARTIAL, pas de MSI. Références dans MEMORY.md.

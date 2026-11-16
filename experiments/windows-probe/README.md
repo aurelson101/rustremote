@@ -2,7 +2,8 @@
 
 Rust/GTK4 Windows integration preview: local ConPTY terminal, saved profiles and
 OpenSSH connections, including macOS/Apple SSH profiles. This is not yet the complete
-Windows application, SFTP browser, RDP/VNC client, MSI or MSIX installer.
+Windows application, RDP/VNC client, MSI or MSIX installer. An experimental
+SFTP browser is now connected to the shared backend.
 It reuses `rustremote-core` profile models; Linux keeps its existing VTE and protocol adapters.
 GPL-3.0-only; root LICENSE/NOTICE apply.
 
@@ -144,4 +145,36 @@ profile metadata and a scoped vault reference are passed to the askpass helper.
 
 The connection flow is wired to the profile manager; the network qualification
 exercises the transport through the CLI rather than physical Windows GUI input.
-SFTP, RDP, Apple graphical sharing, hardware/DPI/endurance and MSI remain open.
+Final SFTP GUI qualification, RDP, Apple graphical sharing, hardware/DPI/endurance
+and MSI remain open.
+
+## SFTP integration — 2026-11-16 (partial qualification)
+
+`Open SFTP` uses the shared Rust backend with an explicit Windows filesystem
+boundary: exclusive private files, no replacement of existing downloads, refusal
+of reparse points, device namespaces, reserved DOS names and alternate streams.
+Encrypted key data is read through Rust with a read-only ACL check, then passed
+in memory to libssh2; user key permissions are never rewritten. Custom SSH
+configuration and proxies remain refused by the direct Windows adapter.
+
+Server 2022 [run43830077411](https://github.com/aurelson101/rustremote/actions/runs/43830077411)
+passes all five native SFTP transport scenarios, including encrypted keys and
+unknown/changed host rejection before authentication. GUI transfer/edit/delete
+operations completed without the previous IME critical after releasing dialog
+focus; that run failed on its empty screenshot, so it is not an overall pass.
+A rendered-frame capture guard is being qualified. Linux isolated GUI and editor
+labs pass against a strict SFTP v3 simulator. No real Mac was contacted.
+
+Remote editing now negotiates `posix-rename@openssh.com` version1 on a separate
+channel of the same authenticated session. Ordinary SFTP v3 rename is insufficient
+for atomic replacement. The small extension parser caps packets at64KiB, validates
+version/request/status and refuses unsupported servers without deleting the
+original. Server-provided error text is not logged. The stale-content check is
+best effort, not a transactional lock against concurrent remote writers.
+
+CI currently links MSYS2 libssh2/OpenSSL through pkg-config because the Rust
+Windows OpenSSL feature otherwise requests unavailable static archives. These
+runtime libraries are not redistributed. Review/update their security advisories
+and package licenses before any MSI build. Defaults remain16MiB/128entries/8levels/
+30seconds; Windows queue persistence, resumable GUI controls, drag-and-drop,
+configurable limits and physical/DPI/IME/UNC qualification remain future work.

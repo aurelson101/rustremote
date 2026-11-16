@@ -1284,3 +1284,50 @@ natif sftp_lab.rs et serveur Paramiko confiné sftp-lab-server.py ; aucun serveu
 réel. Fixture Python SSH/SFTP locale PASS ; Linux fmt/check/clippy et61tests PASS
 (2ignored), Clippy prototype PASS. CI Windows à lancer : port non encore qualifié,
 interface SFTP Windows et MSI encore ouverts.
+
+## WIN-04 SFTP — transport natif et correction édition 2026-11-16
+Commits682e1b9/26a0f35/50f36ee : backend partagé + navigateur worker dédié, deux
+panneaux, navigation clic simple, upload/download dossiers/fichiers, édition,
+mkdir/rename/delete confirmé, annulation, files/buffers bornés. Aucun I/O réseau
+sur GTK ; fermeture sans join. Profile UI ouvre SFTP et boutons passent en FlowBox.
+
+Cause réelle trouvée : ssh2::Sftp::rename émet SSH_FXP_RENAME v3, pas l’extension
+POSIX ; l’ancien simulateur autorisait à tort le remplacement standard. Commit
+0f8fdb0 ajoute sftp_replace.rs : canal SFTP séparé dans la session authentifiée,
+version3 + posix-rename v1 exigées, framing64KiB, request-id/status validés, erreurs
+serveur expurgées. Pas de fallback unlink-original. Fixture annonce explicitement
+son extension et refuse rename standard sur destination existante ; test
+permissions0755 + échec d’écriture et GUI Linux complète PASS. Le contrôle de
+conflit reste best-effort (pas de verrou transactionnel distant).
+
+Run43830077411/source70b7ba6 : tous les scénarios SFTP CLI PASS sur Server2022
+(password, clé chiffrée Unicode, mauvais password, hôte inconnu/modifié avec zéro
+auth). Rapport local dist/windows-probe-validation/43830077411/windows-2022/.
+GUI upload/download binaire, édition + suppression terminent ; run FAIL seulement
+Empty GTK snapshot. Gtk-CRITICAL Windows IME vu run43829485661 : corrigé en
+retirant le focus du dialogue avant enregistrement/fermeture (aucune désactivation
+d’IME ni des warnings). Run43830077411 avec fatal-warnings n’a plus ce critical.
+083742f avait une variable capture_frame manquante, immédiatement corrigée
+cf0ce0d après Clippy ; run obsolète43850660606 annulé.
+
+Run43850695265 sourcecf0ce0d Server2022 en cours pour garde frame_clock avant
+capture. Les runs précédents échoués ne sont pas des qualifications globales.
+43829485661 annulé pendant ARM, remplacé après correction ; Win11 ARM SFTP à
+rejouer ensuite. Linux fmt/check/clippy +63tests PASS/2ignored ; prototype21PASS/
+1ignored +Clippy ; éditeur réseau ignored rejoué PASS. GUI Linux complète PASS
+/tmp/rustremote-sftp-posix-edit-linux-regression.log ; prototype GUI Linux PASS
+/tmp/rustremote-windows-sftp-gui-linux.log. Premier lancement manuel de ce dernier
+avait oublié l’isolation des portails et timeout ; replays avec HOME/XDG/D-Bus
+privés et portail GTK, warnings applicatifs bloquants. Ne pas copier G_DEBUG
+fatal-warnings dans les services activés D-Bus.
+
+CI pkg-config libssh2 MSYS2 pour éviter static ssl absent ; aucune redistribution
+runtime. Alertes de sécurité libssh2 système à revoir/mettre à jour avant MSI.
+Restent : qualification graphique Windows finale/ARM, SFTP GUI limites/reprise/
+queue/drag-and-drop, mstsc, Apple VNC/tunnel, MSI. Aucun binaire Windows publié.
+
+Complément : déconnexion SFTP rend l’annulation définitive pour le navigateur,
+désactive les contrôles et réveille le worker au repos ; elle ne peut plus être
+réinitialisée par une nouvelle action. Quota global16workers, y compris connexions
+en cours de fermeture/résolution DNS, libéré par RAII ; aucune attente join GTK.
+Snapshot attend désormais une frame peinte (même méthode que profile_ui).

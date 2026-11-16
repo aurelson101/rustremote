@@ -138,8 +138,20 @@ Native **Server 2022** CI covers build/unit tests, streaming input/output, resiz
 normal exit/cancellation, and IM commit → ConPTY → GTK display → resize → disconnect.
 See the [validation evidence](docs/validation/windows-probe.json) and
 [manual native workflow](https://github.com/aurelson101/rustremote/actions/workflows/windows-probe.yml).
-Windows 11 remains unverified: local GTK layout simulations are not Windows OS,
-IME hardware, AD, peripheral or end-to-end protocol qualification.
+Real loopback SSH is also qualified on Server 2022 and Windows 11 ARM64 running
+an x64 executable under emulation ([SSH evidence](https://github.com/aurelson101/rustremote/actions/runs/43822234477)).
+This does not qualify physical Windows 11 x64, hardware IME, AD or peripherals.
+The profile manager stores passwords in Windows Credential Manager, supports
+optional DPAPI profile encryption and strict known_hosts checking.
+
+The prototype now includes **Open SFTP**: local/remote panes, single-click folder
+navigation, files/folders upload and download, UTF-8 remote editing, rename,
+folder creation and confirmed recursive deletion. Network and filesystem work
+runs outside GTK. Native Server 2022 transport tests pass for passwords, encrypted
+keys, Unicode/binary transfers, conflicts and permissions; browser qualification
+is being completed. Existing destinations are refused; editing requires the
+server's OpenSSH atomic-rename extension. This remains an experimental browser,
+with default transfer budgets and no persistent Windows transfer queue.
 
 ### Native Windows Server 2022 captures
 
@@ -150,8 +162,9 @@ runner, not mockups or screenshots of the complete Windows product.
 
 ![Native Server 2022 live ConPTY terminal](docs/screenshots/windows-server2022-terminal.png)
 
-Still required: shared application/profile adapters, Windows storage/credential
-protection, native SSH/SFTP/RDP integration, full UI workflows and installer tests.
+Still required: final native SFTP browser validation, RDP/mstsc and graphical
+Apple/VNC integration, remaining application adapters, full UI workflows and
+installer/dependency-security tests.
 The distribution order remains **functional Windows MVP → tested MSI → WinGet →
 MSIX and signing**. See the [ordered roadmap](docs/ROADMAP.md).
 
