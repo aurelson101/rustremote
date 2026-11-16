@@ -236,6 +236,7 @@ fn build(
         })
         .map_err(|_| "Cannot start SFTP worker")?;
     let body = gtk::Box::new(gtk::Orientation::Vertical, 10);
+    body.add_css_class("profiles");
     for side in [
         gtk::PositionType::Top,
         gtk::PositionType::Bottom,
@@ -442,6 +443,7 @@ fn build(
                     .set_sensitive(!browser.cancel.load(Ordering::Relaxed));
                 match result {
                     Ok(Event::Remote(Output::Text { path, bytes })) => {
+                        browser.status.set_text("Remote text loaded · saving checks for changes and preserves permissions");
                         editor(&browser, path, bytes)
                     }
                     Ok(event) => {
@@ -544,6 +546,7 @@ fn name_dialog(b: &Rc<Browser>, source: Option<PathBuf>) {
     dialog.add_button("Apply", gtk::ResponseType::Ok);
     let weak = Rc::downgrade(b);
     dialog.connect_response(move |dialog, response| {
+        gtk::prelude::GtkWindowExt::set_focus(dialog, None::<&gtk::Widget>);
         if response == gtk::ResponseType::Ok
             && let Some(b) = weak.upgrade()
         {
@@ -585,6 +588,7 @@ fn delete_dialog(b: &Rc<Browser>) {
         .build();
     let weak = Rc::downgrade(b);
     dialog.connect_response(move |dialog, response| {
+        gtk::prelude::GtkWindowExt::set_focus(dialog, None::<&gtk::Widget>);
         if response == gtk::ResponseType::Ok
             && let Some(b) = weak.upgrade()
         {
@@ -624,6 +628,7 @@ fn editor(b: &Rc<Browser>, path: PathBuf, original: Vec<u8>) {
     dialog.add_button("Save remotely", gtk::ResponseType::Ok);
     let weak = Rc::downgrade(b);
     dialog.connect_response(move |dialog, response| {
+        gtk::prelude::GtkWindowExt::set_focus(dialog, None::<&gtk::Widget>);
         if response == gtk::ResponseType::Ok
             && let Some(b) = weak.upgrade()
         {

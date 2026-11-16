@@ -465,6 +465,19 @@ fn build(
         });
         dialog.present();
     });
+    let wrapped = gtk::FlowBox::builder()
+        .selection_mode(gtk::SelectionMode::None)
+        .min_children_per_line(1)
+        .max_children_per_line(4)
+        .column_spacing(8)
+        .row_spacing(6)
+        .build();
+    while let Some(child) = bar.first_child() {
+        bar.remove(&child);
+        wrapped.insert(&child, -1);
+    }
+    connections.remove(&bar);
+    connections.append(&wrapped);
     let form = fields();
     let entry_fields: [(&str, &gtk::Entry); 8] = [
         ("Name", &panel.name),

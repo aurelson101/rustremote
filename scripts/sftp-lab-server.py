@@ -7,11 +7,11 @@ import paramiko
 
 
 class Files(paramiko.SFTPServerInterface):
-    def __init__(self, server, root, **kwargs):
+    def __init__(self, server, root, modes=None, **kwargs):
         super().__init__(server, **kwargs)
         self.root = root.resolve()
         self.state = server.case.state
-        self.modes = {}
+        self.modes = modes if modes is not None else {}
 
     def trace(self, operation):
         operations = self.state.setdefault("sftp_operations", [])
@@ -106,6 +106,7 @@ class Files(paramiko.SFTPServerInterface):
         try:
             path = self.path(name)
             path.rmdir()
+            self.modes.pop(path, None)
             return paramiko.SFTP_OK
         except OSError as error:
             return paramiko.SFTPServer.convert_errno(error.errno)

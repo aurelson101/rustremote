@@ -67,6 +67,7 @@ class Server:
     def __init__(self, key):
         self.key = key
         self.sftp_root = None
+        self.sftp_modes = {}
         self.listener = socket.socket()
         self.listener.bind(("127.0.0.1", 0))
         self.port = self.listener.getsockname()[1]
@@ -91,7 +92,7 @@ class Server:
             handler = Session(self.case)
             handler.case = self.case
             if self.sftp_root is not None:
-                transport.set_subsystem_handler("sftp", _files.ProtocolServer, _files.Files, root=self.sftp_root)
+                transport.set_subsystem_handler("sftp", _files.ProtocolServer, _files.Files, root=self.sftp_root, modes=self.sftp_modes)
             try:
                 transport.start_server(server=handler)
                 channel = transport.accept(12)
