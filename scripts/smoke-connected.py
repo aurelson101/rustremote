@@ -39,8 +39,13 @@ with tempfile.TemporaryDirectory(prefix="rustremote-ssh-display-") as directory:
     subprocess.run(["xauth","-f",str(auth)],input=f"add :{number} . {cookie}\n".encode(),check=True,capture_output=True)
     runtime=base/"runtime";runtime.mkdir(mode=0o700)
     home=base/"home";home.mkdir(mode=0o700)
-    os.environ.update(DISPLAY=f":{number}",XAUTHORITY=str(auth),GDK_BACKEND="x11",GSK_RENDERER="cairo",HOME=str(home),XDG_CACHE_HOME=str(base/"cache"),XDG_DATA_HOME=str(base/"data"),XDG_RUNTIME_DIR=str(runtime),XDG_CONFIG_HOME=str(config),GTK_USE_PORTAL="0",GIO_USE_VFS="local")
-    subprocess.run(["dbus-update-activation-environment","DISPLAY","XAUTHORITY","GDK_BACKEND","HOME","XDG_CACHE_HOME","XDG_RUNTIME_DIR","GTK_USE_PORTAL","GIO_USE_VFS"],check=True,capture_output=True,timeout=5)
+    assert config.is_relative_to(Path(tempfile.gettempdir()).resolve()), "Configuration de laboratoire temporaire requise"
+    # Xvfb has no GNOME Shell. Keep backend selection private and deterministic.
+    portals=config/"xdg-desktop-portal";portals.mkdir(mode=0o700)
+    with (portals/"portals.conf").open("x") as output:output.write("[preferred]\ndefault=gtk\n")
+    os.environ.update(DISPLAY=f":{number}",XAUTHORITY=str(auth),GDK_BACKEND="x11",GSK_RENDERER="cairo",HOME=str(home),XDG_CACHE_HOME=str(base/"cache"),XDG_DATA_HOME=str(base/"data"),XDG_RUNTIME_DIR=str(runtime),XDG_CONFIG_HOME=str(config),XDG_CURRENT_DESKTOP="RustRemoteLab",GTK_USE_PORTAL="0",GIO_USE_VFS="local")
+    activation_env=dict(os.environ,G_DEBUG="")
+    subprocess.run(["dbus-update-activation-environment","DISPLAY","XAUTHORITY","GDK_BACKEND","HOME","XDG_CACHE_HOME","XDG_DATA_HOME","XDG_CONFIG_HOME","XDG_CURRENT_DESKTOP","XDG_RUNTIME_DIR","GTK_USE_PORTAL","GIO_USE_VFS","G_DEBUG"],env=activation_env,check=True,capture_output=True,timeout=5)
     import gi
     gi.require_version("Atspi","2.0")
     from gi.repository import Atspi, GLib

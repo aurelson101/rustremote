@@ -1203,3 +1203,24 @@ Natif Windows encore à compiler/exécuter. Nouveau labo CI mot de passe et clé
 chiffrée Unicode/espaces, refus mauvais secret et clé d’hôte inconnue/modifiée.
 Apple désigne ici un profil SSH simulé : ne pas prétendre un Mac/ARD réel qualifié.
 SFTP, RDP mstsc, VNC/Apple graphique et MSI restent ouverts.
+
+## Ancienne alerte GNOME Portal — 2026-11-16
+Rapports SIGABRT datés15nov08:24:05/10, antérieurs au démarrage actuel. Portails
+réels actifs depuis06:34, FileChooser.version4 et ScreenCast.version5 répondent.
+Aucun nouveau crash observé. Cause historique non établie ; corrélation temporelle
+avec ancien laboratoire D-Bus/Xvfb, pas de preuve d’une panne GNOME actuelle.
+Deux rapports existants archivés réversiblement hors dépôt sous
+~/.local/state/rustremote-diagnostics/2026-11-16-portal-reports-wqrrdejt/,
+dossier0700/fichiers0600. Aucun contenu de rapport/environnement/core publié.
+Ni sudo, ni paquet modifié, ni GNOME redémarré, ni signalements désactivés.
+
+scripts/smoke-connected.py : configuration portail GTK dans le XDG_CONFIG_HOME
+éphémère uniquement, XDG_CURRENT_DESKTOP=RustRemoteLab, environnement d’activation
+D-Bus synchronisé. G_DEBUG vide pour les services de laboratoire ; warnings de
+l’application restent bloquants via RUSTREMOTE_GTK_FATAL_WARNINGS. Refus d’un
+répertoire de config non temporaire. Configuration personnelle inchangée.
+Rejeu GUI SSH/SFTP complet PASS, success/services_stopped true dans
+/tmp/rustremote-portal-isolation-validation.log ; aucun nouveau rapport portal.
+Windows SSH toujours en debug : client natif quitte255 sans sortie ; préflight
+BatchMode lui aussi silencieux avec environnement minimal. Ne pas annoncer corrigé.
+Prochaine tâche : identifier l’initialisation native OpenSSH puis finaliser WIN-04.

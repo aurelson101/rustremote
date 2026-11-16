@@ -493,3 +493,11 @@ DPI, AD ou matériel. La0.9.2 Linux est publiée avec quatre assets vérifiés.
 Anciens tags v0.5.0 à v0.9.1 supprimés sur GitHub après sauvegarde Git bundle
 vérifiée. Seuls le tag et la release v0.9.2 sont conservés ; les quatre assets
 sont inchangés. Vérifications Git/API et chemin de restauration dans MEMORY.md.
+
+## Isolation des portails GTK de laboratoire — 2026-11-16 — DONE
+
+Portail GTK explicitement choisi dans la configuration temporaire Xvfb/D-Bus ;
+activation synchronisée et warnings bloquants réservés à l’application. Parcours
+GUI SSH/SFTP complet PASS sans nouveau rapport de crash. Anciennes alertes15nov
+archivées privément ; portails GNOME personnels fonctionnels, sans sudo ni restart.
+La cause du SIGABRT ancien reste inconnue. Preuves et reprise dans MEMORY.md.
