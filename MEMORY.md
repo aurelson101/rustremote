@@ -1458,3 +1458,10 @@ qui exige sspilib sur Windows même si le serveur force NTLM pur. Dépendance
 MSYS2 signée python-sspilib ajoutée au runner uniquement, version dans le rapport
 environment. Aucune autorité de test ajoutée dans cet échec (import avantmain).
 Le test ne constitue pas encore une preuve de login.
+
+NLA run43868647701 : dépendance/compilation PASS ; TimeoutExpired pendant setup
+Windows avantcréation du peer (pas encore d’authentification). Import .NET du
+Root CurrentUser potentiellement interactif : remplacement par certutil -user
+-f sur certificat fixture uniquement, précheck absence +empreinte et postcheck
+exact. Aucun passage au LocalMachine, aucune politique affaiblie. Phases setup
+loggées pour attribuer tout nouvel échec, sortie certutil capturée non publiée.

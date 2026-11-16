@@ -48,6 +48,8 @@ logging.getLogger("spnego").addHandler(logging.NullHandler())
 logging.getLogger("spnego").propagate = False
 os.umask(0o077)
 USER, DOMAIN = "rr-lab", "RRTEST"
+CURRENT_STAGE="initialization"
+FAILURE_STAGE=None
 
 
 class LabNegotiate(NegotiateProxy):
@@ -118,22 +120,28 @@ Set-Acl -LiteralPath $env:RUSTREMOTE_NLA_ROOT -AclObject $acl
 
 
 def trust(root, thumb, add):
-    script = """$ErrorActionPreference='Stop'
-$store=[Security.Cryptography.X509Certificates.X509Store]::new('Root','CurrentUser')
-$store.Open([Security.Cryptography.X509Certificates.OpenFlags]::ReadWrite)
-try {
+    # certutil's explicit force operation avoids .NET's interactive protected-root prompt.
+    # Precheck the exact unique fixture certificate; never force over an existing entry.
+    precheck="""$ErrorActionPreference='Stop'
 $certificate=[Security.Cryptography.X509Certificates.X509Certificate2]::new([IO.File]::ReadAllBytes((Join-Path $env:RUSTREMOTE_NLA_ROOT 'ca.cer')))
 if($certificate.Thumbprint -ne $env:RUSTREMOTE_NLA_THUMB){throw 'Fixture identity mismatch'}
-$entries=$store.Certificates.Find([Security.Cryptography.X509Certificates.X509FindType]::FindByThumbprint,$env:RUSTREMOTE_NLA_THUMB,$false)
-__PRECHECK__
-__OPERATION__
-$entries=$store.Certificates.Find([Security.Cryptography.X509Certificates.X509FindType]::FindByThumbprint,$env:RUSTREMOTE_NLA_THUMB,$false)
-if($entries.Count -ne __COUNT__){throw 'Certificate store verification failed'}
+$store=[Security.Cryptography.X509Certificates.X509Store]::new('Root','CurrentUser')
+$store.Open([Security.Cryptography.X509Certificates.OpenFlags]::ReadOnly)
+try {
+$count=$store.Certificates.Find([Security.Cryptography.X509Certificates.X509FindType]::FindByThumbprint,$env:RUSTREMOTE_NLA_THUMB,$false).Count
+__CHECK__
 } finally {$store.Close()}
 """
-    script=script.replace("__PRECHECK__","if($entries.Count -ne 0){exit 17}" if add else "")
-    script=script.replace("__OPERATION__","$store.Add($certificate)" if add else "foreach($entry in $entries){$store.Remove($entry)}")
-    powershell(script.replace("__COUNT__","1" if add else "0"),root,thumb)
+    powershell(precheck.replace("__CHECK__","if($count -ne 0){exit 17}" if add else ""),root,thumb)
+    import ctypes
+    directory=ctypes.create_unicode_buffer(32768)
+    size=ctypes.windll.kernel32.GetSystemDirectoryW(directory,len(directory))
+    if not 0<size<len(directory):raise RuntimeError("Windows system directory unavailable")
+    command=[str(Path(directory.value)/"certutil.exe"),"-user","-f","-addstore" if add else "-delstore","Root",str(root/"ca.cer") if add else thumb]
+    result=subprocess.run(command,capture_output=True,timeout=20)
+    # Removal may find nothing after an add operation failed; verify state independently.
+    if add and result.returncode:raise RuntimeError("Fixture CA import failed")
+    powershell(precheck.replace("__CHECK__","if($count -ne "+("1" if add else "0")+"){throw 'Fixture trust state mismatch'}"),root,thumb)
 
 
 def receive(stream, length):
@@ -239,40 +247,48 @@ def verify_fixture(peer, root, password):
 
 
 def main():
+    global CURRENT_STAGE, FAILURE_STAGE
     parser=argparse.ArgumentParser();parser.add_argument("--verify-fixture",action="store_true");parser.add_argument("--native",type=Path);parser.add_argument("--fetch-deps",action="store_true");args=parser.parse_args()
     if not args.verify_fixture and not (args.native and sys.platform=="win32" and os.environ.get("GITHUB_ACTIONS")=="true"):
         parser.error("Native certificate changes are restricted to an ephemeral GitHub Windows runner")
     trusted=False;peer=None
     with tempfile.TemporaryDirectory(prefix="RustRemote NLA ") as folder:
         root=Path(folder)
+        CURRENT_STAGE="secure-folder"
         if sys.platform=="win32":secure_folder(root)
         password=secrets.token_urlsafe(24)+"é"
         user_file=root/"ntlm-cache"
         user_file.write_text(f"{DOMAIN}\\{USER}:0:{'0'*32}:{ntowfv1(password).hex()}:[U]:LCT-0\n",encoding="utf-8")
         previous=os.environ.get("NTLM_USER_FILE");os.environ["NTLM_USER_FILE"]=str(user_file)
         try:
+            CURRENT_STAGE="certificate-generation"
             context,thumb=certificate(root)
             if not args.verify_fixture:
+                CURRENT_STAGE="trust-add"
                 trusted=True
                 try:trust(root,thumb,True)
                 except ExistingLabCertificate:
                     trusted=False
                     raise
+            CURRENT_STAGE="peer-start"
             peer=Peer(context,root,password)
             if args.verify_fixture:verify_fixture(peer,root,password)
             else:
                 profile=dict(name="CredSSP loopback lab",host="127.0.0.1",port=peer.port,username=USER,favorite=False,
                     options=dict(protocol="Rdp",domain=DOMAIN,width=1280,height=720,fullscreen=False,clipboard=False,clipboard_files=False))
+                CURRENT_STAGE="native-client"
                 result=subprocess.run([str(args.native.resolve(strict=True)),"--self-test-rdp-nla"],
                     input=json.dumps(dict(profile=profile,secret=password,state=str(root/"rdp-nla-state.json"))),
                     text=True,encoding="utf-8",capture_output=True,timeout=40)
                 peer.state["native_exit"]=result.returncode
                 if result.returncode:raise RuntimeError("Native RDP lab client did not complete")
             peer.close()
+            CURRENT_STAGE="credential-verification"
             if not all(peer.state.get(key) for key in ("negotiation","credssp_complete","account_match","password_match")):
                 raise RuntimeError("Native RDP profile credential was not authenticated")
             report=dict(result="PASS",target="127.0.0.1",real_windows_account=False,desktop_session=False,**peer.state)
         except Exception:
+            FAILURE_STAGE=CURRENT_STAGE
             if peer: print(json.dumps({"stage":"CredSSP", "events":peer.state}))
             raise
         finally:
@@ -280,7 +296,9 @@ def main():
                 if peer and peer.worker.is_alive():peer.close()
             finally:
                 try:
-                    if trusted:trust(root,thumb,False)
+                    if trusted:
+                        CURRENT_STAGE="trust-remove"
+                        trust(root,thumb,False)
                 finally:
                     if previous is None:os.environ.pop("NTLM_USER_FILE",None)
                     else:os.environ["NTLM_USER_FILE"]=previous
@@ -291,5 +309,5 @@ def main():
 if __name__=="__main__":
     try:main()
     except Exception as error:
-        print(json.dumps({"result":"FAIL","error_class":type(error).__name__,"raw_tokens_logged":False}))
+        print(json.dumps({"result":"FAIL","stage":FAILURE_STAGE or CURRENT_STAGE,"error_class":type(error).__name__,"raw_tokens_logged":False}))
         sys.exit(1)
