@@ -1,0 +1,635 @@
+//! Small native browser over the shared backend. All filesystem/network I/O stays on one worker.
+use crate::sftp::{self, Budget, Operation, Output};
+use gtk::prelude::*;
+use rustremote_core::profiles::SessionProfile;
+use std::{
+    cell::{Cell, RefCell},
+    path::PathBuf,
+    rc::Rc,
+    sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+        mpsc,
+    },
+    time::Duration,
+};
+
+enum Command {
+    Local(PathBuf),
+    Remote(Operation, PathBuf),
+}
+enum Event {
+    Local(PathBuf, Vec<sftp::Entry>),
+    Remote(Output),
+}
+struct Browser {
+    window: gtk::glib::WeakRef<gtk::ApplicationWindow>,
+    controls: gtk::Box,
+    local: gtk::ListBox,
+    remote: gtk::ListBox,
+    local_path: gtk::Entry,
+    remote_path: gtk::Entry,
+    status: gtk::Label,
+    local_entries: RefCell<Vec<sftp::Entry>>,
+    remote_entries: RefCell<Vec<sftp::Entry>>,
+    cwd: RefCell<PathBuf>,
+    remote_cwd: RefCell<PathBuf>,
+    busy: Cell<bool>,
+    cancel: Arc<AtomicBool>,
+    tx: mpsc::SyncSender<Command>,
+    progress: Arc<sftp::Progress>,
+}
+impl Browser {
+    fn send(&self, command: Command) {
+        if self.busy.get() {
+            return;
+        }
+        self.cancel.store(false, Ordering::Relaxed);
+        self.progress.reset();
+        if self.tx.try_send(command).is_err() {
+            self.status
+                .set_text("SFTP worker unavailable; close and reconnect");
+            return;
+        }
+        self.busy.set(true);
+        if let Some(window) = self.window.upgrade() {
+            gtk::prelude::GtkWindowExt::set_focus(&window, None::<&gtk::Widget>);
+        }
+        self.controls.set_sensitive(false);
+        self.status.set_text("Working…");
+    }
+    fn list_remote(&self, path: PathBuf) {
+        self.send(Command::Remote(Operation::List(path.clone()), path));
+    }
+    fn selected(&self, remote: bool) -> Vec<(PathBuf, bool)> {
+        let (list, entries, cwd) = if remote {
+            (&self.remote, &self.remote_entries, &self.remote_cwd)
+        } else {
+            (&self.local, &self.local_entries, &self.cwd)
+        };
+        list.selected_rows()
+            .iter()
+            .filter_map(|row| {
+                entries
+                    .borrow()
+                    .get(row.index() as usize)
+                    .and_then(|entry| {
+                        (entry.directory || entry.regular)
+                            .then(|| (cwd.borrow().join(&entry.name), entry.directory))
+                    })
+            })
+            .collect()
+    }
+    fn action(&self, operation: Operation) {
+        self.send(Command::Remote(operation, self.remote_cwd.borrow().clone()));
+    }
+    fn update(&self, event: Event) {
+        match event {
+            Event::Local(path, entries) => {
+                self.local_path.set_text(&path.to_string_lossy());
+                *self.cwd.borrow_mut() = path;
+                fill(&self.local, &entries);
+                *self.local_entries.borrow_mut() = entries;
+            }
+            Event::Remote(Output::Entries { path, entries }) => {
+                self.remote_path.set_text(&path.to_string_lossy());
+                *self.remote_cwd.borrow_mut() = path;
+                fill(&self.remote, &entries);
+                *self.remote_entries.borrow_mut() = entries;
+            }
+            _ => {}
+        }
+    }
+}
+fn fill(list: &gtk::ListBox, entries: &[sftp::Entry]) {
+    while let Some(child) = list.first_child() {
+        list.remove(&child);
+    }
+    for entry in entries {
+        let line = gtk::Box::new(gtk::Orientation::Horizontal, 8);
+        line.append(&gtk::Image::from_icon_name(if entry.directory {
+            "folder-symbolic"
+        } else if entry.regular {
+            "text-x-generic-symbolic"
+        } else {
+            "emblem-unreadable-symbolic"
+        }));
+        let label = gtk::Label::new(Some(&format!("{}   · {} B", entry.name, entry.size)));
+        label.set_xalign(0.0);
+        label.set_ellipsize(gtk::pango::EllipsizeMode::Middle);
+        line.append(&label);
+        line.set_margin_top(6);
+        line.set_margin_bottom(6);
+        list.append(&line);
+    }
+}
+fn local_entries(path: PathBuf) -> Result<Event, String> {
+    let meta = crate::sftp_platform::metadata(&path).map_err(|_| "Cannot access local folder")?;
+    if !meta.is_dir() || meta.is_symlink() {
+        return Err("A regular local folder is required".into());
+    }
+    let mut entries = Vec::new();
+    for item in std::fs::read_dir(&path)
+        .map_err(|_| "Cannot list local folder")?
+        .take(4097)
+    {
+        if entries.len() == 4096 {
+            return Err("Local listing exceeds 4096 entries".into());
+        }
+        let item = item.map_err(|_| "Local listing interrupted")?;
+        let name = item
+            .file_name()
+            .into_string()
+            .map_err(|_| "Non-Unicode filename refused")?;
+        // Ineligible entries remain visible, but cannot be opened or transferred.
+        let meta = crate::sftp_platform::metadata(&item.path()).ok();
+        entries.push(sftp::Entry {
+            name,
+            directory: meta.as_ref().is_some_and(|m| m.is_dir() && !m.is_symlink()),
+            regular: meta
+                .as_ref()
+                .is_some_and(|m| m.is_file() && !m.is_symlink()),
+            size: meta.map_or(0, |m| m.len()),
+        });
+    }
+    entries.sort_by(|a, b| b.directory.cmp(&a.directory).then(a.name.cmp(&b.name)));
+    Ok(Event::Local(path, entries))
+}
+fn connect(profile: &SessionProfile) -> Result<sftp::Connection, String> {
+    #[cfg(windows)]
+    let secret = crate::win_credentials::read(profile)?;
+    #[cfg(not(windows))]
+    let secret: Option<zeroize::Zeroizing<String>> = None;
+    sftp::Connection::connect(profile, secret.as_deref().map(|s| s.as_str()))
+}
+
+pub fn open(parent: &gtk::ApplicationWindow, profile: SessionProfile) -> Result<(), String> {
+    crate::ssh_launch::arguments(&profile)?;
+    let app = parent.application().ok_or("Application unavailable")?;
+    if app.windows().len() >= 18 {
+        return Err("Close an existing session first (16 remote windows maximum)".into());
+    }
+    let (tx, requests) = mpsc::sync_channel::<Command>(1);
+    let (events, rx) = mpsc::sync_channel(1);
+    let cancel = Arc::new(AtomicBool::new(false));
+    let progress = Arc::new(sftp::Progress::default());
+    let stopped = cancel.clone();
+    let meter = progress.clone();
+    std::thread::Builder::new()
+        .name("windows-sftp".into())
+        .spawn(move || {
+            let connection = match connect(&profile) {
+                Ok(connection) => connection,
+                Err(error) => {
+                    let _ = events.send(Err(error));
+                    return;
+                }
+            };
+            let mut budget = Budget::new(stopped.clone()).track(meter.clone());
+            if events
+                .send(
+                    connection
+                        .run(Operation::List(".".into()), &mut budget)
+                        .map(Event::Remote),
+                )
+                .is_err()
+            {
+                return;
+            }
+            while let Ok(command) = requests.recv() {
+                if stopped.load(Ordering::Relaxed) {
+                    break;
+                }
+                let result = match command {
+                    Command::Local(path) => local_entries(path),
+                    Command::Remote(operation, refresh) => {
+                        let mut budget = Budget::new(stopped.clone()).track(meter.clone());
+                        connection.run(operation, &mut budget).and_then(|output| {
+                            if matches!(output, Output::Done(_)) {
+                                connection
+                                    .run(Operation::List(refresh), &mut budget)
+                                    .map(Event::Remote)
+                            } else {
+                                Ok(Event::Remote(output))
+                            }
+                        })
+                    }
+                };
+                if events.send(result).is_err() {
+                    break;
+                }
+            }
+            connection.abort();
+        })
+        .map_err(|_| "Cannot start SFTP worker")?;
+    let body = gtk::Box::new(gtk::Orientation::Vertical, 10);
+    for side in [
+        gtk::PositionType::Top,
+        gtk::PositionType::Bottom,
+        gtk::PositionType::Left,
+        gtk::PositionType::Right,
+    ] {
+        match side {
+            gtk::PositionType::Top => body.set_margin_top(12),
+            gtk::PositionType::Bottom => body.set_margin_bottom(12),
+            gtk::PositionType::Left => body.set_margin_start(12),
+            _ => body.set_margin_end(12),
+        }
+    }
+    let controls = gtk::Box::new(gtk::Orientation::Vertical, 10);
+    let toolbar = gtk::FlowBox::builder()
+        .selection_mode(gtk::SelectionMode::None)
+        .max_children_per_line(6)
+        .column_spacing(8)
+        .row_spacing(6)
+        .build();
+    controls.append(&toolbar);
+    let panes = gtk::Paned::new(gtk::Orientation::Horizontal);
+    panes.set_wide_handle(true);
+    panes.set_vexpand(true);
+    let local = gtk::ListBox::new();
+    let remote = gtk::ListBox::new();
+    let local_path = gtk::Entry::new();
+    let remote_path = gtk::Entry::new();
+    for (index, (title, entry, list)) in [
+        ("Local site", &local_path, &local),
+        ("Remote site", &remote_path, &remote),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let column = gtk::Box::new(gtk::Orientation::Vertical, 6);
+        column.append(&gtk::Label::new(Some(title)));
+        column.append(entry);
+        list.set_selection_mode(gtk::SelectionMode::Multiple);
+        list.set_activate_on_single_click(true);
+        let scroll = gtk::ScrolledWindow::builder()
+            .hexpand(true)
+            .vexpand(true)
+            .min_content_width(230)
+            .min_content_height(220)
+            .child(list)
+            .build();
+        column.append(&scroll);
+        if index == 0 {
+            panes.set_start_child(Some(&column));
+        } else {
+            panes.set_end_child(Some(&column));
+        }
+    }
+    controls.append(&panes);
+    body.append(&controls);
+    let status = gtk::Label::new(Some("Connecting with strict host-key validation…"));
+    status.set_wrap(true);
+    status.set_xalign(0.0);
+    body.append(&status);
+    let cancel_button = gtk::Button::with_label("Cancel operation / disconnect");
+    body.append(&cancel_button);
+    let window = gtk::ApplicationWindow::builder()
+        .application(&app)
+        .transient_for(parent)
+        .title("RustRemote — SFTP")
+        .default_width(1040)
+        .default_height(680)
+        .child(&body)
+        .build();
+    let home = std::env::var_os(if cfg!(windows) { "USERPROFILE" } else { "HOME" })
+        .map(PathBuf::from)
+        .unwrap_or_default();
+    let browser = Rc::new(Browser {
+        window: window.downgrade(),
+        controls,
+        local,
+        remote,
+        local_path,
+        remote_path,
+        status,
+        local_entries: RefCell::new(Vec::new()),
+        remote_entries: RefCell::new(Vec::new()),
+        cwd: RefCell::new(home),
+        remote_cwd: RefCell::new(".".into()),
+        busy: Cell::new(true),
+        cancel,
+        tx,
+        progress,
+    });
+    browser.controls.set_sensitive(false);
+    for (entry, remote) in [(&browser.local_path, false), (&browser.remote_path, true)] {
+        let weak = Rc::downgrade(&browser);
+        entry.connect_activate(move |entry| {
+            if let Some(b) = weak.upgrade() {
+                let path = PathBuf::from(entry.text().as_str());
+                if remote {
+                    b.list_remote(path);
+                } else {
+                    b.send(Command::Local(path));
+                }
+            }
+        });
+    }
+    for (list, remote) in [(&browser.local, false), (&browser.remote, true)] {
+        let weak = Rc::downgrade(&browser);
+        list.connect_row_activated(move |_, row| {
+            if let Some(b) = weak.upgrade() {
+                let entries = if remote {
+                    &b.remote_entries
+                } else {
+                    &b.local_entries
+                };
+                let name = entries
+                    .borrow()
+                    .get(row.index() as usize)
+                    .filter(|e| e.directory)
+                    .map(|e| e.name.clone());
+                if let Some(name) = name {
+                    if remote {
+                        let path = b.remote_cwd.borrow().join(name);
+                        b.list_remote(path);
+                    } else {
+                        let path = b.cwd.borrow().join(name);
+                        b.send(Command::Local(path));
+                    }
+                }
+            }
+        });
+    }
+    button(&toolbar, "Local parent", &browser, |b| {
+        let path = b.cwd.borrow().parent().map(PathBuf::from);
+        if let Some(path) = path {
+            b.send(Command::Local(path));
+        }
+    });
+    button(&toolbar, "Remote parent", &browser, |b| {
+        let path = b
+            .remote_cwd
+            .borrow()
+            .parent()
+            .map(PathBuf::from)
+            .unwrap_or("/".into());
+        b.list_remote(path);
+    });
+    button(&toolbar, "Refresh local", &browser, |b| {
+        let path = b.cwd.borrow().clone();
+        b.send(Command::Local(path));
+    });
+    button(&toolbar, "Refresh remote", &browser, |b| {
+        let path = b.remote_cwd.borrow().clone();
+        b.list_remote(path);
+    });
+    button(&toolbar, "Upload →", &browser, |b| transfer(b, true));
+    button(&toolbar, "← Download", &browser, |b| transfer(b, false));
+    button(&toolbar, "New remote folder…", &browser, |b| {
+        name_dialog(b, None)
+    });
+    button(&toolbar, "Rename remote…", &browser, |b| {
+        let selected = b.selected(true);
+        if selected.len() == 1 {
+            name_dialog(b, Some(selected[0].0.clone()));
+        } else {
+            b.status.set_text("Select one remote entry");
+        }
+    });
+    button(&toolbar, "Edit remote…", &browser, |b| {
+        let selected = b.selected(true);
+        if selected.len() == 1 && !selected[0].1 {
+            b.action(Operation::Read(selected[0].0.clone()));
+        } else {
+            b.status
+                .set_text("Select one regular remote file (UTF-8, maximum 1 MiB)");
+        }
+    });
+    button(&toolbar, "Delete remote…", &browser, delete_dialog);
+    let stopped = browser.cancel.clone();
+    let weak = Rc::downgrade(&browser);
+    cancel_button.connect_clicked(move |_| {
+        stopped.store(true, Ordering::Relaxed);
+        if let Some(b) = weak.upgrade() {
+            b.status
+                .set_text("Cancellation requested; close and reconnect after completion");
+        }
+    });
+    let stopped = browser.cancel.clone();
+    window.connect_close_request(move |_| {
+        stopped.store(true, Ordering::Relaxed);
+        gtk::glib::Propagation::Proceed
+    });
+    let mut initial = true;
+    gtk::glib::timeout_add_local(Duration::from_millis(50), move || {
+        if browser.window.upgrade().is_none_or(|w| !w.is_visible()) {
+            browser.cancel.store(true, Ordering::Relaxed);
+            return gtk::glib::ControlFlow::Break;
+        }
+        match rx.try_recv() {
+            Ok(result) => {
+                let success = result.is_ok();
+                browser.busy.set(false);
+                browser
+                    .controls
+                    .set_sensitive(!browser.cancel.load(Ordering::Relaxed));
+                match result {
+                    Ok(Event::Remote(Output::Text { path, bytes })) => {
+                        editor(&browser, path, bytes)
+                    }
+                    Ok(event) => {
+                        browser.update(event);
+                        browser.status.set_text("Ready · defaults: 16 MiB / 128 entries / 30 seconds per operation; existing destinations are never replaced");
+                    }
+                    Err(error) => browser.status.set_text(&error),
+                }
+                if initial && success {
+                    initial = false;
+                    let path = browser.cwd.borrow().clone();
+                    browser.send(Command::Local(path));
+                }
+            }
+            Err(mpsc::TryRecvError::Empty) => {
+                if browser.busy.get() {
+                    let (bytes, entries) = browser.progress.snapshot();
+                    browser
+                        .status
+                        .set_text(&format!("Working… {bytes} bytes · {entries} entries"));
+                }
+            }
+            Err(mpsc::TryRecvError::Disconnected) => {
+                browser.controls.set_sensitive(false);
+                if browser.busy.replace(false) {
+                    browser
+                        .status
+                        .set_text("SFTP worker stopped; close and reconnect");
+                }
+                return gtk::glib::ControlFlow::Break;
+            }
+        }
+        gtk::glib::ControlFlow::Continue
+    });
+    window.present();
+    Ok(())
+}
+fn button(
+    bar: &gtk::FlowBox,
+    title: &str,
+    browser: &Rc<Browser>,
+    action: impl Fn(&Rc<Browser>) + 'static,
+) {
+    let button = gtk::Button::with_label(title);
+    let weak = Rc::downgrade(browser);
+    button.connect_clicked(move |_| {
+        if let Some(browser) = weak.upgrade()
+            && !browser.busy.get()
+        {
+            action(&browser);
+        }
+    });
+    bar.insert(&button, -1);
+}
+fn transfer(b: &Rc<Browser>, upload: bool) {
+    let selected = b.selected(!upload);
+    if selected.is_empty() || selected.len() > 128 {
+        b.status.set_text("Select 1–128 files or folders");
+        return;
+    }
+    let operations = selected
+        .into_iter()
+        .map(|(path, _)| {
+            let name = path.file_name().ok_or("Invalid entry name")?;
+            if upload {
+                Ok(Operation::Upload {
+                    remote: b.remote_cwd.borrow().join(name),
+                    local: path,
+                })
+            } else {
+                Ok(Operation::Download {
+                    local: b.cwd.borrow().join(name),
+                    remote: path,
+                })
+            }
+        })
+        .collect::<Result<Vec<_>, &str>>();
+    match operations {
+        Ok(ops) => b.action(Operation::Batch(ops)),
+        Err(error) => b.status.set_text(error),
+    }
+}
+fn name_dialog(b: &Rc<Browser>, source: Option<PathBuf>) {
+    let Some(parent) = b.window.upgrade() else {
+        return;
+    };
+    let dialog = gtk::Dialog::builder()
+        .transient_for(&parent)
+        .modal(true)
+        .title(if source.is_some() {
+            "Rename remote entry"
+        } else {
+            "New remote folder"
+        })
+        .build();
+    let entry = gtk::Entry::new();
+    entry.set_max_length(255);
+    dialog.content_area().append(&entry);
+    dialog.add_button("Cancel", gtk::ResponseType::Cancel);
+    dialog.add_button("Apply", gtk::ResponseType::Ok);
+    let weak = Rc::downgrade(b);
+    dialog.connect_response(move |dialog, response| {
+        if response == gtk::ResponseType::Ok
+            && let Some(b) = weak.upgrade()
+        {
+            let name = entry.text();
+            match sftp::component(&name) {
+                Ok(()) => {
+                    let to = b.remote_cwd.borrow().join(name.as_str());
+                    b.action(if let Some(from) = &source {
+                        Operation::Rename {
+                            from: from.clone(),
+                            to,
+                        }
+                    } else {
+                        Operation::Mkdir(to)
+                    });
+                }
+                Err(error) => b.status.set_text(&error),
+            }
+        }
+        dialog.close();
+    });
+    dialog.present();
+}
+fn delete_dialog(b: &Rc<Browser>) {
+    let selected = b.selected(true);
+    if selected.is_empty() || selected.len() > 128 {
+        b.status.set_text("Select 1–128 remote entries");
+        return;
+    }
+    let Some(parent) = b.window.upgrade() else {
+        return;
+    };
+    let dialog = gtk::MessageDialog::builder()
+        .transient_for(&parent)
+        .modal(true)
+        .text(format!("Delete {} remote entries?", selected.len()))
+        .secondary_text("Directories are removed recursively. This cannot be undone.")
+        .buttons(gtk::ButtonsType::OkCancel)
+        .build();
+    let weak = Rc::downgrade(b);
+    dialog.connect_response(move |dialog, response| {
+        if response == gtk::ResponseType::Ok
+            && let Some(b) = weak.upgrade()
+        {
+            b.action(Operation::Batch(
+                selected
+                    .iter()
+                    .map(|(p, _)| Operation::Delete(p.clone()))
+                    .collect(),
+            ));
+        }
+        dialog.close();
+    });
+    dialog.present();
+}
+fn editor(b: &Rc<Browser>, path: PathBuf, original: Vec<u8>) {
+    let Some(parent) = b.window.upgrade() else {
+        return;
+    };
+    let dialog = gtk::Dialog::builder()
+        .transient_for(&parent)
+        .modal(true)
+        .title("Remote UTF-8 editor")
+        .default_width(760)
+        .default_height(520)
+        .build();
+    let view = gtk::TextView::new();
+    view.set_monospace(true);
+    view.buffer().set_text(&String::from_utf8_lossy(&original));
+    dialog.content_area().append(
+        &gtk::ScrolledWindow::builder()
+            .hexpand(true)
+            .vexpand(true)
+            .child(&view)
+            .build(),
+    );
+    dialog.add_button("Close", gtk::ResponseType::Cancel);
+    dialog.add_button("Save remotely", gtk::ResponseType::Ok);
+    let weak = Rc::downgrade(b);
+    dialog.connect_response(move |dialog, response| {
+        if response == gtk::ResponseType::Ok
+            && let Some(b) = weak.upgrade()
+        {
+            let buffer = view.buffer();
+            if buffer.char_count() > 1024 * 1024 {
+                b.status.set_text("Editor exceeds 1 MiB");
+                dialog.close();
+                return;
+            }
+            let text = buffer
+                .text(&buffer.start_iter(), &buffer.end_iter(), false)
+                .as_bytes()
+                .to_vec();
+            b.action(Operation::Save {
+                path: path.clone(),
+                original: original.clone(),
+                text,
+            });
+        }
+        dialog.close();
+    });
+    dialog.present();
+}

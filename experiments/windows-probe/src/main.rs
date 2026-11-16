@@ -19,6 +19,7 @@ mod sftp_platform;
 mod profiles {
     pub use rustremote_core::profiles::*;
 }
+mod sftp_ui;
 mod ssh_launch;
 #[cfg(windows)]
 #[path = "win_route.rs"]

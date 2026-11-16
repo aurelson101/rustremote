@@ -26,6 +26,7 @@ jobs:
     env:
       CARGO_BUILD_JOBS: '2'
       GSK_RENDERER: cairo
+      LIBSSH2_SYS_USE_PKG_CONFIG: '1'
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
@@ -90,6 +91,7 @@ jobs:
             mingw-w64-ucrt-x86_64-pkgconf
             mingw-w64-ucrt-x86_64-python-paramiko
             mingw-w64-ucrt-x86_64-openssl
+            mingw-w64-ucrt-x86_64-libssh2
       - name: Native operating system and architecture
         shell: pwsh
         run: |

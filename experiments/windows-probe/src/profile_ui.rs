@@ -411,6 +411,22 @@ fn build(
         }
     });
     connect.set_sensitive(cfg!(windows));
+    let sftp = action("Open SFTP", &bar, &panel, |p| {
+        let profile = p
+            .list
+            .selected_row()
+            .and_then(|row| p.data.borrow().profiles.get(row.index() as usize).cloned());
+        if let Some(profile) = profile
+            && let Some(parent) = p.window.upgrade()
+        {
+            if let Err(error) = crate::sftp_ui::open(&parent, profile) {
+                p.status.set_text(&error);
+            }
+        } else {
+            p.status.set_text("Select an SSH connection first");
+        }
+    });
+    sftp.set_sensitive(cfg!(windows));
     action("Edit selected", &bar, &panel, |p| {
         if let Some(row) = p.list.selected_row() {
             p.fill(Some(row.index() as usize));
