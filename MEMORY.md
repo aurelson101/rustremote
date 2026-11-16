@@ -1465,3 +1465,10 @@ Root CurrentUser potentiellement interactif : remplacement par certutil -user
 -f sur certificat fixture uniquement, précheck absence +empreinte et postcheck
 exact. Aucun passage au LocalMachine, aucune politique affaiblie. Phases setup
 loggées pour attribuer tout nouvel échec, sortie certutil capturée non publiée.
+
+NLA run43870682362 : phase trust-add confirmée en timeout, avant peer/auth.
+certutil CurrentUser déclenche aussi confirmation protégée. Le labo vérifie
+maintenant la fenêtre du seul PID certutil lancé, sujet fixture exact +empreinte
+SHA1 complète, avant action IDYES ; aucun prompt RDP/credential accepté. Refus si
+identité non reconnue, aucune capture ni texte de fenêtre publié. Même garde
+GITHUB_ACTIONS et compteCI jetable, CurrentUser seulement. Timeout reste bloquant.

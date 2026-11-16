@@ -119,6 +119,65 @@ Set-Acl -LiteralPath $env:RUSTREMOTE_NLA_ROOT -AclObject $acl
 """,root)
 
 
+def approve_fixture_certificate(pid, thumb, subject):
+    """Approve only our CI certutil's exact generated public certificate, never an RDP warning."""
+    if os.environ.get("GITHUB_ACTIONS")!="true":return False
+    import ctypes, re
+    from ctypes import wintypes as w
+    user=ctypes.WinDLL("user32",use_last_error=True)
+    callback=ctypes.WINFUNCTYPE(w.BOOL,w.HWND,w.LPARAM)
+    user.EnumWindows.argtypes=[callback,w.LPARAM]
+    user.EnumChildWindows.argtypes=[w.HWND,callback,w.LPARAM]
+    user.GetWindowThreadProcessId.argtypes=[w.HWND,ctypes.POINTER(w.DWORD)]
+    user.GetClassNameW.argtypes=[w.HWND,w.LPWSTR,ctypes.c_int]
+    user.GetDlgCtrlID.argtypes=[w.HWND]
+    user.SendMessageTimeoutW.argtypes=[w.HWND,w.UINT,w.WPARAM,w.LPARAM,w.UINT,w.UINT,ctypes.POINTER(ctypes.c_size_t)]
+    approved=False
+    @callback
+    def top(window,unused):
+        nonlocal approved
+        owner=w.DWORD();user.GetWindowThreadProcessId(window,ctypes.byref(owner))
+        if owner.value!=pid:return True
+        texts=[];buttons=[];visited=0
+        @callback
+        def child(control,unused):
+            nonlocal visited
+            visited+=1
+            if visited>128:return False
+            name=ctypes.create_unicode_buffer(64);user.GetClassNameW(control,name,len(name))
+            if name.value not in ("Static","Button"):return True
+            text=ctypes.create_unicode_buffer(4096);length=ctypes.c_size_t()
+            user.SendMessageTimeoutW(control,0x000D,len(text),ctypes.cast(text,ctypes.c_void_p).value,3,50,ctypes.byref(length))
+            texts.append(text.value)
+            if name.value=="Button" and user.GetDlgCtrlID(control)==6:buttons.append(control)
+            return True
+        user.EnumChildWindows(window,child,0)
+        text="\n".join(texts)
+        if subject in text and thumb in re.sub("[^0-9A-F]","",text.upper()) and len(buttons)==1:
+            result=ctypes.c_size_t()
+            user.SendMessageTimeoutW(buttons[0],0x00F5,0,0,3,100,ctypes.byref(result))
+            approved=True
+        return True
+    user.EnumWindows(top,0)
+    return approved
+
+
+def certificate_command(command, root, thumb):
+    subject=x509.load_der_x509_certificate((root/"ca.cer").read_bytes()).subject.get_attributes_for_oid(NameOID.COMMON_NAME)[0].value
+    if not subject.startswith("RustRemote loopback lab "):raise RuntimeError("Unexpected fixture certificate subject")
+    with subprocess.Popen(command,stdout=subprocess.PIPE,stderr=subprocess.PIPE) as process:
+        deadline=time.monotonic()+20
+        while True:
+            try:
+                stdout,stderr=process.communicate(timeout=.25)
+                return subprocess.CompletedProcess(command,process.returncode,stdout,stderr)
+            except subprocess.TimeoutExpired:
+                approve_fixture_certificate(process.pid,thumb,subject)
+                if time.monotonic()>deadline:
+                    process.kill();process.communicate()
+                    raise TimeoutError("Owned fixture certificate confirmation did not complete")
+
+
 def trust(root, thumb, add):
     # certutil's explicit force operation avoids .NET's interactive protected-root prompt.
     # Precheck the exact unique fixture certificate; never force over an existing entry.
@@ -138,7 +197,7 @@ __CHECK__
     size=ctypes.windll.kernel32.GetSystemDirectoryW(directory,len(directory))
     if not 0<size<len(directory):raise RuntimeError("Windows system directory unavailable")
     command=[str(Path(directory.value)/"certutil.exe"),"-user","-f","-addstore" if add else "-delstore","Root",str(root/"ca.cer") if add else thumb]
-    result=subprocess.run(command,capture_output=True,timeout=20)
+    result=certificate_command(command,root,thumb)
     # Removal may find nothing after an add operation failed; verify state independently.
     if add and result.returncode:raise RuntimeError("Fixture CA import failed")
     powershell(precheck.replace("__CHECK__","if($count -ne "+("1" if add else "0")+"){throw 'Fixture trust state mismatch'}"),root,thumb)
