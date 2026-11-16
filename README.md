@@ -148,8 +148,8 @@ The prototype now includes **Open SFTP**: local/remote panes, single-click folde
 navigation, files/folders upload and download, UTF-8 remote editing, rename,
 folder creation and confirmed recursive deletion. Network and filesystem work
 runs outside GTK. Native Server 2022 transport tests pass for passwords, encrypted
-keys, Unicode/binary transfers, conflicts and permissions; browser qualification
-is being completed. Existing destinations are refused; editing requires the
+keys, Unicode/binary transfers, conflicts and permissions; browser qualification passes on Server 2022 and Windows 11 ARM64 with an x64
+executable under emulation ([native run43852937335](https://github.com/aurelson101/rustremote/actions/runs/43852937335)). Existing destinations are refused; editing requires the
 server's OpenSSH atomic-rename extension. This remains an experimental browser,
 with default transfer budgets and no persistent Windows transfer queue.
 

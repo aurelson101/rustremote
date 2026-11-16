@@ -530,3 +530,9 @@ Deux tests et parcours GUI des options (persist/export/import) PASS sur Linux ;
 CLI Windows sans réseau ajouté en CI. Session RDP native, clipboard/fichiers/
 dossiers, authentification AD et périphériques non qualifiés. SFTP final reste
 en file GitHub sans runner ; aucun MSI, Apple/VNC Windows encore ouvert.
+
+Preuve native bcfcff1 : run43852937335 SUCCESS Server2022 x64 +Win11 ARM64/x64
+émulé ; SSH/SFTP CLI et GUI (transferts/édition/annulation) PASS, stockage/coffre
+PASS. Configuration privée .rdp et persistance GUI des options PASS ; pas de
+session RDP ni de validation du clipboard/périphériques. WIN-04 conserve ses
+limites queue/reprise GUI ; WIN-05 reste PARTIAL avant Apple/VNC et MSI.

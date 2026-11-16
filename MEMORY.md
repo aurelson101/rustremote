@@ -1370,3 +1370,19 @@ Référence paramètres : https://learn.microsoft.com/en-us/azure/virtual-deskto
 Prochaine étape : qualification native SFTP/RDP config, puis intégration sûre
 du password RDP et labo RDP ; Apple/VNC/tunnel et MSI ensuite, pas de paquet
 non fonctionnel à publier pour masquer les limites.
+
+## Preuve native finale SSH/SFTP/RDP-config — bcfcff1
+Run43852937335 SUCCESS sur Server2022 x64 ET Windows11 ARM64 (binaire x64 émulé) :
+https://github.com/aurelson101/rustremote/actions/runs/43852937335
+7tests core +21tests prototype, stockage/coffre/ConPTY/SSH PASS ;5scénarios SFTP
+CLI PASS +GUI navigation locale/distante, upload/download dossiers Unicode et
+fichier binaire, édition/sauvegarde, suppression confirmée et déconnexion
+définitive PASS avec fatal-warnings. Snapshot valide après frame_clock ; plus
+de critical IME ni Empty GTK snapshot. Configuration RDP client système présent,
+ACL/UTF16/privateFile/cleanup PASS sans réseau ; options RDP GUI persistées via
+phases50/51 puis import/export PASS. AUCUNE session RDP, clipboard RDP ou Mac
+physique qualifiés par ces tests. Ne pas confondre ce périmètre avec MVP achevé.
+Artefacts téléchargés dans dist/windows-probe-validation/43852937335/
+{windows-2022,windows-11-arm}, JSON résultat vérifié pour SSH/SFTP/GUI et PNG
+Server2022 inspecté. Prochaine étape RDP : credential depuis profil et labo de
+session isolé, puis Apple/VNC/tunnel Windows et packaging/runtime/MSI.

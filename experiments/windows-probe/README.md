@@ -197,3 +197,11 @@ terminate. `--self-test-rdp` checks system-client presence, configuration ACL/UT
 and cleanup without launching a connection. The options GUI persistence and two
 configuration tests pass locally; native Windows CI/session validation is pending.
 Properties follow [Microsoft's reference](https://learn.microsoft.com/en-us/azure/virtual-desktop/rdp-properties).
+
+Native source `bcfcff1` now passes the complete existing workflow on both
+Server 2022 x64 and Windows 11 ARM64 with the x64 executable under emulation:
+[run43852937335](https://github.com/aurelson101/rustremote/actions/runs/43852937335).
+This qualifies SSH/SFTP loopback transport and GUI workflows, storage/vault,
+ConPTY, RDP private configuration and the options GUI. It does **not** qualify
+a native RDP session, RDP clipboard/devices, physical Windows 11 x64, or a real Mac.
+The earlier pending/failure notes above are historical, not the final result.
