@@ -133,6 +133,16 @@ fn main() -> std::process::ExitCode {
             }
         };
     }
+    if args.iter().any(|a| a == "--smoke-sftp-ui") {
+        return match sftp_ui::laboratory() {
+            Ok(true) => std::process::ExitCode::SUCCESS,
+            Ok(false) => std::process::ExitCode::FAILURE,
+            Err(error) => {
+                eprintln!("{error}");
+                std::process::ExitCode::FAILURE
+            }
+        };
+    }
     let capture_ui = args.iter().any(|a| a == "--capture-ui");
     let smoke_profiles = args.iter().any(|a| a == "--smoke-profiles-ui");
     let smoke_live = args.iter().any(|a| a == "--smoke-live-ui");

@@ -143,12 +143,14 @@ def main():
     parser.add_argument("--probe", type=Path)
     parser.add_argument("--verify-fixture", action="store_true")
     parser.add_argument("--sftp", action="store_true")
+    parser.add_argument("--sftp-ui", action="store_true")
     args = parser.parse_args()
-    if not args.verify_fixture and (sys.platform != "win32" or args.probe is None):
+    if not args.verify_fixture and (not args.sftp_ui and sys.platform != "win32" or args.probe is None):
         parser.error("native qualification requires Windows and --probe")
     host_key, client_key = paramiko.RSAKey.generate(2048), paramiko.RSAKey.generate(2048)
     server = Server(host_key)
     reports = []
+    if args.sftp_ui: args.sftp = True
     try:
         with tempfile.TemporaryDirectory(prefix="RustRemote Apple é ") as folder:
             root = Path(folder)
@@ -235,15 +237,19 @@ if (-not $actual.AreAccessRulesProtected -or $rules.Count -ne 1 -or $rules[0].Id
                     ("changed_host", wrong, None, password, True),
                     ("unknown_host", unknown, None, password, True),
                 ]:
+                    if args.sftp_ui and name != "password": continue
                     server.case = Case(password, client_key)
                     profile = dict(name="Apple SSH laboratory", host="127.0.0.1", port=server.port,
                                    username="lab@realm.example", favorite=False, platform="MacOs",
                                    options=dict(protocol="Ssh", agent=False, identity_file=key,
                                                 known_hosts_file=str(trust_path), config_file=None))
-                    result = subprocess.run([str(probe), "--self-test-sftp" if args.sftp else "--self-test-ssh"],
+                    probe_environment = os.environ.copy()
+                    if os.environ.get("RUSTREMOTE_GTK_FATAL_WARNINGS") == "1":
+                        probe_environment["G_DEBUG"] = "fatal-warnings"
+                    result = subprocess.run([str(probe), "--smoke-sftp-ui" if args.sftp_ui else "--self-test-sftp" if args.sftp else "--self-test-ssh"],
                                             input=json.dumps(dict(profile=profile, secret=secret, expect_reject=reject)),
-                                            text=True, encoding="utf-8", capture_output=True, timeout=35)
-                    marker = ("WINDOWS_SFTP_REJECT_OK" if reject else "WINDOWS_SFTP_OK") if args.sftp else ("WINDOWS_SSH_REJECT_OK" if reject else "WINDOWS_SSH_OK")
+                                            text=True, encoding="utf-8", capture_output=True, timeout=60 if args.sftp_ui else 35, env=probe_environment)
+                    marker = "WINDOWS_SFTP_GUI_OK" if args.sftp_ui else ("WINDOWS_SFTP_REJECT_OK" if reject else "WINDOWS_SFTP_OK") if args.sftp else ("WINDOWS_SSH_REJECT_OK" if reject else "WINDOWS_SSH_OK")
                     if result.returncode or marker not in result.stdout:
                         # No secret enters this fixed BatchMode preflight. It diagnoses before authentication.
                         client = probe.parent / "OpenSSH" / "ssh.exe"
@@ -257,7 +263,9 @@ if (-not $actual.AreAccessRulesProtected -or $rules.Count -ne 1 -or $rules[0].Id
                                                         env=environment, timeout=10, encoding="utf-8", errors="replace").stderr[-2500:]
                         except subprocess.TimeoutExpired:
                             diagnostic = "BatchMode preflight timed out"
-                        raise RuntimeError(f"Native SSH case {name} failed (exit {result.returncode}): " + result.stderr[-2000:] + "\nBatchMode diagnostic: " + diagnostic)
+                        except OSError:
+                            diagnostic = "Optional OpenSSH preflight unavailable"
+                        raise RuntimeError(f"Native case {name} failed (exit {result.returncode}), state={server.case.state}: " + result.stderr[-2000:] + "\nBatchMode diagnostic: " + diagnostic)
                     state = server.case.state.copy()
                     if name in ("changed_host", "unknown_host"):
                         assert state["password_ok"] + state["password_rejected"] + state["key_ok"] + state["key_rejected"] == 0
@@ -265,7 +273,7 @@ if (-not $actual.AreAccessRulesProtected -or $rules.Count -ne 1 -or $rules[0].Id
                         assert state["password_rejected"] >= 1 and state["password_ok"] == 0
                     else:
                         if args.sftp:
-                            assert state.get("sftp") and state.get("editor_mode_preserved")
+                            assert state.get("sftp") and state.get("editor_written" if args.sftp_ui else "editor_mode_preserved")
                             assert not any(server.sftp_root.iterdir()), "Remote fixture cleanup failed"
                         else:
                             assert state["probe"] and state["pty"] >= 1 and state["resize"] >= 1

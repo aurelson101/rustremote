@@ -155,7 +155,13 @@ fn local_entries(path: PathBuf) -> Result<Event, String> {
     entries.sort_by(|a, b| b.directory.cmp(&a.directory).then(a.name.cmp(&b.name)));
     Ok(Event::Local(path, entries))
 }
-fn connect(profile: &SessionProfile) -> Result<sftp::Connection, String> {
+fn connect(
+    profile: &SessionProfile,
+    laboratory_secret: Option<zeroize::Zeroizing<String>>,
+) -> Result<sftp::Connection, String> {
+    if let Some(secret) = laboratory_secret {
+        return sftp::Connection::connect(profile, Some(&secret));
+    }
     #[cfg(windows)]
     let secret = crate::win_credentials::read(profile)?;
     #[cfg(not(windows))]
@@ -164,6 +170,13 @@ fn connect(profile: &SessionProfile) -> Result<sftp::Connection, String> {
 }
 
 pub fn open(parent: &gtk::ApplicationWindow, profile: SessionProfile) -> Result<(), String> {
+    build(parent, profile, None).map(|_| ())
+}
+fn build(
+    parent: &gtk::ApplicationWindow,
+    profile: SessionProfile,
+    laboratory_secret: Option<zeroize::Zeroizing<String>>,
+) -> Result<(gtk::ApplicationWindow, Rc<Browser>), String> {
     crate::ssh_launch::arguments(&profile)?;
     let app = parent.application().ok_or("Application unavailable")?;
     if app.windows().len() >= 18 {
@@ -178,7 +191,7 @@ pub fn open(parent: &gtk::ApplicationWindow, profile: SessionProfile) -> Result<
     std::thread::Builder::new()
         .name("windows-sftp".into())
         .spawn(move || {
-            let connection = match connect(&profile) {
+            let connection = match connect(&profile, laboratory_secret) {
                 Ok(connection) => connection,
                 Err(error) => {
                     let _ = events.send(Err(error));
@@ -413,6 +426,7 @@ pub fn open(parent: &gtk::ApplicationWindow, profile: SessionProfile) -> Result<
         stopped.store(true, Ordering::Relaxed);
         gtk::glib::Propagation::Proceed
     });
+    let result = browser.clone();
     let mut initial = true;
     gtk::glib::timeout_add_local(Duration::from_millis(50), move || {
         if browser.window.upgrade().is_none_or(|w| !w.is_visible()) {
@@ -463,7 +477,7 @@ pub fn open(parent: &gtk::ApplicationWindow, profile: SessionProfile) -> Result<
         gtk::glib::ControlFlow::Continue
     });
     window.present();
-    Ok(())
+    Ok((window, result))
 }
 fn button(
     bar: &gtk::FlowBox,
@@ -632,4 +646,136 @@ fn editor(b: &Rc<Browser>, path: PathBuf, original: Vec<u8>) {
         dialog.close();
     });
     dialog.present();
+}
+
+/// Native widgets and real loopback SFTP; lab input never becomes process arguments or logs.
+pub fn laboratory() -> Result<bool, String> {
+    use std::io::Read;
+    use zeroize::{Zeroize, Zeroizing};
+    #[derive(serde::Deserialize)]
+    #[serde(deny_unknown_fields)]
+    struct Input {
+        profile: SessionProfile,
+        secret: String,
+        expect_reject: bool,
+    }
+    impl Drop for Input {
+        fn drop(&mut self) {
+            self.secret.zeroize();
+        }
+    }
+    let mut bytes = Zeroizing::new(Vec::new());
+    std::io::stdin()
+        .lock()
+        .take(32769)
+        .read_to_end(&mut bytes)
+        .map_err(|_| "Lab stdin unavailable")?;
+    if bytes.len() > 32768 {
+        return Err("Lab input exceeds budget".into());
+    }
+    let input: Input = serde_json::from_slice(&bytes).map_err(|_| "Invalid lab profile")?;
+    if input.expect_reject
+        || input.profile.credential_ref.is_some()
+        || !input
+            .profile
+            .host
+            .parse::<std::net::IpAddr>()
+            .is_ok_and(|ip| ip.is_loopback())
+        || !matches!(
+            &input.profile.options,
+            rustremote_core::profiles::ProtocolOptions::Ssh {
+                agent: false,
+                config_file: None,
+                known_hosts_file: Some(_),
+                ..
+            }
+        )
+    {
+        return Err("Only explicit trusted loopback fixtures are allowed".into());
+    }
+    let mut profile = input.profile.clone();
+    let backend = crate::profile_service::laboratory()?;
+    #[cfg(windows)]
+    {
+        profile.credential_ref = Some(backend.credential_write(&profile, &input.secret)?);
+    }
+    #[cfg(not(windows))]
+    let _ = &mut profile;
+    let temporary = Arc::new(tempfile::tempdir().map_err(|_| "Local fixture unavailable")?);
+    let upload = temporary.path().join("dossier été");
+    std::fs::create_dir(&upload).map_err(|_| "Fixture mkdir unavailable")?;
+    let payload = b"binary\0\xff\xfe";
+    std::fs::write(upload.join("fichier é.bin"), payload)
+        .map_err(|_| "Fixture file unavailable")?;
+    std::fs::write(upload.join("texte.txt"), b"initial text")
+        .map_err(|_| "Fixture text unavailable")?;
+    let app = gtk::Application::builder()
+        .application_id("com.rustremote.SftpLab")
+        .build();
+    let passed = Rc::new(Cell::new(false));
+    let seen = passed.clone();
+    let secret = Zeroizing::new(input.secret.clone());
+    app.connect_activate(move |app| {
+        let _guard=&backend;
+        let parent=gtk::ApplicationWindow::builder().application(app).title("SFTP loopback laboratory").build();
+        let secret=if cfg!(windows){None}else{Some(secret.clone())};
+        let (window,browser)=match build(&parent,profile.clone(),secret) {Ok(value)=>value,Err(error)=>{eprintln!("{error}");app.quit();return;}};
+        let temporary=temporary.clone();let mut phase=0;let started=std::time::Instant::now();
+        let app=app.clone();let passed=seen.clone();let mut ticks=0;
+        gtk::glib::timeout_add_local(Duration::from_millis(50),move || {
+            ticks+=1;
+            if started.elapsed()>Duration::from_secs(45) {
+                eprintln!("SFTP UI timeout at phase {phase}: {}",browser.status.text());window.close();app.quit();return gtk::glib::ControlFlow::Break;
+            }
+            if browser.busy.get(){return gtk::glib::ControlFlow::Continue;}
+            let click=|title:&str|->bool {
+                fn find(widget:&gtk::Widget,title:&str)->Option<gtk::Button>{
+                    if let Some(button)=widget.downcast_ref::<gtk::Button>() && button.label().is_some_and(|label|label==title){return Some(button.clone());}
+                    let mut child=widget.first_child();while let Some(widget)=child {if let Some(button)=find(&widget,title){return Some(button);}child=widget.next_sibling();}None
+                }
+                if let Some(button)=find(browser.controls.upcast_ref(),title){button.emit_clicked();true}else{false}
+            };
+            let select=|remote:bool,name:&str,activate:bool|->bool {
+                let (list,entries)=if remote{(&browser.remote,&browser.remote_entries)}else{(&browser.local,&browser.local_entries)};
+                let index=entries.borrow().iter().position(|entry|entry.name==name);
+                if let Some(row)=index.and_then(|i|list.row_at_index(i as i32)) {list.unselect_all();list.select_row(Some(&row));if activate {row.emit_activate();}true}else{false}
+            };
+            let dialog=|title:&str| gtk::Window::list_toplevels().iter().find_map(|window|window.clone().downcast::<gtk::Dialog>().ok().filter(|dialog|dialog.title().is_some_and(|t|t==title)));
+            match phase {
+                0=>{browser.send(Command::Local(temporary.path().to_path_buf()));phase=1;},
+                1=>{if !select(false,"dossier été",true){return gtk::glib::ControlFlow::Continue;}phase=2;},
+                2=>{if !browser.cwd.borrow().ends_with("dossier été"){return gtk::glib::ControlFlow::Continue;}click("Local parent");phase=3;},
+                3=>{if !select(false,"dossier été",false){return gtk::glib::ControlFlow::Continue;}click("Upload →");phase=4;},
+                4=>{if !select(true,"dossier été",true){return gtk::glib::ControlFlow::Continue;}phase=5;},
+                5=>{if !browser.remote_entries.borrow().iter().any(|e|e.name=="texte.txt"){return gtk::glib::ControlFlow::Continue;}click("Remote parent");phase=6;},
+                6=>{
+                    let download=temporary.path().join("downloads");if std::fs::create_dir(&download).is_err(){app.quit();return gtk::glib::ControlFlow::Break;}
+                    browser.send(Command::Local(download));phase=7;
+                },
+                7=>{if !select(true,"dossier été",false){return gtk::glib::ControlFlow::Continue;}click("← Download");phase=8;},
+                8=>{
+                    if std::fs::read(temporary.path().join("downloads/dossier été/fichier é.bin")).ok().as_deref()!=Some(payload){eprintln!("UI binary download mismatch");app.quit();return gtk::glib::ControlFlow::Break;}
+                    select(true,"dossier été",true);phase=9;
+                },
+                9=>{if !select(true,"texte.txt",false){return gtk::glib::ControlFlow::Continue;}click("Edit remote…");phase=10;},
+                10=>{
+                    if let Some(dialog)=dialog("Remote UTF-8 editor"){
+                        fn text(widget:&gtk::Widget)->Option<gtk::TextView>{if let Some(view)=widget.downcast_ref::<gtk::TextView>(){return Some(view.clone());}let mut child=widget.first_child();while let Some(w)=child{if let Some(v)=text(&w){return Some(v);}child=w.next_sibling();}None}
+                        if let Some(view)=text(dialog.upcast_ref()){view.buffer().set_text("edited via native SFTP");dialog.response(gtk::ResponseType::Ok);phase=11;}
+                    }
+                },
+                11=>{if let Some(dialog)=dialog("Remote UTF-8 editor"){dialog.response(gtk::ResponseType::Cancel);click("Remote parent");phase=12;}},
+                12=>{if !select(true,"dossier été",false){return gtk::glib::ControlFlow::Continue;}click("Delete remote…");phase=13;},
+                13=>{if let Some(dialog)=gtk::Window::list_toplevels().iter().find_map(|w|w.clone().downcast::<gtk::MessageDialog>().ok()){dialog.response(gtk::ResponseType::Ok);phase=14;}},
+                _=>{
+                    if !browser.remote_entries.borrow().is_empty(){return gtk::glib::ControlFlow::Continue;}
+                    if let Err(error)=crate::capture::window(&window,std::path::Path::new("dist/windows-probe/sftp-gui.png")){eprintln!("{error}");}else if ticks>5 {passed.set(true);println!("WINDOWS_SFTP_GUI_OK: widget activation, local/remote directory navigation, folder upload/download, binary readback, remote edit/save, confirmed recursive deletion; GTK ticks={ticks}");}
+                    window.close();app.quit();return gtk::glib::ControlFlow::Break;
+                }
+            }
+            gtk::glib::ControlFlow::Continue
+        });
+    });
+    app.run_with_args::<&str>(&[]);
+    Ok(passed.get())
 }

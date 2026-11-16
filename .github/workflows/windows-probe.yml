@@ -132,6 +132,10 @@ jobs:
         run: |
           set -o pipefail
           python scripts/test-windows-ssh-local.py --probe experiments/windows-probe/target/debug/rustremote-windows-probe.exe --sftp | tee dist/windows-probe/sftp-loopback.json
+      - name: Native SFTP browser widgets and real loopback transfers
+        run: |
+          set -o pipefail
+          G_DEBUG=fatal-warnings python scripts/test-windows-ssh-local.py --probe experiments/windows-probe/target/debug/rustremote-windows-probe.exe --sftp-ui | tee dist/windows-probe/sftp-gui.json
       - name: GTK Windows startup
         run: |
           set -o pipefail

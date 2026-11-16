@@ -13,6 +13,10 @@ class Files(paramiko.SFTPServerInterface):
         self.state = server.case.state
         self.modes = {}
 
+    def trace(self, operation):
+        operations = self.state.setdefault("sftp_operations", [])
+        if len(operations) < 64: operations.append(operation)
+
     def path(self, name):
         if "\\" in name or "\0" in name or ".." in PurePosixPath(name).parts:
             raise PermissionError(errno.EACCES, "Confined lab path")
@@ -34,6 +38,7 @@ class Files(paramiko.SFTPServerInterface):
             return "/"
 
     def list_folder(self, name):
+        self.trace("list_folder")
         try:
             result = []
             for path in self.path(name).iterdir():
@@ -45,6 +50,7 @@ class Files(paramiko.SFTPServerInterface):
             return paramiko.SFTPServer.convert_errno(error.errno)
 
     def stat(self, name):
+        self.trace("stat")
         if name == "/blocked-link":
             item = paramiko.SFTPAttributes()
             item.st_mode = stat.S_IFLNK | 0o777
@@ -57,6 +63,7 @@ class Files(paramiko.SFTPServerInterface):
     lstat = stat
 
     def open(self, name, flags, attr):
+        self.trace("open")
         if name == "/blocked-link":
             return paramiko.SFTP_PERMISSION_DENIED
         try:
@@ -71,6 +78,7 @@ class Files(paramiko.SFTPServerInterface):
             return paramiko.SFTPServer.convert_errno(error.errno)
 
     def mkdir(self, name, attr):
+        self.trace("mkdir")
         try:
             path = self.path(name)
             path.mkdir()
@@ -80,10 +88,13 @@ class Files(paramiko.SFTPServerInterface):
             return paramiko.SFTPServer.convert_errno(error.errno)
 
     def remove(self, name):
+        self.trace("remove")
         try:
             path = self.path(name)
-            if path.read_bytes() == b"edited via native SFTP" and self.modes.get(path) == 0o755:
-                self.state["editor_mode_preserved"] = True
+            if path.read_bytes() == b"edited via native SFTP":
+                self.state["editor_written"] = True
+                if self.modes.get(path) == 0o755:
+                    self.state["editor_mode_preserved"] = True
             path.unlink()
             self.modes.pop(path, None)
             return paramiko.SFTP_OK
@@ -91,6 +102,7 @@ class Files(paramiko.SFTPServerInterface):
             return paramiko.SFTPServer.convert_errno(error.errno)
 
     def rmdir(self, name):
+        self.trace("rmdir")
         try:
             path = self.path(name)
             path.rmdir()
@@ -105,6 +117,7 @@ class Files(paramiko.SFTPServerInterface):
         return self._rename(old, new, True)
 
     def _rename(self, old, new, replace):
+        self.trace("_rename")
         try:
             source, destination = self.path(old), self.path(new)
             if destination.exists() and not replace:
@@ -119,6 +132,7 @@ class Files(paramiko.SFTPServerInterface):
             return paramiko.SFTPServer.convert_errno(error.errno)
 
     def chattr(self, name, attr):
+        self.trace("chattr")
         try:
             path = self.path(name)
             if not path.exists():

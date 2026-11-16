@@ -62,7 +62,7 @@ pub fn run() -> Result<String, String> {
             Err("Rejected SFTP scenario authenticated".into())
         };
     }
-    let connection = connection?;
+    let connection = LabConnection(connection.map_err(|e| format!("Lab connect: {e}"))?);
     let temporary = tempfile::tempdir().map_err(|_| "SFTP local fixture unavailable")?;
     let root = temporary.path();
     let upload = root.join("dossier été");
@@ -179,4 +179,27 @@ pub fn run() -> Result<String, String> {
     connection.run(Operation::Delete(renamed), &mut budget())?;
     connection.abort();
     Ok("WINDOWS_SFTP_OK: binary files/folders, Unicode paths, listing, edit/conflict, rename/delete, cancellation, collisions, link/device rejection".into())
+}
+
+struct LabConnection(sftp::Connection);
+impl LabConnection {
+    fn run(&self, operation: Operation, budget: &mut Budget) -> Result<Output, String> {
+        let stage = match &operation {
+            Operation::List(_) => "list",
+            Operation::Read(_) => "read",
+            Operation::Save { .. } => "save",
+            Operation::Upload { .. } => "upload",
+            Operation::Download { .. } => "download",
+            Operation::Permissions { .. } => "permissions",
+            Operation::Rename { .. } => "rename",
+            Operation::Delete(_) => "delete",
+            _ => "other",
+        };
+        self.0
+            .run(operation, budget)
+            .map_err(|error| format!("Lab {stage}: {error}"))
+    }
+    fn abort(&self) {
+        self.0.abort();
+    }
 }
