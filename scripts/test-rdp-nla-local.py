@@ -168,13 +168,14 @@ class Peer:
     def __init__(self, context, root, password):
         self.listener=socket.socket();self.listener.bind(("127.0.0.1",0));self.listener.listen(1);self.listener.settimeout(25)
         self.port=self.listener.getsockname()[1];self.context=context;self.root=root;self.password=password
-        self.state={"negotiation":False,"credssp_complete":False,"password_match":False,"account_match":False}
+        self.state={"phase":"accept","negotiation":False,"credssp_complete":False,"password_match":False,"account_match":False}
         self.worker=threading.Thread(target=self.serve);self.worker.start()
 
     def serve(self):
         try:
             with self.listener.accept()[0] as stream:
                 stream.settimeout(15)
+                self.state["phase"]="rdp-negotiation"
                 header=receive(stream,4);length=int.from_bytes(header[2:],"big")
                 if header[:2]!=b"\x03\x00" or not 11<=length<=4096: raise ValueError()
                 request=header+receive(stream,length-4)
@@ -189,7 +190,9 @@ class Peer:
                 self.state["negotiation"]=True
                 context=spnego.server(protocol="credssp",credssp_negotiate_context=negotiation("accept"),
                                       credssp_tls_context=self.context,credssp_min_protocol=5)
+                self.state["phase"]="tls"
                 tls_handshake(stream,context)
+                self.state["phase"]="credssp"
                 context.step()
                 budget=0
                 for _ in range(64):
@@ -199,6 +202,7 @@ class Peer:
                     token=context.step(header+receive(stream,length))
                     if token:stream.sendall(token)
                     if context.complete:
+                        self.state["phase"]="delegated-password"
                         credential=context.get_extra_info("client_credential")
                         self.state.update(credssp_complete=True,
                             account_match=credential.domain_name.upper()==DOMAIN and credential.username==USER,
@@ -262,6 +266,7 @@ def main():
                 result=subprocess.run([str(args.native.resolve(strict=True)),"--self-test-rdp-nla"],
                     input=json.dumps(dict(profile=profile,secret=password,state=str(root/"rdp-nla-state.json"))),
                     text=True,encoding="utf-8",capture_output=True,timeout=40)
+                peer.state["native_exit"]=result.returncode
                 if result.returncode:raise RuntimeError("Native RDP lab client did not complete")
             peer.close()
             if not all(peer.state.get(key) for key in ("negotiation","credssp_complete","account_match","password_match")):

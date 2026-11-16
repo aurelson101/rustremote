@@ -1444,3 +1444,11 @@ pas d’attente arbitraire ni crypto maison ; test fixture reproduit PASS.
 Erreur initiale Python TypeError(cipherNone) avec records isolés dans step, corrigée
 par ce pré-handshake ; SyntaxError concatPS corrigée avant commit. Résultat
 natif NLA à obtenir, ne pas qualifier password mstsc réel par seuleDPAPI.
+
+Labo NLA run43866535989 échoué AVANT exécution : inférence du type Result de la
+fermeture pollState ambiguë sous cfgWindows (pas vue parClippy Linux). Annotation
+Result<(),String> ajoutée. Aucun certificat ajouté dans ce run (build échoué).
+Avertissement Rust1.100 fetch_update déprécié : quota SFTP maintenant en boucle
+compare_exchange_weak, compatible Rust local et Windows, même limite16.
+Journal NLA enrichi en phases/exitcode et compteurs seulement ; aucun texte de
+fenêtre ni token/password. Fixture Python TLS/CredSSP toujours PASS après patch.

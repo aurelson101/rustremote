@@ -578,7 +578,7 @@ pub fn nla_lab() -> Result<String, String> {
     struct State {
         done: bool,
     }
-    let outcome = (|| {
+    let outcome: Result<(), String> = (|| {
         while Instant::now() < deadline {
             match crate::sftp_platform::read(&input.state, false) {
                 Ok(file) => {

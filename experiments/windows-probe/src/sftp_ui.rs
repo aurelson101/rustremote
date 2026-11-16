@@ -18,12 +18,23 @@ static WORKERS: AtomicUsize = AtomicUsize::new(0);
 struct WorkerPermit;
 impl WorkerPermit {
     fn acquire() -> Result<Self, String> {
-        WORKERS
-            .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |count| {
-                (count < 16).then_some(count + 1)
-            })
-            .map_err(|_| "SFTP worker limit reached; wait for closed connections to stop")?;
-        Ok(Self)
+        let mut count = WORKERS.load(Ordering::Relaxed);
+        loop {
+            if count >= 16 {
+                return Err(
+                    "SFTP worker limit reached; wait for closed connections to stop".into(),
+                );
+            }
+            match WORKERS.compare_exchange_weak(
+                count,
+                count + 1,
+                Ordering::Relaxed,
+                Ordering::Relaxed,
+            ) {
+                Ok(_) => return Ok(Self),
+                Err(current) => count = current,
+            }
+        }
     }
 }
 impl Drop for WorkerPermit {
