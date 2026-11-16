@@ -213,24 +213,7 @@ fn partial_path(path: &Path) -> Result<PathBuf, String> {
     Ok(path.with_file_name(name))
 }
 fn publish(from: &Path, to: &Path) -> Result<(), String> {
-    use std::os::unix::ffi::OsStrExt;
-    let from = std::ffi::CString::new(from.as_os_str().as_bytes()).map_err(error)?;
-    let to = std::ffi::CString::new(to.as_os_str().as_bytes()).map_err(error)?;
-    let result = unsafe {
-        libc::renameat2(
-            libc::AT_FDCWD,
-            from.as_ptr(),
-            libc::AT_FDCWD,
-            to.as_ptr(),
-            libc::RENAME_NOREPLACE,
-        )
-    };
-    if result != 0 {
-        return Err(
-            "Destination existante ou publication atomique impossible ; aucun écrasement".into(),
-        );
-    }
-    Ok(())
+    crate::sftp_platform::publish(from, to)
 }
 fn error(_: impl std::fmt::Display) -> String {
     "Erreur SFTP : opération refusée, connexion interrompue ou permissions insuffisantes".into()
@@ -272,17 +255,13 @@ impl Connection {
             .as_ref()
             .map(PathBuf::from)
             .or_else(|| {
-                std::env::var_os("HOME").map(|home| PathBuf::from(home).join(".ssh/known_hosts"))
+                std::env::var_os(if cfg!(windows) { "USERPROFILE" } else { "HOME" })
+                    .map(|home| PathBuf::from(home).join(".ssh/known_hosts"))
             })
             .ok_or("Chemin known_hosts indisponible")?;
-        use std::os::unix::fs::OpenOptionsExt;
-        let input = fs::OpenOptions::new()
-            .read(true)
-            .custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK)
-            .open(&known_path)
-            .map_err(
-                |_| "known_hosts illisible : validez d’abord l’empreinte depuis le terminal SSH",
-            )?;
+        let input = crate::sftp_platform::read(&known_path, false).map_err(
+            |_| "known_hosts illisible : validez d’abord l’empreinte depuis le terminal SSH",
+        )?;
         if !input.metadata().map_err(error)?.is_file() {
             return Err("known_hosts doit être un fichier régulier".into());
         }
@@ -319,13 +298,28 @@ impl Connection {
                 if !metadata.is_file() || metadata.len() > 256 * 1024 {
                     return Err("Clé SSH : fichier régulier de 256 Kio maximum requis".into());
                 }
+                #[cfg(not(windows))]
                 let _ = session.userauth_pubkey_file(&profile.username, None, key, None);
+                #[cfg(windows)]
+                {
+                    let file = crate::sftp_platform::read(key, false).map_err(error)?;
+                    crate::win_storage::validate_key_acl(&file)?;
+                    let mut text = zeroize::Zeroizing::new(String::new());
+                    file.take(256 * 1024 + 1)
+                        .read_to_string(&mut text)
+                        .map_err(error)?;
+                    if text.len() > 256 * 1024 {
+                        return Err("Private key exceeds 256 KiB".into());
+                    }
+                    let _ =
+                        session.userauth_pubkey_memory(&profile.username, None, &text, password);
+                }
             }
             if !session.authenticated() && *agent {
                 use base64::Engine;
                 let expected = if let Some(key) = identity_file {
                     let path = PathBuf::from(format!("{key}.pub"));
-                    let file=fs::OpenOptions::new().read(true).custom_flags(libc::O_NOFOLLOW|libc::O_NONBLOCK).open(path).map_err(|_|"Pour utiliser cette clé protégée via l’agent, conservez son fichier .pub à côté de la clé")?;
+                    let file=crate::sftp_platform::read(&path,false).map_err(|_|"Pour utiliser cette clé protégée via l’agent, conservez son fichier .pub à côté de la clé")?;
                     if !file.metadata().map_err(error)?.is_file() {
                         return Err("Clé publique régulière requise".into());
                     }
@@ -370,6 +364,7 @@ impl Connection {
             return Err(message);
         }
         if !session.authenticated()
+            && (!cfg!(windows) || identity_file.is_none())
             && let Some(password) = password
         {
             session
@@ -736,22 +731,20 @@ impl Connection {
         remote: &Path,
         budget: &mut Budget,
     ) -> Result<(), String> {
-        use std::os::unix::fs::OpenOptionsExt;
         if !local.is_absolute() {
             return Err("Chemin local absolu requis pour la reprise".into());
         }
         path_ok(remote)?;
         budget.entry(0)?;
         let remote_stat = self.sftp.lstat(remote).map_err(error)?;
-        if !remote_stat.is_file() || !fs::symlink_metadata(local).map_err(error)?.is_file() {
+        if !remote_stat.is_file()
+            || !crate::sftp_platform::metadata(local)
+                .map_err(error)?
+                .is_file()
+        {
             return Err("Reprise réservée aux fichiers réguliers existants, sans lien".into());
         }
-        let mut local_file = fs::OpenOptions::new()
-            .read(true)
-            .append(!upload)
-            .custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK)
-            .open(local)
-            .map_err(error)?;
+        let mut local_file = crate::sftp_platform::read(local, !upload).map_err(error)?;
         local_file
             .try_lock()
             .map_err(|_| "Le fichier local est déjà utilisé")?;
@@ -854,7 +847,7 @@ impl Connection {
         budget: &mut Budget,
     ) -> Result<(), String> {
         budget.entry(depth)?;
-        let metadata = fs::symlink_metadata(local).map_err(error)?;
+        let metadata = crate::sftp_platform::metadata(local).map_err(error)?;
         if metadata.is_dir() {
             self.sftp.mkdir(remote, 0o700).map_err(error)?;
             for entry in fs::read_dir(local).map_err(error)? {
@@ -870,12 +863,7 @@ impl Connection {
             if metadata.len() > budget.limits.bytes().saturating_sub(budget.bytes) {
                 return Err(format!("Limite SFTP : {} Mio", budget.limits.mib));
             }
-            use std::os::unix::fs::OpenOptionsExt;
-            let mut input = fs::OpenOptions::new()
-                .read(true)
-                .custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK)
-                .open(local)
-                .map_err(error)?;
+            let mut input = crate::sftp_platform::read(local, false).map_err(error)?;
             if !input.metadata().map_err(error)?.is_file() {
                 return Err("Fichier régulier requis".into());
             }
@@ -915,11 +903,7 @@ impl Connection {
         path_ok(remote)?;
         let metadata = self.sftp.lstat(remote).map_err(error)?;
         if metadata.is_dir() {
-            use std::os::unix::fs::DirBuilderExt;
-            fs::DirBuilder::new()
-                .mode(0o700)
-                .create(local)
-                .map_err(error)?;
+            crate::sftp_platform::mkdir(local).map_err(error)?;
             for entry in self.entries(remote, budget)? {
                 component(&entry.name)?;
                 self.download(
@@ -930,14 +914,8 @@ impl Connection {
                 )?;
             }
         } else if metadata.is_file() {
-            use std::os::unix::fs::OpenOptionsExt;
             let mut input = self.sftp.open(remote).map_err(error)?;
-            let mut output = fs::OpenOptions::new()
-                .write(true)
-                .create_new(true)
-                .mode(0o600)
-                .open(local)
-                .map_err(error)?;
+            let mut output = crate::sftp_platform::create(local).map_err(error)?;
             let mut chunk = [0; 16384];
             loop {
                 budget.check()?;
@@ -961,6 +939,7 @@ mod tests {
     use super::*;
 
     #[test]
+    #[cfg(target_os = "linux")]
     #[ignore = "requires the ephemeral loopback fixture in test-ssh-sftp-local.py"]
     fn remote_editor_preserves_permissions_and_cleans_failed_write() {
         use std::os::unix::fs::PermissionsExt;

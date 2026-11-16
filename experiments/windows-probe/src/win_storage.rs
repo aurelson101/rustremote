@@ -627,3 +627,90 @@ pub fn self_test() -> Result<String, String> {
     }
     Ok("WINDOWS_STORAGE_OK: user-owned protected ACL, exclusive lock, Unicode paths, plain/DPAPI save, tamper/hard-link rejection, reopen, Credential Manager roundtrip/cleanup".into())
 }
+
+/// New transfer files/directories use the same protected current-user ACL policy.
+pub(crate) fn private_file(path: &Path) -> Result<File, String> {
+    let security = PrivateSecurity::current()?;
+    let file = handle(path, GENERIC_READ | GENERIC_WRITE, 0, CREATE_NEW, &security)?;
+    security.secure(&file, false)?;
+    Ok(File::from(file))
+}
+pub(crate) fn private_directory(path: &Path) -> Result<(), String> {
+    let security = PrivateSecurity::current()?;
+    let name = wide(path)?;
+    if unsafe { CreateDirectoryW(name.as_ptr(), &security.attributes()) } == 0 {
+        return Err(error("Create private transfer directory"));
+    }
+    let folder = handle(
+        path,
+        GENERIC_READ,
+        FILE_SHARE_READ | FILE_SHARE_WRITE,
+        OPEN_EXISTING,
+        &security,
+    )?;
+    security.secure(&folder, true)
+}
+
+/// Validate, never rewrite, the ACL of a user-selected private key.
+pub(crate) fn validate_key_acl(file: &File) -> Result<(), String> {
+    use windows_sys::Win32::Security::{
+        ACCESS_ALLOWED_ACE, GetAce, IsValidSid, IsWellKnownSid, WinBuiltinAdministratorsSid,
+        WinLocalSystemSid,
+    };
+    let security = PrivateSecurity::current()?;
+    let (mut owner, mut dacl, mut descriptor) = (null_mut(), null_mut(), null_mut());
+    if unsafe {
+        GetSecurityInfo(
+            file.as_raw_handle(),
+            SE_FILE_OBJECT,
+            OWNER_SECURITY_INFORMATION | DACL_SECURITY_INFORMATION,
+            &mut owner,
+            null_mut(),
+            &mut dacl,
+            null_mut(),
+            &mut descriptor,
+        )
+    } != 0
+    {
+        return Err("Cannot verify private-key ACL".into());
+    }
+    let _allocation = Local(descriptor);
+    let trusted = |sid: PSID| unsafe {
+        !sid.is_null()
+            && IsValidSid(sid) != 0
+            && (EqualSid(sid, security.owner) != 0
+                || IsWellKnownSid(sid, WinLocalSystemSid) != 0
+                || IsWellKnownSid(sid, WinBuiltinAdministratorsSid) != 0)
+    };
+    if !trusted(owner) || dacl.is_null() {
+        return Err("Private key owner or DACL is unsafe".into());
+    }
+    let count = unsafe { (*dacl).AceCount };
+    if count > 64 {
+        return Err("Private-key ACL exceeds its budget".into());
+    }
+    for index in 0..u32::from(count) {
+        let mut pointer = null_mut();
+        if unsafe { GetAce(dacl, index, &mut pointer) } == 0 || pointer.is_null() {
+            return Err("Invalid private-key ACE".into());
+        }
+        let header = unsafe { &*pointer.cast::<windows_sys::Win32::Security::ACE_HEADER>() };
+        if header.AceType == 1 {
+            continue;
+        } // Deny entries cannot grant another identity access.
+        if header.AceType != 0
+            || usize::from(header.AceSize) < std::mem::offset_of!(ACCESS_ALLOWED_ACE, SidStart) + 8
+        {
+            return Err("Unsupported private-key access rule".into());
+        }
+        let ace = unsafe { &*pointer.cast::<ACCESS_ALLOWED_ACE>() };
+        let sid = std::ptr::addr_of!(ace.SidStart).cast_mut().cast();
+        if !trusted(sid) {
+            return Err(
+                "Private key is accessible to another identity; correct its ACL before connecting"
+                    .into(),
+            );
+        }
+    }
+    Ok(())
+}

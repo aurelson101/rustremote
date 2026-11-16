@@ -9,6 +9,7 @@ mod icons;
 mod preferences;
 mod profiles;
 mod sftp;
+mod sftp_platform;
 mod sftp_ui;
 mod simulation;
 mod ssh_auth;

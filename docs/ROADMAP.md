@@ -505,3 +505,9 @@ activation synchronisée et warnings bloquants réservés à l’application. Pa
 GUI SSH/SFTP complet PASS sans nouveau rapport de crash. Anciennes alertes15nov
 archivées privément ; portails GNOME personnels fonctionnels, sans sudo ni restart.
 La cause du SIGABRT ancien reste inconnue. Preuves et reprise dans MEMORY.md.
+
+## WIN-04 SFTP — PARTIAL 2026-11-16
+Backend Linux partagé avec une frontière fichiers Windows et laboratoire réel
+loopback (transferts binaires/dossiers Unicode, édition/conflit, permissions,
+annulation et refus des liens/collisions). Fixture Python PASS ; qualification
+native Windows et interface graphique SFTP restent à terminer. Aucun MSI publié.

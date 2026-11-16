@@ -89,6 +89,7 @@ jobs:
             mingw-w64-ucrt-x86_64-gtk4
             mingw-w64-ucrt-x86_64-pkgconf
             mingw-w64-ucrt-x86_64-python-paramiko
+            mingw-w64-ucrt-x86_64-openssl
       - name: Native operating system and architecture
         shell: pwsh
         run: |
@@ -125,6 +126,10 @@ jobs:
         run: |
           set -o pipefail
           python scripts/test-windows-ssh-local.py --probe experiments/windows-probe/target/debug/rustremote-windows-probe.exe | tee dist/windows-probe/ssh-loopback.json
+      - name: Real loopback SFTP transfer and editing
+        run: |
+          set -o pipefail
+          python scripts/test-windows-ssh-local.py --probe experiments/windows-probe/target/debug/rustremote-windows-probe.exe --sftp | tee dist/windows-probe/sftp-loopback.json
       - name: GTK Windows startup
         run: |
           set -o pipefail

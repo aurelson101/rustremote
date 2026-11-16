@@ -9,7 +9,23 @@ mod live_ui;
 mod probe_output;
 mod profile_service;
 mod profile_ui;
+#[allow(dead_code)]
+#[path = "../../../src/sftp.rs"]
+mod sftp;
+#[cfg(windows)]
+mod sftp_lab;
+#[path = "../../../src/sftp_platform.rs"]
+mod sftp_platform;
+mod profiles {
+    pub use rustremote_core::profiles::*;
+}
 mod ssh_launch;
+#[cfg(windows)]
+#[path = "win_route.rs"]
+mod ssh_route;
+#[cfg(not(windows))]
+#[path = "../../../src/ssh_route.rs"]
+mod ssh_route;
 mod terminal;
 mod terminal_keys;
 #[cfg(windows)]
@@ -54,6 +70,23 @@ fn main() -> std::process::ExitCode {
     }
     if args.iter().any(|a| a == "--self-test-live") {
         return match live::self_test() {
+            Ok(report) => {
+                println!("{report}");
+                std::process::ExitCode::SUCCESS
+            }
+            Err(error) => {
+                eprintln!("{error}");
+                std::process::ExitCode::FAILURE
+            }
+        };
+    }
+    if args.iter().any(|a| a == "--self-test-sftp") {
+        #[cfg(windows)]
+        let result = sftp_lab::run();
+        #[cfg(not(windows))]
+        let result: Result<String, String> =
+            Err("Native SFTP qualification requires Windows".into());
+        return match result {
             Ok(report) => {
                 println!("{report}");
                 std::process::ExitCode::SUCCESS

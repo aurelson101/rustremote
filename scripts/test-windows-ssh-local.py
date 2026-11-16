@@ -12,6 +12,11 @@ import tempfile
 import threading
 import time
 import paramiko
+import importlib.util
+
+_spec = importlib.util.spec_from_file_location("sftp_lab_server", Path(__file__).with_name("sftp-lab-server.py"))
+_files = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(_files)
 
 
 class Case:
@@ -49,6 +54,10 @@ class Session(paramiko.ServerInterface):
         self.case.state["resize"] += 1
         return True
 
+    def check_channel_subsystem_request(self, channel, name):
+        if name == "sftp": self.case.state["sftp"] = True
+        return super().check_channel_subsystem_request(channel, name)
+
     def check_channel_shell_request(self, channel):
         self.shell.set()
         return True
@@ -57,6 +66,7 @@ class Session(paramiko.ServerInterface):
 class Server:
     def __init__(self, key):
         self.key = key
+        self.sftp_root = None
         self.listener = socket.socket()
         self.listener.bind(("127.0.0.1", 0))
         self.port = self.listener.getsockname()[1]
@@ -79,11 +89,20 @@ class Server:
             transport.local_version = "SSH-2.0-RustRemote_Apple_SIMULATION"
             transport.add_server_key(self.key)
             handler = Session(self.case)
+            handler.case = self.case
+            if self.sftp_root is not None:
+                transport.set_subsystem_handler("sftp", paramiko.SFTPServer, _files.Files, root=self.sftp_root)
             try:
                 transport.start_server(server=handler)
                 channel = transport.accept(12)
-                if channel is None or not handler.shell.wait(5):
+                if channel is None: continue
+                until = time.monotonic() + 5
+                while not handler.shell.is_set() and not handler.case.state.get("sftp") and transport.is_active() and time.monotonic() < until:
+                    handler.shell.wait(.02)
+                if handler.case.state.get("sftp"):
+                    while transport.is_active() and not self.stop.is_set(): time.sleep(.05)
                     continue
+                if not handler.shell.is_set(): continue
                 channel.settimeout(.2)
                 channel.sendall(b"RUSTREMOTE_SSH_READY\r\n")
                 data, deadline = b"", time.monotonic() + 12
@@ -123,6 +142,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--probe", type=Path)
     parser.add_argument("--verify-fixture", action="store_true")
+    parser.add_argument("--sftp", action="store_true")
     args = parser.parse_args()
     if not args.verify_fixture and (sys.platform != "win32" or args.probe is None):
         parser.error("native qualification requires Windows and --probe")
@@ -132,6 +152,9 @@ def main():
     try:
         with tempfile.TemporaryDirectory(prefix="RustRemote Apple é ") as folder:
             root = Path(folder)
+            if args.sftp:
+                server.sftp_root = root / "server-data"
+                server.sftp_root.mkdir()
             known, wrong, unknown = root / "known hosts", root / "changed host", root / "unknown host"
             def trust(path, key):
                 path.write_text(f"[127.0.0.1]:{server.port} {key.get_name()} {key.get_base64()}\n", encoding="utf-8")
@@ -173,14 +196,36 @@ if (-not $actual.AreAccessRulesProtected -or $rules.Count -ne 1 -or $rules[0].Id
                 client.load_host_keys(str(known))
                 client.connect("127.0.0.1", server.port, "lab@realm.example", password=password,
                                allow_agent=False, look_for_keys=False, timeout=5)
-                channel = client.invoke_shell(width=80, height=24)
-                channel.settimeout(5)
-                assert b"RUSTREMOTE_SSH_READY" in channel.recv(4096)
-                channel.resize_pty(width=92, height=28)
-                channel.sendall("probe-é\r".encode())
-                assert "RUSTREMOTE_SSH_OK_été".encode() in channel.recv(4096)
+                if args.sftp:
+                    sftp = client.open_sftp()
+                    sftp.mkdir("/dossier été")
+                    path = "/dossier été/fichier é.bin"
+                    payload = b"binary\0\xff\xfe"
+                    with sftp.open(path, "wb") as remote:
+                        remote.write(payload)
+                    with sftp.open(path, "rb") as remote:
+                        assert remote.read() == payload
+                    sftp.chmod(path, 0o755)
+                    assert sftp.stat(path).st_mode & 0o777 == 0o755
+                    with sftp.open("/temporary", "wb") as remote:
+                        remote.write(b"edited via native SFTP")
+                    sftp.chmod("/temporary", 0o755)
+                    sftp.posix_rename("/temporary", path)
+                    sftp.rename("/dossier été", "/renommé été")
+                    sftp.remove("/renommé été/fichier é.bin")
+                    sftp.rmdir("/renommé été")
+                    sftp.close()
+                    assert server.case.state.get("editor_mode_preserved")
+                    assert not any(server.sftp_root.iterdir())
+                else:
+                    channel = client.invoke_shell(width=80, height=24)
+                    channel.settimeout(5)
+                    assert b"RUSTREMOTE_SSH_READY" in channel.recv(4096)
+                    channel.resize_pty(width=92, height=28)
+                    channel.sendall("probe-é\r".encode())
+                    assert "RUSTREMOTE_SSH_OK_été".encode() in channel.recv(4096)
                 client.close()
-                print(json.dumps({"fixture": "PASS", "simulation": "Apple SSH protocol, not a real Mac", **server.case.state}))
+                print(json.dumps({"fixture": "PASS", "simulation": "Apple SSH/SFTP protocol, not a real Mac", **server.case.state}))
             else:
                 probe = args.probe.resolve(strict=True)
                 for name, trust_path, key, secret, reject in [
@@ -195,10 +240,11 @@ if (-not $actual.AreAccessRulesProtected -or $rules.Count -ne 1 -or $rules[0].Id
                                    username="lab@realm.example", favorite=False, platform="MacOs",
                                    options=dict(protocol="Ssh", agent=False, identity_file=key,
                                                 known_hosts_file=str(trust_path), config_file=None))
-                    result = subprocess.run([str(probe), "--self-test-ssh"],
+                    result = subprocess.run([str(probe), "--self-test-sftp" if args.sftp else "--self-test-ssh"],
                                             input=json.dumps(dict(profile=profile, secret=secret, expect_reject=reject)),
                                             text=True, encoding="utf-8", capture_output=True, timeout=35)
-                    if result.returncode or ("WINDOWS_SSH_REJECT_OK" if reject else "WINDOWS_SSH_OK") not in result.stdout:
+                    marker = ("WINDOWS_SFTP_REJECT_OK" if reject else "WINDOWS_SFTP_OK") if args.sftp else ("WINDOWS_SSH_REJECT_OK" if reject else "WINDOWS_SSH_OK")
+                    if result.returncode or marker not in result.stdout:
                         # No secret enters this fixed BatchMode preflight. It diagnoses before authentication.
                         client = probe.parent / "OpenSSH" / "ssh.exe"
                         keep = ("PATH", "PATHEXT", "TEMP", "TMP", "USERPROFILE", "LOCALAPPDATA", "APPDATA", "COMSPEC", "SYSTEMROOT", "WINDIR", "PROGRAMDATA", "ALLUSERSPROFILE")
@@ -218,7 +264,11 @@ if (-not $actual.AreAccessRulesProtected -or $rules.Count -ne 1 -or $rules[0].Id
                     elif name == "wrong_password":
                         assert state["password_rejected"] >= 1 and state["password_ok"] == 0
                     else:
-                        assert state["probe"] and state["pty"] >= 1 and state["resize"] >= 1
+                        if args.sftp:
+                            assert state.get("sftp") and state.get("editor_mode_preserved")
+                            assert not any(server.sftp_root.iterdir()), "Remote fixture cleanup failed"
+                        else:
+                            assert state["probe"] and state["pty"] >= 1 and state["resize"] >= 1
                         assert state["key_ok" if key else "password_ok"] >= 1
                     reports.append(dict(case=name, result="PASS", **state))
                 print(json.dumps(dict(result="PASS", target="127.0.0.1", real_mac=False,

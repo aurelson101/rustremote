@@ -1274,3 +1274,13 @@ non redistribué dans les artefacts. Pas de MSI ni nouvelle AppImage/release.
 Prochaine tâche : SFTP Windows avec chemins POSIX distants distincts des chemins
 locaux/UNC et anti-reparse ; puis mstsc, Apple/VNC avec tunnel et MSI. WIN-04 reste
 PARTIAL. Ne pas annoncer le portage Windows complet.
+
+## WIN-04 SFTP partagé — en cours 2026-11-16
+Backend src/sftp.rs réutilisé dans le prototype Windows ; frontière locale
+sftp_platform.rs (publication sans écrasement, fichiers privés Windows, refus
+reparse/device/ADS), transport direct win_route.rs et lecture mémoire des clés
+chiffrées avec validation ACL sans modifier les clés utilisateur. Laboratoire
+natif sftp_lab.rs et serveur Paramiko confiné sftp-lab-server.py ; aucun serveur
+réel. Fixture Python SSH/SFTP locale PASS ; Linux fmt/check/clippy et61tests PASS
+(2ignored), Clippy prototype PASS. CI Windows à lancer : port non encore qualifié,
+interface SFTP Windows et MSI encore ouverts.
