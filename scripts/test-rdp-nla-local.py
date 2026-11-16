@@ -309,11 +309,19 @@ def verify_fixture(peer, root, password):
 def native_window_flags(parent, root):
     script=r"""$ErrorActionPreference='Stop'
 Add-Type -AssemblyName UIAutomationClient
+Add-Type 'using System; using System.Runtime.InteropServices; public static class OwnedPopup { [DllImport("user32.dll")] public static extern IntPtr GetLastActivePopup(IntPtr window); }'
 $children=@(Get-CimInstance Win32_Process -Filter ("ParentProcessId="+$env:RUSTREMOTE_NLA_PARENT+" AND Name='mstsc.exe'"))
 $flags=0
 foreach($process in $children){
 $condition=[Windows.Automation.PropertyCondition]::new([Windows.Automation.AutomationElement]::ProcessIdProperty,[int]$process.ProcessId)
-$windows=[Windows.Automation.AutomationElement]::RootElement.FindAll([Windows.Automation.TreeScope]::Children,$condition)
+$windows=@([Windows.Automation.AutomationElement]::RootElement.FindAll([Windows.Automation.TreeScope]::Children,$condition))
+# A credential broker can run in another process. Only follow a popup owned by
+# a proven mstsc window; never search unrelated security windows.
+foreach($window in @($windows)){
+$handle=[IntPtr]$window.Current.NativeWindowHandle
+$popup=[OwnedPopup]::GetLastActivePopup($handle)
+if($popup -ne [IntPtr]::Zero -and $popup -ne $handle){$windows+=,[Windows.Automation.AutomationElement]::FromHandle($popup)}
+}
 foreach($window in $windows){
 $flags=$flags -bor 1
 $controls=$window.FindAll([Windows.Automation.TreeScope]::Descendants,[Windows.Automation.Condition]::TrueCondition)
@@ -323,6 +331,7 @@ if($control.Current.ControlType -eq [Windows.Automation.ControlType]::Button -an
 if($control.Current.ControlType -eq [Windows.Automation.ControlType]::Text){
 if($control.Current.Name -match 'credential|password'){$flags=$flags -bor 8}
 if($control.Current.Name -match 'invalid|corrupt|connection file'){$flags=$flags -bor 16}}
+if($control.Current.ControlType -eq [Windows.Automation.ControlType]::Text -and $control.Current.Name -match 'publisher|trust|identify'){$flags=$flags -bor 32}
 }}
 }
 $policy=(Get-ItemProperty -LiteralPath 'HKLM:\SOFTWARE\Policies\Microsoft\Windows NT\Terminal Services' -Name DisablePasswordSaving -ErrorAction SilentlyContinue).DisablePasswordSaving
@@ -394,11 +403,17 @@ def main():
                 command=[str(args.native.resolve(strict=True)),"--self-test-rdp-nla"]
                 with subprocess.Popen(command,stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,encoding="utf-8") as process:
                     try:
-                        stdout,stderr=process.communicate(json.dumps(dict(profile=profile,secret=password,state=str(root/"rdp-nla-state.json"))),timeout=5)
+                        try:
+                            stdout,stderr=process.communicate(json.dumps(dict(profile=profile,secret=password,state=str(root/"rdp-nla-state.json"))),timeout=5)
+                        except subprocess.TimeoutExpired:
+                            try:peer.state["native_ui"]=native_window_flags(process.pid,root)
+                            except Exception as error:peer.state["ui_probe_error"]=type(error).__name__
+                            stdout,stderr=process.communicate(timeout=35)
                     except subprocess.TimeoutExpired:
-                        try:peer.state["native_ui"]=native_window_flags(process.pid,root)
-                        except Exception as error:peer.state["ui_probe_error"]=type(error).__name__
-                        stdout,stderr=process.communicate(timeout=35)
+                        # Popen.__exit__ waits indefinitely: reap our hung actor before
+                        # unwinding so the fixture's certificate cleanup still runs.
+                        process.kill();process.communicate()
+                        raise TimeoutError("Native RDP lab actor exceeded its deadline") from None
                     result=subprocess.CompletedProcess(command,process.returncode,stdout,stderr)
                 peer.state["native_exit"]=result.returncode
                 if result.returncode:raise RuntimeError("Native RDP lab client did not complete")

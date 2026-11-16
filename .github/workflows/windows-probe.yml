@@ -122,6 +122,8 @@ jobs:
           set -o pipefail
           experiments/windows-probe/target/debug/rustremote-windows-probe.exe --self-test-rdp | tee dist/windows-probe/rdp-config.txt
       - name: Native RDP CredSSP loopback credentials (simulation, no desktop)
+        id: rdp_nla
+        continue-on-error: true
         run: |
           set -o pipefail
           python scripts/test-rdp-nla-local.py --fetch-deps --native experiments/windows-probe/target/debug/rustremote-windows-probe.exe | tee dist/windows-probe/rdp-nla.json
@@ -161,6 +163,11 @@ jobs:
         run: |
           cp experiments/windows-probe/README.md dist/windows-probe/README.md
           cp LICENSE NOTICE dist/windows-probe/
+      - name: Enforce native RDP qualification result
+        if: always() && steps.rdp_nla.outcome == 'failure'
+        run: |
+          echo 'Native RDP authentication failed; see rdp-nla.json. Other protocol checks were allowed to run.'
+          exit 1
       - if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
