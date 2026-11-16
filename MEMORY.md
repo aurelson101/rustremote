@@ -1452,3 +1452,9 @@ Avertissement Rust1.100 fetch_update déprécié : quota SFTP maintenant en bouc
 compare_exchange_weak, compatible Rust local et Windows, même limite16.
 Journal NLA enrichi en phases/exitcode et compteurs seulement ; aucun texte de
 fenêtre ni token/password. Fixture Python TLS/CredSSP toujours PASS après patch.
+
+NLA run43867807402 : buildWindows corrigé PASS ; arrêt au bootstrap pyspnego
+qui exige sspilib sur Windows même si le serveur force NTLM pur. Dépendance
+MSYS2 signée python-sspilib ajoutée au runner uniquement, version dans le rapport
+environment. Aucune autorité de test ajoutée dans cet échec (import avantmain).
+Le test ne constitue pas encore une preuve de login.

@@ -90,6 +90,7 @@ jobs:
             mingw-w64-ucrt-x86_64-gtk4
             mingw-w64-ucrt-x86_64-pkgconf
             mingw-w64-ucrt-x86_64-python-paramiko
+            mingw-w64-ucrt-x86_64-python-sspilib
             mingw-w64-ucrt-x86_64-openssl
             mingw-w64-ucrt-x86_64-libssh2
       - name: Native operating system and architecture
@@ -101,7 +102,7 @@ jobs:
       - name: Native environment
         run: |
           mkdir -p dist/windows-probe
-          { cmd.exe //c ver; rustc -Vv; cargo -V; pkg-config --modversion gtk4; pacman -Q mingw-w64-ucrt-x86_64-rust mingw-w64-ucrt-x86_64-gtk4; } > dist/windows-probe/environment.txt
+          { cmd.exe //c ver; rustc -Vv; cargo -V; pkg-config --modversion gtk4; pacman -Q mingw-w64-ucrt-x86_64-rust mingw-w64-ucrt-x86_64-gtk4 mingw-w64-ucrt-x86_64-python-sspilib; } > dist/windows-probe/environment.txt
       - name: Shared models without Linux adapters
         run: |
           set -o pipefail
