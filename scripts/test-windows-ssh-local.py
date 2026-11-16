@@ -142,9 +142,24 @@ def main():
             key_path = root / "clé privée SSH"
             client_key.write_private_key_file(str(key_path), password=password)
             if sys.platform == "win32":
-                user = os.environ["USERDOMAIN"] + "\\" + os.environ["USERNAME"]
-                subprocess.run(["icacls.exe", str(key_path), "/inheritance:r", "/grant:r", user + ":(R)"],
-                               check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                # MSYS2 can add an explicit OWNER RIGHTS ACE. Replacing only inherited ACEs
+                # leaves it behind on Windows 11; use a fresh DACL on this generated lab key.
+                acl_script = """
+$ErrorActionPreference = 'Stop'
+$owner = [Security.Principal.WindowsIdentity]::GetCurrent().User
+$acl = [Security.AccessControl.FileSecurity]::new()
+$acl.SetOwner($owner)
+$acl.SetAccessRuleProtection($true, $false)
+$rule = [Security.AccessControl.FileSystemAccessRule]::new($owner, [Security.AccessControl.FileSystemRights]::Read, [Security.AccessControl.AccessControlType]::Allow)
+$acl.AddAccessRule($rule)
+Set-Acl -LiteralPath $env:RUSTREMOTE_LAB_KEY -AclObject $acl
+$actual = Get-Acl -LiteralPath $env:RUSTREMOTE_LAB_KEY
+$rules = @($actual.GetAccessRules($true,$true,[Security.Principal.SecurityIdentifier]))
+if (-not $actual.AreAccessRulesProtected -or $rules.Count -ne 1 -or $rules[0].IdentityReference -ne $owner) { throw 'Lab private-key DACL verification failed' }
+"""
+                environment = dict(os.environ, RUSTREMOTE_LAB_KEY=str(key_path))
+                subprocess.run(["pwsh.exe", "-NoProfile", "-NonInteractive", "-Command", acl_script],
+                               env=environment, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             else:
                 key_path.chmod(0o600)
             if args.verify_fixture:
