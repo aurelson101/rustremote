@@ -316,7 +316,7 @@ def confirm_fixture_file_dialogs(parent, root, port):
     script=r"""$ErrorActionPreference='Stop'
 Add-Type -AssemblyName UIAutomationClient
 Add-Type -AssemblyName System.Drawing
-Add-Type 'using System; using System.Text; using System.Runtime.InteropServices; public static class IntroCapture { [StructLayout(LayoutKind.Sequential)] public struct Rect {public int Left,Top,Right,Bottom;} [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr window,out Rect rect); [DllImport("user32.dll")] public static extern bool PrintWindow(IntPtr window,IntPtr dc,uint flags); [DllImport("user32.dll")] public static extern IntPtr GetDlgItem(IntPtr window,int id); [DllImport("user32.dll")] public static extern int GetWindowTextW(IntPtr window,StringBuilder text,int size); [DllImport("user32.dll")] public static extern bool IsWindowEnabled(IntPtr window); [DllImport("user32.dll")] public static extern IntPtr SendMessageTimeoutW(IntPtr window,uint message,UIntPtr param,IntPtr data,uint flags,uint timeout,out UIntPtr result); }'
+Add-Type 'using System; using System.Text; using System.Runtime.InteropServices; public static class IntroCapture { [StructLayout(LayoutKind.Sequential)] public struct Rect {public int Left,Top,Right,Bottom;} [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr window,out Rect rect); [DllImport("user32.dll")] public static extern bool PrintWindow(IntPtr window,IntPtr dc,uint flags); [DllImport("user32.dll")] public static extern IntPtr GetDlgItem(IntPtr window,int id); [DllImport("user32.dll")] public static extern int GetWindowTextW(IntPtr window,StringBuilder text,int size); [DllImport("user32.dll")] public static extern bool IsWindowEnabled(IntPtr window); [DllImport("user32.dll")] public static extern bool PostMessageW(IntPtr window,uint message,UIntPtr param,IntPtr data); }'
 function Label($control){return (($control.Current.Name -replace '&','' -replace '\u2019',"'" -replace '\s+',' ').Trim())}
 function ClickVerifiedTaskButton($window,$button){
 if(-not $button.Current.IsEnabled){throw 'Verified fixture button is disabled'}
@@ -331,8 +331,7 @@ $text=[Text.StringBuilder]::new(64)
 if($native -ne [IntPtr]::Zero -and [IntroCapture]::IsWindowEnabled($native)){
 [void][IntroCapture]::GetWindowTextW($native,$text,64)
 if(($text.ToString() -replace '&','').Trim() -ceq 'Connect'){
-$result=[UIntPtr]::Zero
-if([IntroCapture]::SendMessageTimeoutW($native,245,[UIntPtr]::Zero,[IntPtr]::Zero,3,1000,[ref]$result) -eq [IntPtr]::Zero){throw 'Fixture legacy Connect action timed out'}
+if(-not [IntroCapture]::PostMessageW($native,245,[UIntPtr]::Zero,[IntPtr]::Zero)){throw 'Fixture legacy Connect action not queued'}
 return
 }
 }
@@ -340,10 +339,10 @@ return
 if($button.Current.AutomationId -cnotmatch '^CommandButton_([0-9]{1,5})$'){throw 'Unknown fixture task-dialog button'}
 $id=[uint32]$Matches[1]
 if($id -gt 65535){throw 'Invalid fixture task-dialog button ID'}
-$result=[UIntPtr]::Zero
 # TDM_CLICK_BUTTON = WM_USER + 102. The caller has verified the entire fixture
 # dialog; this is never called for certificate or credential warnings.
-if([IntroCapture]::SendMessageTimeoutW([IntPtr]$window.Current.NativeWindowHandle,1126,[UIntPtr]$id,[IntPtr]::Zero,3,1000,[ref]$result) -eq [IntPtr]::Zero){throw 'Fixture task-dialog action timed out'}
+# Queue the click: its callback may open another modal dialog.
+if(-not [IntroCapture]::PostMessageW([IntPtr]$window.Current.NativeWindowHandle,1126,[UIntPtr]$id,[IntPtr]::Zero)){throw 'Fixture task-dialog action not queued'}
 }
 $children=@(Get-CimInstance Win32_Process -Filter ("ParentProcessId="+$env:RUSTREMOTE_NLA_PARENT+" AND Name='mstsc.exe'"))
 $intro=0;$connection=0;$candidate=@{};$connectionCandidate=@{};$deadline=[DateTime]::UtcNow.AddSeconds(12)
@@ -419,11 +418,22 @@ Start-Sleep -Milliseconds 200
 }
 @{intro_confirmed=$intro;loopback_file_confirmed=$connection;intro_candidate=$candidate;connection_candidate=$connectionCandidate}|ConvertTo-Json -Compress
 """
+    script="try {\n"+script+r"""
+} catch {
+@{error_type=$_.Exception.GetType().FullName;error_id=$_.FullyQualifiedErrorId}|ConvertTo-Json -Compress|Set-Content -LiteralPath (Join-Path $env:RUSTREMOTE_NLA_ROOT 'rdp-consent-error.json') -Encoding utf8
+exit 1
+}
+"""
     try:
-        result=json.loads(powershell(script,root,extra={"RUSTREMOTE_NLA_PARENT":str(parent),"RUSTREMOTE_NLA_TARGET":f"127.0.0.1:{port}"}))
+        try:
+            result=json.loads(powershell(script,root,extra={"RUSTREMOTE_NLA_PARENT":str(parent),"RUSTREMOTE_NLA_TARGET":f"127.0.0.1:{port}"}))
+        except RuntimeError:
+            error=root/"rdp-consent-error.json"
+            if not error.is_file() or error.stat().st_size>4096:raise
+            result=json.loads(error.read_text(encoding="utf-8-sig"))
     finally:
         # Keep the verified introduction evidence even if its action fails.
-        for name in ("rdp-intro.png","rdp-intro-accessibility.json"):
+        for name in ("rdp-intro.png","rdp-intro-accessibility.json","rdp-consent-error.json"):
             capture=root/name
             if capture.is_file():
                 report=Path("dist/windows-probe")/name
@@ -551,6 +561,7 @@ def main():
                             stdout,stderr=process.communicate(json.dumps(dict(profile=profile,secret=password,state=str(root/"rdp-nla-state.json"))),timeout=5)
                         except subprocess.TimeoutExpired:
                             peer.state["file_consents"]=confirm_fixture_file_dialogs(process.pid,root,peer.port)
+                            if "error_type" in peer.state["file_consents"]:raise RuntimeError("Native fixture consent action failed")
                             try:peer.state["native_ui"]=native_window_flags(process.pid,root)
                             except Exception as error:peer.state["ui_probe_error"]=type(error).__name__
                             stdout,stderr=process.communicate(timeout=35)
