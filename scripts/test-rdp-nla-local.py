@@ -40,6 +40,7 @@ if "--fetch-deps" in sys.argv:
         archive.extractall(_dependency_guard.name)
     sys.path.insert(0,_dependency_guard.name)
 import spnego
+from spnego.exceptions import SpnegoError
 from spnego._negotiate import NegotiateProxy
 from spnego._ntlm_raw.crypto import ntowfv1
 from spnego.tls import CredSSPTLSContext, get_certificate_public_key
@@ -53,6 +54,17 @@ FAILURE_STAGE=None
 
 
 class LabNegotiate(NegotiateProxy):
+    last_error=None
+
+    def step(self, *args, **kwargs):
+        try:
+            return super().step(*args, **kwargs)
+        except SpnegoError as error:
+            # CredSSP can encode this exception in TSRequest instead of raising
+            # until its next step. Retain only type/status, never message/token.
+            self.last_error={"error_class":type(error).__name__,"status":error.nt_status}
+            raise
+
     @classmethod
     def available_protocols(cls, options=None):
         # Never consult Kerberos or Windows SSPI account databases on this simulator.
@@ -257,7 +269,8 @@ class Peer:
                 if request[5]!=0xe0 or len(negotiation_request)!=8 or negotiation_request[:1]!=b"\x01" or negotiation_request[2:4]!=b"\x08\0" or not int.from_bytes(negotiation_request[4:],"little") & 2:raise ValueError()
                 stream.sendall(bytes.fromhex("030000130ed000000000000200080002000000"))
                 self.state["negotiation"]=True
-                context=spnego.server(protocol="credssp",credssp_negotiate_context=negotiation("accept"),
+                authentication=negotiation("accept")
+                context=spnego.server(protocol="credssp",credssp_negotiate_context=authentication,
                                       credssp_tls_context=self.context,credssp_min_protocol=5)
                 self.state["phase"]="tls"
                 tls_handshake(stream,context)
@@ -276,6 +289,10 @@ class Peer:
                     kinds=self.state["credssp_record_types"]
                     kinds[str(header[0])]=kinds.get(str(header[0]),0)+1
                     token=context.step(header+receive(stream,length))
+                    self.state["auth_stage"]=context.get_extra_info("auth_stage")
+                    self.state["credssp_version"]=context.get_extra_info("protocol_version")
+                    self.state["ntlm_complete"]=authentication.complete
+                    if authentication.last_error:self.state["authentication_error"]=authentication.last_error
                     protocol=context.negotiated_protocol
                     if protocol in ("ntlm","kerberos"):self.state["auth_protocol"]=protocol
                     if token:
