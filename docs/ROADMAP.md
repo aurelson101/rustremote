@@ -565,3 +565,18 @@ PASS ; NLA natif toujours FAIL avant TCP. Garde finale vérifiée en échec malg
 la poursuite des autres étapes. Prochain incrément : identifier le blocage natif
 avant connexion, puis valider CredSSP et bureau/clipboard avant MSI. Aucun nouveau
 tag/release ; qualification Win11ARM de ces changements reste à effectuer.
+
+2026-11-17 : blocage avantTCP localisé au consentement initial d’ouverture des
+fichiers RDP (titre+label+case reconnus, capture du seul dialogue vérifiée).
+Ce n’était pas encore une tentative d’authentification. Contrôleur RDP clarifié ;
+laboratoire CI autorisé à confirmer uniquement cette introduction et le fichier
+127.0.0.1:port exact sans redirection, jamais une alerteTLS ni une saisiepassword.
+WIN-05 reste PARTIAL jusqu’à preuve CredSSP native ; aucune qualification MSI.
+
+Dernière preuve : run44034020953/824886b Server2022, consentement initial et
+éditeur PASS ; négociation RDP et handshake TLS atteints, puis ConnectionResetError
+en phase CredSSP. Le blocage avantTCP est levé dans le labo. Authentification
+toujours FAIL/non qualifiée, garde finale CI rouge. SSH/SFTP CLI+GUI, coffre,
+ConPTY et GUI profils PASS dans ce même run. Prochaine tâche : localiser la
+réinitialisation CredSSP (échanges/politique certificat/auth), sans affaiblir TLS,
+puis seulement bureau/clipboard, Win11 et MSI. Aucun MSI ou tag publié.

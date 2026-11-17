@@ -197,6 +197,7 @@ clair n’est ajouté aux exports, arguments, variables d’environnement ou log
 Le lanceur laisse les consentements des fichiers RDP à l’utilisateur, sans
 affaiblir la politique Windows. Le laboratoire CI jetable peut seulement
 confirmer le libellé exact du consentement initial et le dialogue éditeur du
-profil généré : PID mstsc enfant possédé, destination 127.0.0.1:port exacte,
+profil généré : PID mstsc enfant possédé, destination affichée 127.0.0.1 et
+port éphémère exact dans le modèle/fichier privé généré,
 toutes les redirections décochées. Aucun clic sur une alerte de certificat ou
 sur une saisie d’identifiants ; aucune automatisation sur le poste personnel.

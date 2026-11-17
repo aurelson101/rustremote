@@ -1533,3 +1533,48 @@ Tests locaux de cette reprise : fmt racine+prototype, check/clippy -Dwarnings
 racine+prototype PASS ; workspace63 PASS/2ignored ; prototype23 PASS/1ignored.
 Python -Werror py_compile PASS ; contrôle positifTLS/CredSSP local PASS après
 ajout du helper (aucun certstore local modifié). État natif final à consigner.
+
+Qualification complémentaire : run44028028814 captureintro PASS ; image inspectée
+dans dist/windows-probe-validation/44028028814/windows-2022/rdp-intro.png : dialogue
+normal, pas de défaut de rendu. run44028901395 a révélé une erreur du diagnostic
+(.NET UIA2 n’expose pas LegacyIAccessiblePattern) : appel retiré dansf0d0a73.
+run44029715778/f0d0a73 : traces d’accessibilité du seul intro connu ; OK est un
+ControlType.Pane, AutomationId CommandButton_1, enabled=true, Invoke=false.
+272787c utilise TDM_CLICK_BUTTON (WM_USER+102), message Win32 documenté, après
+garde titre+label+caseOn+id exact ; run44030528233 confirme intro_confirmed1.
+Le fichier atteint ensuite l’avertissement d’éditeur classique (Unknown publisher,
+Connect présent), toujours sans TCP. Ne pas déclarer le password en échec : pas
+encore de tentative réseau. Support legacy limité aux champs Publisher/Remote
+computer, destination locale connue, aucune ressource cochée ; accès à une valeur
+uniquement si ValuePattern.IsReadOnly et hors champ password, jamais journalisée.
+Ne pas affirmer que le port est masqué : les noms de contrôles seuls n’exposaient
+pas l’adresse ; sa représentation reste à établir. Fichier privé/modèle du lab
+portent le port éphémère exact. Source068271f en qualification run44032363121.
+45fc19c préserve PNG+trace intro même si l’action échoue ; test local isolé PASS
+(mockPowerShell en échec, erreur propagée, preuves conservées, aucune API Windows).
+Import initial du mock sans pyspnego échoué ; --fetch-deps du fixture résout sans
+installation Python système. Tout nouvel état natif doit référencer son run/source.
+
+Résultat final reprise : run44034020953/source824886b. Les deux consentements
+PASS (intro1/file1). RDP negotiation true, handshake TLS terminé (phasecredssp),
+puis ConnectionResetError ; credssp_complete/account_match/password_match false.
+Ne pas conclure que le mot de passe est faux ou que la politique certificat
+est validée : la cause du reset n’est pas établie. Le blocage AVANT TCP est levé.
+Correction NativeConnect : GetWindowTextW exige CharSet.Unicode pour StringBuilder,
+sinon libellé lu enANSI et refus du bouton. Les TaskDialog Pane sansInvoke utilisent
+TDM_CLICK_BUTTON après guards exacts ; legacyConnect BM_CLICK sur IDOK au libellé
+Connect vérifié. Clics postés pour ne pas attendre un callback modal. Erreurs
+PowerShell : type+FullyQualifiedErrorId uniquement, pas de message/stack/secret.
+Sourcefd8e401 avait introduit API LegacyIAccessible absente du wrapper.NET ;
+retirée enf0d0a73 après échec run44028901395, preuvepréservée via45fc19c.
+Tous les autres tests natifs de44034020953 PASS :28 unitaires (core7+probe21),
+stockage/coffre, RDPconfig+éditeur, ConPTY, SSH/SFTP CLI+GUI, GTK et profils.
+Garde finale échoue correctement sur outcome NLA malgré continue-on-error.
+Artefacts : dist/windows-probe-validation/44034020953/windows-2022 ; journal
+/tmp/rustremote-rdp-unicode-button.log. Capture intro inspectée dans artefacts
+44028028814 ; trace des Pane sansInvoke dans44029715778, aucun champcredential.
+README/prototype/SECURITY/ROADMAP alignés. Aucun MSI, release ou tag nouveau,
+aucun rejouage Win11ARM de cette série. Prochaine tâche : compter/localiser les
+échanges CredSSP et la validation serveur au point du reset, sans contourner
+certificat/NLA, puis qualifier bureau/clipboard. Contrôle positif pyspnego local
+réussi ; il ne prouve pas l’interopérabilité mstsc ni une session Windows réelle.

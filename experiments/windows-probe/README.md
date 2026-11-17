@@ -225,15 +225,20 @@ computer-name controls of its owned PID, skips password controls and logs no
 native window text. A loopback listener guards against unexpected connection
 attempts. Even that test qualifies file loading, not an RDP session.
 
-The subsequent native TLS/CredSSP loopback test currently fails before TCP
-connection on Server 2022. A stored profile password must **not** be advertised
+The subsequent native TLS/CredSSP loopback test now passes file confirmations
+and reaches RDP/TLS negotiation on Server 2022, but resets during CredSSP:
+[run44034020953](https://github.com/aurelson101/rustremote/actions/runs/44034020953),
+source `824886b`. A stored profile password must **not** be advertised
 as working native automatic authentication yet. Diagnostics inspect only owned
-client windows and publish fixed flags/categories, never field values or text.
+client windows and publish fixed flags/categories, never field values.
+Only the verified non-credential introduction may produce a capture and static
+accessibility labels; credential windows are never captured.
 The Python peer authenticates its generated fake account successfully in the
 local positive control. Its CA is installed only on a disposable Windows CI
 runner, then removed by exact fingerprint. Only on this disposable runner, the
 lab may confirm the exact first-launch RDP-file consent and the generated
-loopback file's publisher dialog, with the exact host/port shown and every
+loopback file's publisher dialog, checking the displayed local destination and
+the exact port in the generated private file, with every
 resource checkbox off. TLS warnings and credential prompts are never accepted.
 The production launcher leaves these decisions to the user. Microsoft's
 [RDP-file warning reference](https://learn.microsoft.com/en-us/windows-server/remote/remote-desktop-services/remotepc/understanding-security-warnings)
