@@ -316,10 +316,23 @@ def confirm_fixture_file_dialogs(parent, root, port):
     script=r"""$ErrorActionPreference='Stop'
 Add-Type -AssemblyName UIAutomationClient
 Add-Type -AssemblyName System.Drawing
-Add-Type 'using System; using System.Runtime.InteropServices; public static class IntroCapture { [StructLayout(LayoutKind.Sequential)] public struct Rect {public int Left,Top,Right,Bottom;} [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr window,out Rect rect); [DllImport("user32.dll")] public static extern bool PrintWindow(IntPtr window,IntPtr dc,uint flags); }'
+Add-Type 'using System; using System.Runtime.InteropServices; public static class IntroCapture { [StructLayout(LayoutKind.Sequential)] public struct Rect {public int Left,Top,Right,Bottom;} [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr window,out Rect rect); [DllImport("user32.dll")] public static extern bool PrintWindow(IntPtr window,IntPtr dc,uint flags); [DllImport("user32.dll")] public static extern IntPtr SendMessageTimeoutW(IntPtr window,uint message,UIntPtr param,IntPtr data,uint flags,uint timeout,out UIntPtr result); }'
 function Label($control){return (($control.Current.Name -replace '&','' -replace '\s+',' ').Trim())}
+function ClickVerifiedTaskButton($window,$button){
+if(-not $button.Current.IsEnabled){throw 'Verified fixture button is disabled'}
+if($button.GetCurrentPropertyValue([Windows.Automation.AutomationElement]::IsInvokePatternAvailableProperty)){
+$button.GetCurrentPattern([Windows.Automation.InvokePattern]::Pattern).Invoke();return
+}
+if($window.Current.ClassName -ne '#32770' -or $button.Current.AutomationId -cnotmatch '^CommandButton_([0-9]{1,5})$'){throw 'Unknown fixture task-dialog button'}
+$id=[uint32]$Matches[1]
+if($id -gt 65535){throw 'Invalid fixture task-dialog button ID'}
+$result=[UIntPtr]::Zero
+# TDM_CLICK_BUTTON = WM_USER + 102. The caller has verified the entire fixture
+# dialog; this is never called for certificate or credential warnings.
+if([IntroCapture]::SendMessageTimeoutW([IntPtr]$window.Current.NativeWindowHandle,1126,[UIntPtr]$id,[IntPtr]::Zero,3,1000,[ref]$result) -eq [IntPtr]::Zero){throw 'Fixture task-dialog action timed out'}
+}
 $children=@(Get-CimInstance Win32_Process -Filter ("ParentProcessId="+$env:RUSTREMOTE_NLA_PARENT+" AND Name='mstsc.exe'"))
-$intro=0;$connection=0;$candidate=@{};$deadline=[DateTime]::UtcNow.AddSeconds(12)
+$intro=0;$connection=0;$candidate=@{};$connectionCandidate=@{};$deadline=[DateTime]::UtcNow.AddSeconds(12)
 while([DateTime]::UtcNow -lt $deadline){
 foreach($process in $children){
 $condition=[Windows.Automation.PropertyCondition]::new([Windows.Automation.AutomationElement]::ProcessIdProperty,[int]$process.ProcessId)
@@ -330,7 +343,7 @@ if(@($controls|Where-Object{$_.Current.IsPassword}).Count){continue}
 $boxes=@($controls|Where-Object{$_.Current.ControlType -eq [Windows.Automation.ControlType]::CheckBox})
 $introLabels=@($controls|Where-Object{(Label $_) -cmatch '^I understand and allow (RDP|\.rdp) files to open on this device for my account$'})
 $introTitle=@($controls|Where-Object{(Label $_) -ceq 'Opening Remote Desktop Connection'})
-$ok=@($controls|Where-Object{(Label $_) -eq 'OK'})
+$ok=@($controls|Where-Object{(Label $_) -ceq 'OK' -and $_.Current.AutomationId -ceq 'CommandButton_1'})
 $candidate=@{checkboxes=$boxes.Count;intro_labels=$introLabels.Count;intro_titles=$introTitle.Count;ok_buttons=$ok.Count}
 if($intro -eq 0 -and $boxes.Count -eq 1 -and $introLabels.Count -ge 1 -and $introTitle.Count -eq 1){
 # Capture only this proven educational dialog, which contains no account or
@@ -358,24 +371,24 @@ if(-not (Test-Path -LiteralPath $debug)){
 })|ConvertTo-Json -Depth 3|Set-Content -LiteralPath $debug -Encoding utf8
 }
 if($ok.Count -eq 1 -and $ok[0].Current.IsEnabled){
-if($ok[0].GetCurrentPropertyValue([Windows.Automation.AutomationElement]::IsInvokePatternAvailableProperty)){$ok[0].GetCurrentPattern([Windows.Automation.InvokePattern]::Pattern).Invoke()}
-else{throw 'Verified introduction button has no supported action'}
+ClickVerifiedTaskButton $window $ok[0]
 $intro++;continue
 }
 }
 $labels=@($controls|Where-Object{-not $_.Current.IsPassword}|ForEach-Object{Label $_})
-$connect=@($controls|Where-Object{$_.Current.ControlType -eq [Windows.Automation.ControlType]::Button -and (Label $_) -ceq 'Connect' -and $_.Current.IsEnabled})
+$connect=@($controls|Where-Object{(Label $_) -ceq 'Connect' -and $_.Current.IsEnabled})
+$connectionCandidate=@{banner=($labels -ccontains 'Caution: Unknown remote connection');publisher=($labels -ccontains 'Unknown publisher');target=($labels -ccontains $env:RUSTREMOTE_NLA_TARGET);connect=$connect.Count}
 if($connection -eq 0 -and $labels -ccontains 'Caution: Unknown remote connection' -and $labels -ccontains 'Unknown publisher' -and $labels -ccontains $env:RUSTREMOTE_NLA_TARGET -and $connect.Count -eq 1){
 foreach($box in $boxes){
 if($box.GetCurrentPattern([Windows.Automation.TogglePattern]::Pattern).Current.ToggleState -ne [Windows.Automation.ToggleState]::Off){throw 'Fixture unexpectedly requests local resources'}
 }
-$connect[0].GetCurrentPattern([Windows.Automation.InvokePattern]::Pattern).Invoke();$connection++
+ClickVerifiedTaskButton $window $connect[0];$connection++
 }
 }}
 if($connection -eq 1){break}
 Start-Sleep -Milliseconds 200
 }
-@{intro_confirmed=$intro;loopback_file_confirmed=$connection;intro_candidate=$candidate}|ConvertTo-Json -Compress
+@{intro_confirmed=$intro;loopback_file_confirmed=$connection;intro_candidate=$candidate;connection_candidate=$connectionCandidate}|ConvertTo-Json -Compress
 """
     try:
         result=json.loads(powershell(script,root,extra={"RUSTREMOTE_NLA_PARENT":str(parent),"RUSTREMOTE_NLA_TARGET":f"127.0.0.1:{port}"}))
