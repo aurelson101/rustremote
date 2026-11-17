@@ -330,7 +330,7 @@ if(@($controls|Where-Object{$_.Current.IsPassword}).Count){continue}
 $boxes=@($controls|Where-Object{$_.Current.ControlType -eq [Windows.Automation.ControlType]::CheckBox})
 $introLabels=@($controls|Where-Object{(Label $_) -cmatch '^I understand and allow (RDP|\.rdp) files to open on this device for my account$'})
 $introTitle=@($controls|Where-Object{(Label $_) -ceq 'Opening Remote Desktop Connection'})
-$ok=@($controls|Where-Object{(Label $_) -eq 'OK' -and $_.GetCurrentPropertyValue([Windows.Automation.AutomationElement]::IsInvokePatternAvailableProperty)})
+$ok=@($controls|Where-Object{(Label $_) -eq 'OK'})
 $candidate=@{checkboxes=$boxes.Count;intro_labels=$introLabels.Count;intro_titles=$introTitle.Count;ok_buttons=$ok.Count}
 if($intro -eq 0 -and $boxes.Count -eq 1 -and $introLabels.Count -ge 1 -and $introTitle.Count -eq 1){
 # Capture only this proven educational dialog, which contains no account or
@@ -349,7 +349,20 @@ if($drawn){$bitmap.Save($capture,[Drawing.Imaging.ImageFormat]::Png)}
 $toggle=$boxes[0].GetCurrentPattern([Windows.Automation.TogglePattern]::Pattern)
 if($toggle.Current.ToggleState -eq [Windows.Automation.ToggleState]::Off){$toggle.Toggle()}
 if($toggle.Current.ToggleState -ne [Windows.Automation.ToggleState]::On){throw 'Fixture opening consent not selected'}
-if($ok.Count -eq 1 -and $ok[0].Current.IsEnabled){$ok[0].GetCurrentPattern([Windows.Automation.InvokePattern]::Pattern).Invoke();$intro++;continue}
+# Only this already identified, non-credential dialog may expose label metadata.
+# DirectUI buttons can expose a legacy default action instead of InvokePattern.
+$debug=Join-Path $env:RUSTREMOTE_NLA_ROOT 'rdp-intro-accessibility.json'
+if(-not (Test-Path -LiteralPath $debug)){
+@($controls|Select-Object -First 128|ForEach-Object{
+@{type=$_.Current.ControlType.ProgrammaticName;name=(Label $_);id=$_.Current.AutomationId;enabled=$_.Current.IsEnabled;invoke=$_.GetCurrentPropertyValue([Windows.Automation.AutomationElement]::IsInvokePatternAvailableProperty);legacy=$_.GetCurrentPropertyValue([Windows.Automation.AutomationElement]::IsLegacyIAccessiblePatternAvailableProperty)}
+})|ConvertTo-Json -Depth 3|Set-Content -LiteralPath $debug -Encoding utf8
+}
+if($ok.Count -eq 1 -and $ok[0].Current.IsEnabled){
+if($ok[0].GetCurrentPropertyValue([Windows.Automation.AutomationElement]::IsInvokePatternAvailableProperty)){$ok[0].GetCurrentPattern([Windows.Automation.InvokePattern]::Pattern).Invoke()}
+elseif($ok[0].GetCurrentPropertyValue([Windows.Automation.AutomationElement]::IsLegacyIAccessiblePatternAvailableProperty)){$ok[0].GetCurrentPattern([Windows.Automation.LegacyIAccessiblePattern]::Pattern).DoDefaultAction()}
+else{throw 'Verified introduction button has no supported action'}
+$intro++;continue
+}
 }
 $labels=@($controls|Where-Object{-not $_.Current.IsPassword}|ForEach-Object{Label $_})
 $connect=@($controls|Where-Object{$_.Current.ControlType -eq [Windows.Automation.ControlType]::Button -and (Label $_) -ceq 'Connect' -and $_.Current.IsEnabled})
@@ -366,10 +379,11 @@ Start-Sleep -Milliseconds 200
 @{intro_confirmed=$intro;loopback_file_confirmed=$connection;intro_candidate=$candidate}|ConvertTo-Json -Compress
 """
     result=json.loads(powershell(script,root,extra={"RUSTREMOTE_NLA_PARENT":str(parent),"RUSTREMOTE_NLA_TARGET":f"127.0.0.1:{port}"}))
-    capture=root/"rdp-intro.png"
-    if capture.is_file():
-        report=Path("dist/windows-probe/rdp-intro.png")
-        with report.open("xb") as output:output.write(capture.read_bytes())
+    for name in ("rdp-intro.png","rdp-intro-accessibility.json"):
+        capture=root/name
+        if capture.is_file():
+            report=Path("dist/windows-probe")/name
+            with report.open("xb") as output:output.write(capture.read_bytes())
     return result
 
 
