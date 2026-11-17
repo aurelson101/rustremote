@@ -496,7 +496,7 @@ try{
 $chain.ChainPolicy.DisableCertificateDownloads=$true
 $chain.ChainPolicy.UrlRetrievalTimeout=[TimeSpan]::FromSeconds(2)
 $chain.ChainPolicy.RevocationMode=[Security.Cryptography.X509Certificates.X509RevocationMode]::Online
-$chain.ChainPolicy.ApplicationPolicy.Add([Security.Cryptography.Oid]::new('1.3.6.1.5.5.7.3.1'))
+[void]$chain.ChainPolicy.ApplicationPolicy.Add([Security.Cryptography.Oid]::new('1.3.6.1.5.5.7.3.1'))
 [void]$chain.ChainPolicy.ExtraStore.Add($issuer)
 $valid=$chain.Build($leaf)
 $results+=@{machine_context=$machine;valid=$valid;status=@($chain.ChainStatus|ForEach-Object{$_.Status.ToString()})}
