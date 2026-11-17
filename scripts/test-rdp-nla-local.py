@@ -92,7 +92,14 @@ def certificate(root):
             .add_extension(x509.BasicConstraints(ca=False,path_length=None),critical=True)
             .add_extension(x509.ExtendedKeyUsage([ExtendedKeyUsageOID.SERVER_AUTH]),critical=False)
             .add_extension(x509.SubjectAlternativeName([x509.IPAddress(ipaddress.ip_address("127.0.0.1"))]),critical=False)
+            .add_extension(x509.CRLDistributionPoints([x509.DistributionPoint(
+                full_name=[x509.UniformResourceIdentifier((root/"ca.crl").resolve().as_uri())],
+                relative_name=None,reasons=None,crl_issuer=None)]),critical=False)
             .sign(key,hashes.SHA256()))
+    crl=(x509.CertificateRevocationListBuilder().issuer_name(subject)
+         .last_update(now-datetime.timedelta(minutes=5)).next_update(now+datetime.timedelta(hours=1))
+         .add_extension(x509.CRLNumber(1),critical=False).sign(key,hashes.SHA256()))
+    (root/"ca.crl").write_bytes(crl.public_bytes(serialization.Encoding.DER))
     (root/"ca.cer").write_bytes(ca.public_bytes(serialization.Encoding.DER))
     (root/"server.cer").write_bytes(leaf.public_bytes(serialization.Encoding.DER))
     (root/"ca.pem").write_bytes(ca.public_bytes(serialization.Encoding.PEM))
