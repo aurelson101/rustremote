@@ -94,6 +94,7 @@ def certificate(root):
             .add_extension(x509.SubjectAlternativeName([x509.IPAddress(ipaddress.ip_address("127.0.0.1"))]),critical=False)
             .sign(key,hashes.SHA256()))
     (root/"ca.cer").write_bytes(ca.public_bytes(serialization.Encoding.DER))
+    (root/"server.cer").write_bytes(leaf.public_bytes(serialization.Encoding.DER))
     (root/"ca.pem").write_bytes(ca.public_bytes(serialization.Encoding.PEM))
     chain=root/"server.pem"
     chain.write_bytes(leaf.public_bytes(serialization.Encoding.PEM)+ca.public_bytes(serialization.Encoding.PEM)+
@@ -483,6 +484,29 @@ exit 1
     return result
 
 
+def inspect_windows_chain(root):
+    """Read-only chain diagnostics; never used to relax the mstsc connection."""
+    script=r"""$ErrorActionPreference='Stop'
+$leaf=[Security.Cryptography.X509Certificates.X509Certificate2]::new([IO.File]::ReadAllBytes((Join-Path $env:RUSTREMOTE_NLA_ROOT 'server.cer')))
+$issuer=[Security.Cryptography.X509Certificates.X509Certificate2]::new([IO.File]::ReadAllBytes((Join-Path $env:RUSTREMOTE_NLA_ROOT 'ca.cer')))
+$results=@()
+try{foreach($machine in @($false,$true)){
+$chain=[Security.Cryptography.X509Certificates.X509Chain]::new($machine)
+try{
+$chain.ChainPolicy.DisableCertificateDownloads=$true
+$chain.ChainPolicy.UrlRetrievalTimeout=[TimeSpan]::FromSeconds(2)
+$chain.ChainPolicy.RevocationMode=[Security.Cryptography.X509Certificates.X509RevocationMode]::Online
+$chain.ChainPolicy.ApplicationPolicy.Add([Security.Cryptography.Oid]::new('1.3.6.1.5.5.7.3.1'))
+[void]$chain.ChainPolicy.ExtraStore.Add($issuer)
+$valid=$chain.Build($leaf)
+$results+=@{machine_context=$machine;valid=$valid;status=@($chain.ChainStatus|ForEach-Object{$_.Status.ToString()})}
+}finally{$chain.Dispose()}
+}}finally{$leaf.Dispose();$issuer.Dispose()}
+@{revocation_mode='online';certificate_downloads=$false;chains=$results}|ConvertTo-Json -Depth 4 -Compress
+"""
+    return json.loads(powershell(script,root))
+
+
 def native_client_events(pids, started, root):
     """Read only numeric RDP client diagnostics for the fixture's exact processes."""
     script=r"""$ErrorActionPreference='Stop'
@@ -613,6 +637,7 @@ def main():
         try:
             CURRENT_STAGE="certificate-generation"
             context,thumb=certificate(root)
+            chain_report=None
             if args.native:
                 CURRENT_STAGE="trust-add"
                 trusted=True
@@ -620,8 +645,11 @@ def main():
                 except ExistingLabCertificate:
                     trusted=False
                     raise
+                try:chain_report=inspect_windows_chain(root)
+                except Exception as error:chain_report={"error_class":type(error).__name__}
             CURRENT_STAGE="peer-start"
             peer=Peer(context,root,password)
+            if chain_report is not None:peer.state["windows_chain"]=chain_report
             if args.verify_fixture or args.verify_sspi_fixture:verify_fixture(peer,root,password,native_sspi=args.verify_sspi_fixture)
             else:
                 profile=dict(name="CredSSP loopback lab",host="127.0.0.1",port=peer.port,username=USER,favorite=False,
