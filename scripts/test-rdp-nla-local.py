@@ -236,7 +236,8 @@ class Peer:
     def __init__(self, context, root, password):
         self.listener=socket.socket();self.listener.bind(("127.0.0.1",0));self.listener.listen(1);self.listener.settimeout(25)
         self.port=self.listener.getsockname()[1];self.context=context;self.root=root;self.password=password
-        self.state={"phase":"accept","negotiation":False,"credssp_complete":False,"password_match":False,"account_match":False}
+        self.state={"phase":"accept","negotiation":False,"credssp_complete":False,"password_match":False,"account_match":False,
+                    "credssp_records":0,"credssp_responses":0,"credssp_record_types":{}}
         self.worker=threading.Thread(target=self.serve);self.worker.start()
 
     def serve(self):
@@ -260,15 +261,26 @@ class Peer:
                                       credssp_tls_context=self.context,credssp_min_protocol=5)
                 self.state["phase"]="tls"
                 tls_handshake(stream,context)
+                self.state["tls_version"]=context.get_extra_info("ssl_object").version()
                 self.state["phase"]="credssp"
-                context.step()
+                initial=context.step()
+                if initial:
+                    stream.sendall(initial)
+                    self.state["credssp_responses"]+=1
                 budget=0
                 for _ in range(64):
                     header=receive(stream,5);length=int.from_bytes(header[3:],"big")
                     budget+=length+5
                     if header[0] not in (20,21,22,23) or length>18432 or budget>256*1024: raise ValueError()
+                    self.state["credssp_records"]+=1
+                    kinds=self.state["credssp_record_types"]
+                    kinds[str(header[0])]=kinds.get(str(header[0]),0)+1
                     token=context.step(header+receive(stream,length))
-                    if token:stream.sendall(token)
+                    protocol=context.negotiated_protocol
+                    if protocol in ("ntlm","kerberos"):self.state["auth_protocol"]=protocol
+                    if token:
+                        stream.sendall(token)
+                        self.state["credssp_responses"]+=1
                     if context.complete:
                         self.state["phase"]="delegated-password"
                         credential=context.get_extra_info("client_credential")
@@ -416,7 +428,7 @@ ClickVerifiedTaskButton $window $connect[0];$connection++
 if($connection -eq 1){break}
 Start-Sleep -Milliseconds 200
 }
-@{intro_confirmed=$intro;loopback_file_confirmed=$connection;intro_candidate=$candidate;connection_candidate=$connectionCandidate}|ConvertTo-Json -Compress
+@{intro_confirmed=$intro;loopback_file_confirmed=$connection;intro_candidate=$candidate;connection_candidate=$connectionCandidate;client_pids=@($children|ForEach-Object{$_.ProcessId})}|ConvertTo-Json -Compress
 """
     script="try {\n"+script+r"""
 } catch {
@@ -439,6 +451,32 @@ exit 1
                 report=Path("dist/windows-probe")/name
                 with report.open("xb") as output:output.write(capture.read_bytes())
     return result
+
+
+def native_client_events(pids, started, root):
+    """Read only numeric RDP client diagnostics for the fixture's exact processes."""
+    script=r"""$ErrorActionPreference='Stop'
+$pids=@($env:RUSTREMOTE_NLA_PIDS.Split(',')|Where-Object{$_}|ForEach-Object{[uint32]$_})
+$start=[DateTimeOffset]::Parse($env:RUSTREMOTE_NLA_STARTED).LocalDateTime
+$events=@();$channels=@()
+foreach($channel in @('Microsoft-Windows-TerminalServices-RDPClient/Operational','Microsoft-Windows-TerminalServices-ClientActiveXCore/Operational')){
+try{
+$records=@(Get-WinEvent -FilterHashtable @{LogName=$channel;StartTime=$start} -MaxEvents 64 -ErrorAction Stop)
+$channels+=@{channel=$channel;state='read'}
+foreach($record in $records){
+$xml=[xml]$record.ToXml()
+if($pids -notcontains [uint32]$xml.Event.System.Execution.ProcessID){continue}
+$codes=@{}
+foreach($field in $xml.Event.EventData.Data){
+if($field.Name -in @('ErrorCode','Reason','DisconnectReason','ExtendedReason','Status','HResult','ResultCode') -and $field.InnerText -match '^(0x[0-9a-fA-F]{1,16}|-?[0-9]{1,20})$'){$codes[$field.Name]=$field.InnerText}
+}
+$events+=@{channel=$channel;id=$record.Id;codes=$codes}
+}
+}catch{$channels+=@{channel=$channel;state='empty_or_unavailable'}}
+}
+@{channels=$channels;events=$events}|ConvertTo-Json -Depth 5 -Compress
+"""
+    return json.loads(powershell(script,root,extra={"RUSTREMOTE_NLA_PIDS":",".join(str(int(pid)) for pid in pids),"RUSTREMOTE_NLA_STARTED":started}))
 
 
 def native_window_flags(parent, root):
@@ -554,6 +592,7 @@ def main():
                 profile=dict(name="CredSSP loopback lab",host="127.0.0.1",port=peer.port,username=USER,favorite=False,
                     options=dict(protocol="Rdp",domain=DOMAIN,width=1280,height=720,fullscreen=False,clipboard=False,clipboard_files=False))
                 CURRENT_STAGE="native-client"
+                started=datetime.datetime.now(datetime.timezone.utc).isoformat()
                 command=[str(args.native.resolve(strict=True)),"--self-test-rdp-nla"]
                 with subprocess.Popen(command,stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,encoding="utf-8") as process:
                     try:
@@ -572,6 +611,8 @@ def main():
                         raise TimeoutError("Native RDP lab actor exceeded its deadline") from None
                     result=subprocess.CompletedProcess(command,process.returncode,stdout,stderr)
                 peer.state["native_exit"]=result.returncode
+                try:peer.state["client_events"]=native_client_events(peer.state.get("file_consents",{}).get("client_pids",[]),started,root)
+                except Exception as error:peer.state["event_probe_error"]=type(error).__name__
                 if result.returncode:raise RuntimeError("Native RDP lab client did not complete")
             peer.close()
             CURRENT_STAGE="credential-verification"
