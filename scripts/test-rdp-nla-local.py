@@ -499,7 +499,8 @@ if($pids -notcontains [uint32]$xml.Event.System.Execution.ProcessID){continue}
 $codes=@{}
 foreach($field in $xml.SelectNodes('//*[local-name()="EventData"]/* | //*[local-name()="UserData"]//*[not(*)]')){
 $name=if($field.HasAttribute('Name')){$field.GetAttribute('Name')}else{$field.LocalName}
-$value=[string]$field.InnerText
+$name=$name -replace '[ _]',''
+$value=([string]$field.InnerText).Trim()
 if($name -in @('ErrorCode','Reason','ReasonCode','DisconnectReason','ExtendedReason','Status','HResult','ResultCode','Error','Code') -and $value -match '^(0x[0-9a-fA-F]{1,16}|-?[0-9]{1,20})$'){$codes[$name]=$value}
 }
 $events+=@{channel=$channel;id=$record.Id;codes=$codes}
