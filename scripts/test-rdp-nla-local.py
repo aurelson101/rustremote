@@ -315,6 +315,8 @@ def confirm_fixture_file_dialogs(parent, root, port):
         raise RuntimeError("RDP file consent is restricted to the loopback CI fixture")
     script=r"""$ErrorActionPreference='Stop'
 Add-Type -AssemblyName UIAutomationClient
+Add-Type -AssemblyName System.Drawing
+Add-Type 'using System; using System.Runtime.InteropServices; public static class IntroCapture { [StructLayout(LayoutKind.Sequential)] public struct Rect {public int Left,Top,Right,Bottom;} [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr window,out Rect rect); [DllImport("user32.dll")] public static extern bool PrintWindow(IntPtr window,IntPtr dc,uint flags); }'
 function Label($control){return (($control.Current.Name -replace '&','' -replace '\s+',' ').Trim())}
 $children=@(Get-CimInstance Win32_Process -Filter ("ParentProcessId="+$env:RUSTREMOTE_NLA_PARENT+" AND Name='mstsc.exe'"))
 $intro=0;$connection=0;$candidate=@{};$deadline=[DateTime]::UtcNow.AddSeconds(12)
@@ -328,9 +330,22 @@ if(@($controls|Where-Object{$_.Current.IsPassword}).Count){continue}
 $boxes=@($controls|Where-Object{$_.Current.ControlType -eq [Windows.Automation.ControlType]::CheckBox})
 $introLabels=@($controls|Where-Object{(Label $_) -cmatch '^I understand and allow (RDP|\.rdp) files to open on this device for my account$'})
 $introTitle=@($controls|Where-Object{(Label $_) -ceq 'Opening Remote Desktop Connection'})
-$ok=@($controls|Where-Object{$_.Current.ControlType -eq [Windows.Automation.ControlType]::Button -and (Label $_) -eq 'OK'})
+$ok=@($controls|Where-Object{(Label $_) -eq 'OK' -and $_.GetCurrentPropertyValue([Windows.Automation.AutomationElement]::IsInvokePatternAvailableProperty)})
 $candidate=@{checkboxes=$boxes.Count;intro_labels=$introLabels.Count;intro_titles=$introTitle.Count;ok_buttons=$ok.Count}
 if($intro -eq 0 -and $boxes.Count -eq 1 -and $introLabels.Count -ge 1 -and $introTitle.Count -eq 1){
+# Capture only this proven educational dialog, which contains no account or
+# password fields. Never capture credential, certificate or arbitrary windows.
+$capture=Join-Path $env:RUSTREMOTE_NLA_ROOT 'rdp-intro.png'
+if(-not (Test-Path -LiteralPath $capture)){
+$rect=[IntroCapture+Rect]::new();$handle=[IntPtr]$window.Current.NativeWindowHandle
+if([IntroCapture]::GetWindowRect($handle,[ref]$rect) -and ($rect.Right-$rect.Left) -gt 0 -and ($rect.Right-$rect.Left) -le 4096 -and ($rect.Bottom-$rect.Top) -gt 0 -and ($rect.Bottom-$rect.Top) -le 4096){
+$bitmap=[Drawing.Bitmap]::new(($rect.Right-$rect.Left),($rect.Bottom-$rect.Top))
+try{$graphics=[Drawing.Graphics]::FromImage($bitmap)
+try{$dc=$graphics.GetHdc();try{$drawn=[IntroCapture]::PrintWindow($handle,$dc,2)}finally{$graphics.ReleaseHdc($dc)}}finally{$graphics.Dispose()}
+if($drawn){$bitmap.Save($capture,[Drawing.Imaging.ImageFormat]::Png)}
+}finally{$bitmap.Dispose()}
+}
+}
 $toggle=$boxes[0].GetCurrentPattern([Windows.Automation.TogglePattern]::Pattern)
 if($toggle.Current.ToggleState -eq [Windows.Automation.ToggleState]::Off){$toggle.Toggle()}
 if($toggle.Current.ToggleState -ne [Windows.Automation.ToggleState]::On){throw 'Fixture opening consent not selected'}
@@ -350,7 +365,12 @@ Start-Sleep -Milliseconds 200
 }
 @{intro_confirmed=$intro;loopback_file_confirmed=$connection;intro_candidate=$candidate}|ConvertTo-Json -Compress
 """
-    return json.loads(powershell(script,root,extra={"RUSTREMOTE_NLA_PARENT":str(parent),"RUSTREMOTE_NLA_TARGET":f"127.0.0.1:{port}"}))
+    result=json.loads(powershell(script,root,extra={"RUSTREMOTE_NLA_PARENT":str(parent),"RUSTREMOTE_NLA_TARGET":f"127.0.0.1:{port}"}))
+    capture=root/"rdp-intro.png"
+    if capture.is_file():
+        report=Path("dist/windows-probe/rdp-intro.png")
+        with report.open("xb") as output:output.write(capture.read_bytes())
+    return result
 
 
 def native_window_flags(parent, root):
