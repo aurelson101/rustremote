@@ -378,12 +378,15 @@ Start-Sleep -Milliseconds 200
 }
 @{intro_confirmed=$intro;loopback_file_confirmed=$connection;intro_candidate=$candidate}|ConvertTo-Json -Compress
 """
-    result=json.loads(powershell(script,root,extra={"RUSTREMOTE_NLA_PARENT":str(parent),"RUSTREMOTE_NLA_TARGET":f"127.0.0.1:{port}"}))
-    for name in ("rdp-intro.png","rdp-intro-accessibility.json"):
-        capture=root/name
-        if capture.is_file():
-            report=Path("dist/windows-probe")/name
-            with report.open("xb") as output:output.write(capture.read_bytes())
+    try:
+        result=json.loads(powershell(script,root,extra={"RUSTREMOTE_NLA_PARENT":str(parent),"RUSTREMOTE_NLA_TARGET":f"127.0.0.1:{port}"}))
+    finally:
+        # Keep the verified introduction evidence even if its action fails.
+        for name in ("rdp-intro.png","rdp-intro-accessibility.json"):
+            capture=root/name
+            if capture.is_file():
+                report=Path("dist/windows-probe")/name
+                with report.open("xb") as output:output.write(capture.read_bytes())
     return result
 
 
