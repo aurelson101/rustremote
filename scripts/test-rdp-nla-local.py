@@ -316,14 +316,28 @@ def confirm_fixture_file_dialogs(parent, root, port):
     script=r"""$ErrorActionPreference='Stop'
 Add-Type -AssemblyName UIAutomationClient
 Add-Type -AssemblyName System.Drawing
-Add-Type 'using System; using System.Runtime.InteropServices; public static class IntroCapture { [StructLayout(LayoutKind.Sequential)] public struct Rect {public int Left,Top,Right,Bottom;} [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr window,out Rect rect); [DllImport("user32.dll")] public static extern bool PrintWindow(IntPtr window,IntPtr dc,uint flags); [DllImport("user32.dll")] public static extern IntPtr SendMessageTimeoutW(IntPtr window,uint message,UIntPtr param,IntPtr data,uint flags,uint timeout,out UIntPtr result); }'
+Add-Type 'using System; using System.Text; using System.Runtime.InteropServices; public static class IntroCapture { [StructLayout(LayoutKind.Sequential)] public struct Rect {public int Left,Top,Right,Bottom;} [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr window,out Rect rect); [DllImport("user32.dll")] public static extern bool PrintWindow(IntPtr window,IntPtr dc,uint flags); [DllImport("user32.dll")] public static extern IntPtr GetDlgItem(IntPtr window,int id); [DllImport("user32.dll")] public static extern int GetWindowTextW(IntPtr window,StringBuilder text,int size); [DllImport("user32.dll")] public static extern bool IsWindowEnabled(IntPtr window); [DllImport("user32.dll")] public static extern IntPtr SendMessageTimeoutW(IntPtr window,uint message,UIntPtr param,IntPtr data,uint flags,uint timeout,out UIntPtr result); }'
 function Label($control){return (($control.Current.Name -replace '&','' -replace '\s+',' ').Trim())}
 function ClickVerifiedTaskButton($window,$button){
 if(-not $button.Current.IsEnabled){throw 'Verified fixture button is disabled'}
 if($button.GetCurrentPropertyValue([Windows.Automation.AutomationElement]::IsInvokePatternAvailableProperty)){
 $button.GetCurrentPattern([Windows.Automation.InvokePattern]::Pattern).Invoke();return
 }
-if($window.Current.ClassName -ne '#32770' -or $button.Current.AutomationId -cnotmatch '^CommandButton_([0-9]{1,5})$'){throw 'Unknown fixture task-dialog button'}
+if($window.Current.ClassName -ne '#32770'){throw 'Unknown fixture dialog class'}
+if((Label $button) -ceq 'Connect'){
+# The legacy publisher warning has a native IDOK button instead of a TaskDialog.
+$native=[IntroCapture]::GetDlgItem([IntPtr]$window.Current.NativeWindowHandle,1)
+$text=[Text.StringBuilder]::new(64)
+if($native -ne [IntPtr]::Zero -and [IntroCapture]::IsWindowEnabled($native)){
+[void][IntroCapture]::GetWindowTextW($native,$text,64)
+if(($text.ToString() -replace '&','').Trim() -ceq 'Connect'){
+$result=[UIntPtr]::Zero
+if([IntroCapture]::SendMessageTimeoutW($native,245,[UIntPtr]::Zero,[IntPtr]::Zero,3,1000,[ref]$result) -eq [IntPtr]::Zero){throw 'Fixture legacy Connect action timed out'}
+return
+}
+}
+}
+if($button.Current.AutomationId -cnotmatch '^CommandButton_([0-9]{1,5})$'){throw 'Unknown fixture task-dialog button'}
 $id=[uint32]$Matches[1]
 if($id -gt 65535){throw 'Invalid fixture task-dialog button ID'}
 $result=[UIntPtr]::Zero
@@ -377,8 +391,13 @@ $intro++;continue
 }
 $labels=@($controls|Where-Object{-not $_.Current.IsPassword}|ForEach-Object{Label $_})
 $connect=@($controls|Where-Object{(Label $_) -ceq 'Connect' -and $_.Current.IsEnabled})
-$connectionCandidate=@{banner=($labels -ccontains 'Caution: Unknown remote connection');publisher=($labels -ccontains 'Unknown publisher');target=($labels -ccontains $env:RUSTREMOTE_NLA_TARGET);connect=$connect.Count}
-if($connection -eq 0 -and $labels -ccontains 'Caution: Unknown remote connection' -and $labels -ccontains 'Unknown publisher' -and $labels -ccontains $env:RUSTREMOTE_NLA_TARGET -and $connect.Count -eq 1){
+$legacy=($labels -ccontains "The publisher of this remote connection can't be identified. Do you want to connect anyway?" -or $labels -ccontains 'The publisher of this remote connection cannot be identified. Do you want to connect anyway?')
+$banner=($labels -ccontains 'Caution: Unknown remote connection')
+# Legacy mstsc omits the port in this UI. The actor's fixed loopback profile
+# and private generated launch file carry the listener's exact ephemeral port.
+$target=($labels -ccontains $env:RUSTREMOTE_NLA_TARGET -or ($legacy -and $labels -ccontains '127.0.0.1'))
+$connectionCandidate=@{banner=$banner;legacy=$legacy;publisher=($labels -ccontains 'Unknown publisher');target=$target;connect=$connect.Count}
+if($connection -eq 0 -and ($banner -or $legacy) -and $labels -ccontains 'Unknown publisher' -and $target -and $connect.Count -eq 1){
 foreach($box in $boxes){
 if($box.GetCurrentPattern([Windows.Automation.TogglePattern]::Pattern).Current.ToggleState -ne [Windows.Automation.ToggleState]::Off){throw 'Fixture unexpectedly requests local resources'}
 }
