@@ -328,16 +328,16 @@ if(@($controls|Where-Object{$_.Current.IsPassword}).Count){continue}
 $boxes=@($controls|Where-Object{$_.Current.ControlType -eq [Windows.Automation.ControlType]::CheckBox})
 $introLabels=@($controls|Where-Object{(Label $_) -cmatch '^I understand and allow (RDP|\.rdp) files to open on this device for my account$'})
 $introTitle=@($controls|Where-Object{(Label $_) -ceq 'Opening Remote Desktop Connection'})
-$ok=@($controls|Where-Object{$_.Current.ControlType -eq [Windows.Automation.ControlType]::Button -and (Label $_) -ceq 'OK'})
+$ok=@($controls|Where-Object{$_.Current.ControlType -eq [Windows.Automation.ControlType]::Button -and (Label $_) -eq 'OK'})
 $candidate=@{checkboxes=$boxes.Count;intro_labels=$introLabels.Count;intro_titles=$introTitle.Count;ok_buttons=$ok.Count}
-if($intro -eq 0 -and $boxes.Count -eq 1 -and $introLabels.Count -ge 1 -and $introTitle.Count -eq 1 -and $ok.Count -eq 1){
+if($intro -eq 0 -and $boxes.Count -eq 1 -and $introLabels.Count -ge 1 -and $introTitle.Count -eq 1){
 $toggle=$boxes[0].GetCurrentPattern([Windows.Automation.TogglePattern]::Pattern)
 if($toggle.Current.ToggleState -eq [Windows.Automation.ToggleState]::Off){$toggle.Toggle()}
 if($toggle.Current.ToggleState -ne [Windows.Automation.ToggleState]::On){throw 'Fixture opening consent not selected'}
-if($ok[0].Current.IsEnabled){$ok[0].GetCurrentPattern([Windows.Automation.InvokePattern]::Pattern).Invoke();$intro++;continue}
+if($ok.Count -eq 1 -and $ok[0].Current.IsEnabled){$ok[0].GetCurrentPattern([Windows.Automation.InvokePattern]::Pattern).Invoke();$intro++;continue}
 }
-$labels=@($controls|Where-Object{$_.Current.ControlType -eq [Windows.Automation.ControlType]::Text}|ForEach-Object{$_.Current.Name})
-$connect=@($controls|Where-Object{$_.Current.ControlType -eq [Windows.Automation.ControlType]::Button -and $_.Current.Name -ceq 'Connect' -and $_.Current.IsEnabled})
+$labels=@($controls|Where-Object{-not $_.Current.IsPassword}|ForEach-Object{Label $_})
+$connect=@($controls|Where-Object{$_.Current.ControlType -eq [Windows.Automation.ControlType]::Button -and (Label $_) -ceq 'Connect' -and $_.Current.IsEnabled})
 if($connection -eq 0 -and $labels -ccontains 'Caution: Unknown remote connection' -and $labels -ccontains 'Unknown publisher' -and $labels -ccontains $env:RUSTREMOTE_NLA_TARGET -and $connect.Count -eq 1){
 foreach($box in $boxes){
 if($box.GetCurrentPattern([Windows.Automation.TogglePattern]::Pattern).Current.ToggleState -ne [Windows.Automation.ToggleState]::Off){throw 'Fixture unexpectedly requests local resources'}
