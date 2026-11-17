@@ -292,6 +292,8 @@ class Peer:
                     self.state["auth_stage"]=context.get_extra_info("auth_stage")
                     self.state["credssp_version"]=context.get_extra_info("protocol_version")
                     self.state["ntlm_complete"]=authentication.complete
+                    self.state["mechlist_mic_sent"]=authentication._mic_sent
+                    self.state["mechlist_mic_received"]=authentication._mic_recv
                     if authentication.last_error:self.state["authentication_error"]=authentication.last_error
                     protocol=context.negotiated_protocol
                     if protocol in ("ntlm","kerberos"):self.state["auth_protocol"]=protocol
@@ -484,8 +486,10 @@ foreach($record in $records){
 $xml=[xml]$record.ToXml()
 if($pids -notcontains [uint32]$xml.Event.System.Execution.ProcessID){continue}
 $codes=@{}
-foreach($field in $xml.Event.EventData.Data){
-if($field.Name -in @('ErrorCode','Reason','DisconnectReason','ExtendedReason','Status','HResult','ResultCode') -and $field.InnerText -match '^(0x[0-9a-fA-F]{1,16}|-?[0-9]{1,20})$'){$codes[$field.Name]=$field.InnerText}
+foreach($field in $xml.SelectNodes('//*[local-name()="EventData"]/* | //*[local-name()="UserData"]//*[not(*)]')){
+$name=if($field.HasAttribute('Name')){$field.GetAttribute('Name')}else{$field.LocalName}
+$value=[string]$field.InnerText
+if($name -in @('ErrorCode','Reason','ReasonCode','DisconnectReason','ExtendedReason','Status','HResult','ResultCode','Error','Code') -and $value -match '^(0x[0-9a-fA-F]{1,16}|-?[0-9]{1,20})$'){$codes[$name]=$value}
 }
 $events+=@{channel=$channel;id=$record.Id;codes=$codes}
 }
