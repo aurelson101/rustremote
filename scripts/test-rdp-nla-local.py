@@ -317,7 +317,7 @@ def confirm_fixture_file_dialogs(parent, root, port):
 Add-Type -AssemblyName UIAutomationClient
 Add-Type -AssemblyName System.Drawing
 Add-Type 'using System; using System.Text; using System.Runtime.InteropServices; public static class IntroCapture { [StructLayout(LayoutKind.Sequential)] public struct Rect {public int Left,Top,Right,Bottom;} [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr window,out Rect rect); [DllImport("user32.dll")] public static extern bool PrintWindow(IntPtr window,IntPtr dc,uint flags); [DllImport("user32.dll")] public static extern IntPtr GetDlgItem(IntPtr window,int id); [DllImport("user32.dll")] public static extern int GetWindowTextW(IntPtr window,StringBuilder text,int size); [DllImport("user32.dll")] public static extern bool IsWindowEnabled(IntPtr window); [DllImport("user32.dll")] public static extern IntPtr SendMessageTimeoutW(IntPtr window,uint message,UIntPtr param,IntPtr data,uint flags,uint timeout,out UIntPtr result); }'
-function Label($control){return (($control.Current.Name -replace '&','' -replace '\s+',' ').Trim())}
+function Label($control){return (($control.Current.Name -replace '&','' -replace '\u2019',"'" -replace '\s+',' ').Trim())}
 function ClickVerifiedTaskButton($window,$button){
 if(-not $button.Current.IsEnabled){throw 'Verified fixture button is disabled'}
 if($button.GetCurrentPropertyValue([Windows.Automation.AutomationElement]::IsInvokePatternAvailableProperty)){
@@ -391,12 +391,22 @@ $intro++;continue
 }
 $labels=@($controls|Where-Object{-not $_.Current.IsPassword}|ForEach-Object{Label $_})
 $connect=@($controls|Where-Object{(Label $_) -ceq 'Connect' -and $_.Current.IsEnabled})
-$legacy=($labels -ccontains "The publisher of this remote connection can't be identified. Do you want to connect anyway?" -or $labels -ccontains 'The publisher of this remote connection cannot be identified. Do you want to connect anyway?')
+$publisherField=($labels -ccontains 'Publisher:' -or $labels -ccontains 'Publisher')
+$computerField=($labels -ccontains 'Remote computer:' -or $labels -ccontains 'Remote computer')
+$legacy=($publisherField -and $computerField)
 $banner=($labels -ccontains 'Caution: Unknown remote connection')
-# Legacy mstsc omits the port in this UI. The actor's fixed loopback profile
-# and private generated launch file carry the listener's exact ephemeral port.
+# The actor's fixed profile and private file carry the listener's exact port.
+# A read-only destination field may expose its text as a value, not its name.
 $target=($labels -ccontains $env:RUSTREMOTE_NLA_TARGET -or ($legacy -and $labels -ccontains '127.0.0.1'))
-$connectionCandidate=@{banner=$banner;legacy=$legacy;publisher=($labels -ccontains 'Unknown publisher');target=$target;connect=$connect.Count}
+if(-not $target -and ($banner -or $legacy) -and $labels -ccontains 'Unknown publisher'){
+foreach($control in $controls){
+if(-not $control.Current.IsPassword -and $control.GetCurrentPropertyValue([Windows.Automation.AutomationElement]::IsValuePatternAvailableProperty)){
+$value=$control.GetCurrentPattern([Windows.Automation.ValuePattern]::Pattern)
+if($value.Current.IsReadOnly -and ($value.Current.Value -ceq $env:RUSTREMOTE_NLA_TARGET -or ($legacy -and $value.Current.Value -ceq '127.0.0.1'))){$target=$true}
+}
+}
+}
+$connectionCandidate=@{banner=$banner;legacy=$legacy;publisher_field=$publisherField;computer_field=$computerField;publisher=($labels -ccontains 'Unknown publisher');target=$target;connect=$connect.Count}
 if($connection -eq 0 -and ($banner -or $legacy) -and $labels -ccontains 'Unknown publisher' -and $target -and $connect.Count -eq 1){
 foreach($box in $boxes){
 if($box.GetCurrentPattern([Windows.Automation.TogglePattern]::Pattern).Current.ToggleState -ne [Windows.Automation.ToggleState]::Off){throw 'Fixture unexpectedly requests local resources'}
