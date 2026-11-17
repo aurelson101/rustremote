@@ -121,6 +121,12 @@ jobs:
         run: |
           set -o pipefail
           experiments/windows-probe/target/debug/rustremote-windows-probe.exe --self-test-rdp | tee dist/windows-probe/rdp-config.txt
+      - name: Native SSPI loopback control (fake credentials, no system account)
+        id: sspi_control
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          python scripts/test-rdp-nla-local.py --fetch-deps --verify-sspi-fixture | tee dist/windows-probe/sspi-control.json
       - name: Native RDP CredSSP loopback credentials (simulation, no desktop)
         id: rdp_nla
         continue-on-error: true
@@ -164,7 +170,7 @@ jobs:
           cp experiments/windows-probe/README.md dist/windows-probe/README.md
           cp LICENSE NOTICE dist/windows-probe/
       - name: Enforce native RDP qualification result
-        if: always() && steps.rdp_nla.outcome == 'failure'
+        if: always() && (steps.rdp_nla.outcome == 'failure' || steps.sspi_control.outcome == 'failure')
         run: |
           echo 'Native RDP authentication failed; see rdp-nla.json. Other protocol checks were allowed to run.'
           exit 1

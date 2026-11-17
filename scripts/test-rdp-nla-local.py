@@ -320,10 +320,21 @@ class Peer:
         if self.worker.is_alive():raise RuntimeError("RDP fixture did not stop")
 
 
-def verify_fixture(peer, root, password):
-    context=ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT);context.check_hostname=False;context.verify_mode=ssl.CERT_REQUIRED
+class LoopbackClientTLS(ssl.SSLContext):
+    def wrap_bio(self, incoming, outgoing, server_side=False, server_hostname=None, session=None):
+        # pyspnego's BIO adapter omits server_hostname. Supply the fixture's
+        # literal identity so the normal TLS verifier also checks its IP SAN.
+        if server_side:raise ValueError("Client-only loopback TLS context")
+        return super().wrap_bio(incoming,outgoing,server_side=False,
+                                server_hostname=server_hostname or "127.0.0.1",session=session)
+
+
+def verify_fixture(peer, root, password, native_sspi=False):
+    context=LoopbackClientTLS(ssl.PROTOCOL_TLS_CLIENT)
     context.minimum_version=ssl.TLSVersion.TLSv1_2;context.load_verify_locations(root/"ca.pem")
-    client=spnego.client(DOMAIN+"\\"+USER,password,protocol="credssp",credssp_negotiate_context=negotiation("initiate",password),
+    authentication=(spnego.client(DOMAIN+"\\"+USER,password,protocol="ntlm",hostname="127.0.0.1",service="TERMSRV",
+                                  options=spnego.NegotiateOptions.use_sspi) if native_sspi else negotiation("initiate",password))
+    client=spnego.client(DOMAIN+"\\"+USER,password,protocol="credssp",credssp_negotiate_context=authentication,
                          credssp_tls_context=CredSSPTLSContext(context),credssp_min_protocol=5)
     with socket.create_connection(("127.0.0.1",peer.port),timeout=10) as stream:
         stream.settimeout(10)
@@ -584,8 +595,10 @@ $policy=(Get-ItemProperty -LiteralPath 'HKLM:\SOFTWARE\Policies\Microsoft\Window
 
 def main():
     global CURRENT_STAGE, FAILURE_STAGE
-    parser=argparse.ArgumentParser();parser.add_argument("--verify-fixture",action="store_true");parser.add_argument("--native",type=Path);parser.add_argument("--fetch-deps",action="store_true");args=parser.parse_args()
-    if not args.verify_fixture and not (args.native and sys.platform=="win32" and os.environ.get("GITHUB_ACTIONS")=="true"):
+    parser=argparse.ArgumentParser();mode=parser.add_mutually_exclusive_group(required=True)
+    mode.add_argument("--verify-fixture",action="store_true");mode.add_argument("--verify-sspi-fixture",action="store_true");mode.add_argument("--native",type=Path)
+    parser.add_argument("--fetch-deps",action="store_true");args=parser.parse_args()
+    if not args.verify_fixture and not (sys.platform=="win32" and os.environ.get("GITHUB_ACTIONS")=="true"):
         parser.error("Native certificate changes are restricted to an ephemeral GitHub Windows runner")
     trusted=False;peer=None
     with tempfile.TemporaryDirectory(prefix="RustRemote NLA ") as folder:
@@ -599,7 +612,7 @@ def main():
         try:
             CURRENT_STAGE="certificate-generation"
             context,thumb=certificate(root)
-            if not args.verify_fixture:
+            if args.native:
                 CURRENT_STAGE="trust-add"
                 trusted=True
                 try:trust(root,thumb,True)
@@ -608,7 +621,7 @@ def main():
                     raise
             CURRENT_STAGE="peer-start"
             peer=Peer(context,root,password)
-            if args.verify_fixture:verify_fixture(peer,root,password)
+            if args.verify_fixture or args.verify_sspi_fixture:verify_fixture(peer,root,password,native_sspi=args.verify_sspi_fixture)
             else:
                 profile=dict(name="CredSSP loopback lab",host="127.0.0.1",port=peer.port,username=USER,favorite=False,
                     options=dict(protocol="Rdp",domain=DOMAIN,width=1280,height=720,fullscreen=False,clipboard=False,clipboard_files=False))
@@ -639,7 +652,8 @@ def main():
             CURRENT_STAGE="credential-verification"
             if not all(peer.state.get(key) for key in ("negotiation","credssp_complete","account_match","password_match")):
                 raise RuntimeError("Native RDP profile credential was not authenticated")
-            report=dict(result="PASS",target="127.0.0.1",real_windows_account=False,desktop_session=False,**peer.state)
+            report=dict(result="PASS",target="127.0.0.1",client="native_sspi" if args.verify_sspi_fixture else "pyspnego" if args.verify_fixture else "mstsc",
+                        real_windows_account=False,desktop_session=False,**peer.state)
         except Exception:
             FAILURE_STAGE=CURRENT_STAGE
             if peer: print(json.dumps({"stage":"CredSSP", "events":peer.state}))
