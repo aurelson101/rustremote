@@ -193,3 +193,10 @@ Le fichier est retiré à la fermeture normale du contrôleur ; un crash peut
 laisser le fichier chiffré privé. DPAPI ne constitue pas une séparation contre
 un autre processus du même utilisateur ou un administrateur. Aucun secret
 clair n’est ajouté aux exports, arguments, variables d’environnement ou logs.
+
+Le lanceur laisse les consentements des fichiers RDP à l’utilisateur, sans
+affaiblir la politique Windows. Le laboratoire CI jetable peut seulement
+confirmer le libellé exact du consentement initial et le dialogue éditeur du
+profil généré : PID mstsc enfant possédé, destination 127.0.0.1:port exacte,
+toutes les redirections décochées. Aucun clic sur une alerte de certificat ou
+sur une saisie d’identifiants ; aucune automatisation sur le poste personnel.

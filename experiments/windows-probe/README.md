@@ -231,6 +231,12 @@ as working native automatic authentication yet. Diagnostics inspect only owned
 client windows and publish fixed flags/categories, never field values or text.
 The Python peer authenticates its generated fake account successfully in the
 local positive control. Its CA is installed only on a disposable Windows CI
-runner, then removed by exact fingerprint; no RDP warnings are accepted.
+runner, then removed by exact fingerprint. Only on this disposable runner, the
+lab may confirm the exact first-launch RDP-file consent and the generated
+loopback file's publisher dialog, with the exact host/port shown and every
+resource checkbox off. TLS warnings and credential prompts are never accepted.
+The production launcher leaves these decisions to the user. Microsoft's
+[RDP-file warning reference](https://learn.microsoft.com/en-us/windows-server/remote/remote-desktop-services/remotepc/understanding-security-warnings)
+describes these preconnection dialogs introduced in April 2026.
 The workflow continues other protocol checks after this failure and fails a
 final RDP gate, so a green job cannot conceal failed native authentication.

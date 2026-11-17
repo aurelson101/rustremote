@@ -173,7 +173,7 @@ pub fn open(parent: &gtk::ApplicationWindow, profile: SessionProfile) -> Result<
         body.append(&destination);
     }
     let status = gtk::Label::new(Some(
-        "A saved profile password is passed encrypted for your Windows account; otherwise Windows requests it. Close the native RDP window to disconnect. This controller never terminates other mstsc sessions.",
+        "Windows may first ask permission to open RDP files, then ask you to confirm this destination. Check the address above and enable only the local resources you want to share. Windows may still request credentials. Close the native RDP window to disconnect.",
     ));
     status.set_wrap(true);
     body.append(&status);
@@ -196,6 +196,9 @@ pub fn open(parent: &gtk::ApplicationWindow, profile: SessionProfile) -> Result<
             return;
         }
         button.set_sensitive(false);
+        if let Some(status) = weak.upgrade() {
+            status.set_text("Opening Windows Remote Desktop. Check its security dialogs and destination; authentication and connection are not yet confirmed.");
+        }
         let Some(receiver) = rx.borrow_mut().take() else {
             return;
         };

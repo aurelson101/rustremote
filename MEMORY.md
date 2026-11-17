@@ -1511,3 +1511,25 @@ Prochaine tâche WIN-05 : identifier pourquoi mstsc reste avant TCP (contexte
 interactif/broker ou méthode d’auth native à établir), puis obtenir une vraie
 preuve CredSSP avant qualification bureau/clipboard et MSI. Aucune cause non
 observée déclarée corrigée, aucune politique Windows ni entrée TERMSRV modifiée.
+
+## Reprise 2026-11-17 — avertissement initial mstsc
+État initial propre, HEAD b7e2919 (diagnostic déjà en cours run44024683589).
+Ce run puis44025566273/dda56b8 : avantTCP, fenêtre #32770 visible et shell RDP
+caché. UIA flag64 = texte « RDP files » trouvé, contrairement aux précédents
+tests qui ne regardaient que Text/Window et ignoraient les cases à cocher.
+Microsoft documente depuis avril2026 un consentement initial puis une confirmation
+du fichier avant connexion : https://learn.microsoft.com/en-us/windows-server/remote/remote-desktop-services/remotepc/understanding-security-warnings
+Ne pas confondre ces dialogues avec un échec du password/CredSSP ; l’auth n’était
+pas encore atteinte. Contrôleur UI clarifié : destination/partages à vérifier,
+lancement ne signifie pas connexion/auth réussie.
+Helper CI uniquement : ouvrir les fichiers RDP sur le compte jetable via titre+
+label exact+case unique+OK ; puis seulement fichier du lab avec adresse127.0.0.1:
+port exact, publisher inconnu attendu, aucune redirection cochée. Pas d’alerte TLS
+ni de saisie d’identifiants automatisée, pas de politique modifiée, aucun TERMSRV.
+run44026216672/5ac919a : aucun consentement trouvé (intro0/file0) ; sécurité
+failclosed et garde finale rouge conservées. Correspondance accessibilité séparée
+label/case + normalisation espaces/mnémoniques dans fbfbba1 ; run44026758091 lancé.
+Tests locaux de cette reprise : fmt racine+prototype, check/clippy -Dwarnings
+racine+prototype PASS ; workspace63 PASS/2ignored ; prototype23 PASS/1ignored.
+Python -Werror py_compile PASS ; contrôle positifTLS/CredSSP local PASS après
+ajout du helper (aucun certstore local modifié). État natif final à consigner.
