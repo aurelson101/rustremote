@@ -327,6 +327,8 @@ $flags=$flags -bor 1
 $controls=@($window)+@($window.FindAll([Windows.Automation.TreeScope]::Descendants,[Windows.Automation.Condition]::TrueCondition))
 foreach($control in $controls){
 if($control.Current.IsPassword){$flags=$flags -bor 2;continue}
+if($control.Current.Name -match 'phishing|RDP files|Remote Desktop files'){$flags=$flags -bor 64}
+if($control.Current.ControlType -eq [Windows.Automation.ControlType]::Button -and $control.Current.Name -match '^Allow$|^Continue$'){$flags=$flags -bor 128}
 if($control.Current.ControlType -eq [Windows.Automation.ControlType]::Button -and $control.Current.Name -match 'Connect'){$flags=$flags -bor 4}
 if($control.Current.ControlType -in @([Windows.Automation.ControlType]::Text,[Windows.Automation.ControlType]::Window,[Windows.Automation.ControlType]::Pane)){
 if($control.Current.Name -match 'credential|password'){$flags=$flags -bor 8}
@@ -353,7 +355,11 @@ $policy=(Get-ItemProperty -LiteralPath 'HKLM:\SOFTWARE\Policies\Microsoft\Window
     user.IsWindowVisible.argtypes=[wintypes.HWND]
     user.SendMessageTimeoutW.argtypes=[wintypes.HWND,wintypes.UINT,ctypes.c_size_t,ctypes.c_ssize_t,wintypes.UINT,wintypes.UINT,ctypes.POINTER(ctypes.c_size_t)]
     categories=set();buttons=set();classes=set();windows=[]
-    words=("publisher","trust","credential","password","connect","error","invalid","identify","identity","security","certificate","remote","desktop","session","license","policy","authentication","version","computer","blocked")
+    words=("publisher","trust","credential","password","connect","error","invalid","identify","identity","security","certificate","remote","desktop","session","license","policy","authentication","version","computer","blocked","phishing","rdp files","allow","continue")
+    def classify_label(control):
+        text=ctypes.create_unicode_buffer(8192);length=ctypes.c_size_t()
+        user.SendMessageTimeoutW(control,0x000D,len(text),ctypes.cast(text,ctypes.c_void_p).value,3,50,ctypes.byref(length))
+        categories.update(word for word in words if word in text.value.lower())
     @callback
     def top(window,unused):
         pid=wintypes.DWORD();user.GetWindowThreadProcessId(window,ctypes.byref(pid))
@@ -361,6 +367,7 @@ $policy=(Get-ItemProperty -LiteralPath 'HKLM:\SOFTWARE\Policies\Microsoft\Window
         name=ctypes.create_unicode_buffer(128);user.GetClassNameW(window,name,len(name))
         # Window class and visibility contain no user input or credential values.
         windows.append(dict(window_class=name.value,visible=bool(user.IsWindowVisible(window))))
+        classify_label(window)
         visited=0
         @callback
         def child(control,unused):
@@ -368,12 +375,11 @@ $policy=(Get-ItemProperty -LiteralPath 'HKLM:\SOFTWARE\Policies\Microsoft\Window
             visited+=1
             if visited>128:return False
             name=ctypes.create_unicode_buffer(128);user.GetClassNameW(control,name,len(name))
-            if name.value not in ("Static","Button"):return True
             classes.add(name.value)
-            if name.value=="Button":buttons.add(user.GetDlgCtrlID(control));return True
-            text=ctypes.create_unicode_buffer(4096);length=ctypes.c_size_t()
-            user.SendMessageTimeoutW(control,0x000D,len(text),ctypes.cast(text,ctypes.c_void_p).value,3,50,ctypes.byref(length))
-            categories.update(word for word in words if word in text.value.lower())
+            if name.value=="Button":buttons.add(user.GetDlgCtrlID(control))
+            # Only labels; never WM_GETTEXT on Edit, ComboBox, browser or custom
+            # credential controls, even when accessibility metadata is absent.
+            if name.value in ("Static","Button","SysLink"):classify_label(control)
             return True
         user.EnumChildWindows(window,child,0)
         return True
