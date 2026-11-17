@@ -324,11 +324,11 @@ if($popup -ne [IntPtr]::Zero -and $popup -ne $handle){$windows+=,[Windows.Automa
 }
 foreach($window in $windows){
 $flags=$flags -bor 1
-$controls=$window.FindAll([Windows.Automation.TreeScope]::Descendants,[Windows.Automation.Condition]::TrueCondition)
+$controls=@($window)+@($window.FindAll([Windows.Automation.TreeScope]::Descendants,[Windows.Automation.Condition]::TrueCondition))
 foreach($control in $controls){
 if($control.Current.IsPassword){$flags=$flags -bor 2;continue}
 if($control.Current.ControlType -eq [Windows.Automation.ControlType]::Button -and $control.Current.Name -match 'Connect'){$flags=$flags -bor 4}
-if($control.Current.ControlType -eq [Windows.Automation.ControlType]::Text){
+if($control.Current.ControlType -in @([Windows.Automation.ControlType]::Text,[Windows.Automation.ControlType]::Window,[Windows.Automation.ControlType]::Pane)){
 if($control.Current.Name -match 'credential|password'){$flags=$flags -bor 8}
 if($control.Current.Name -match 'invalid|corrupt|connection file'){$flags=$flags -bor 16}}
 if($control.Current.ControlType -eq [Windows.Automation.ControlType]::Text -and $control.Current.Name -match 'publisher|trust|identify'){$flags=$flags -bor 32}
@@ -345,15 +345,28 @@ $policy=(Get-ItemProperty -LiteralPath 'HKLM:\SOFTWARE\Policies\Microsoft\Window
     from ctypes import wintypes
     user=ctypes.WinDLL("user32",use_last_error=True)
     callback=ctypes.WINFUNCTYPE(wintypes.BOOL,wintypes.HWND,wintypes.LPARAM)
+    user.EnumWindows.argtypes=[callback,wintypes.LPARAM]
+    user.EnumChildWindows.argtypes=[wintypes.HWND,callback,wintypes.LPARAM]
+    user.GetWindowThreadProcessId.argtypes=[wintypes.HWND,ctypes.POINTER(wintypes.DWORD)]
+    user.GetClassNameW.argtypes=[wintypes.HWND,wintypes.LPWSTR,ctypes.c_int]
+    user.GetDlgCtrlID.argtypes=[wintypes.HWND]
+    user.IsWindowVisible.argtypes=[wintypes.HWND]
     user.SendMessageTimeoutW.argtypes=[wintypes.HWND,wintypes.UINT,ctypes.c_size_t,ctypes.c_ssize_t,wintypes.UINT,wintypes.UINT,ctypes.POINTER(ctypes.c_size_t)]
-    categories=set();buttons=set();classes=set()
+    categories=set();buttons=set();classes=set();windows=[]
     words=("publisher","trust","credential","password","connect","error","invalid","identify","identity","security","certificate","remote","desktop","session","license","policy","authentication","version","computer","blocked")
     @callback
     def top(window,unused):
         pid=wintypes.DWORD();user.GetWindowThreadProcessId(window,ctypes.byref(pid))
         if pid.value not in pids:return True
+        name=ctypes.create_unicode_buffer(128);user.GetClassNameW(window,name,len(name))
+        # Window class and visibility contain no user input or credential values.
+        windows.append(dict(window_class=name.value,visible=bool(user.IsWindowVisible(window))))
+        visited=0
         @callback
         def child(control,unused):
+            nonlocal visited
+            visited+=1
+            if visited>128:return False
             name=ctypes.create_unicode_buffer(128);user.GetClassNameW(control,name,len(name))
             if name.value not in ("Static","Button"):return True
             classes.add(name.value)
@@ -365,7 +378,7 @@ $policy=(Get-ItemProperty -LiteralPath 'HKLM:\SOFTWARE\Policies\Microsoft\Window
         user.EnumChildWindows(window,child,0)
         return True
     user.EnumWindows(top,0)
-    result.update(static_categories=sorted(categories),button_ids=sorted(buttons),control_classes=sorted(classes))
+    result.update(static_categories=sorted(categories),button_ids=sorted(buttons),control_classes=sorted(classes),windows=windows)
     return result
 
 
