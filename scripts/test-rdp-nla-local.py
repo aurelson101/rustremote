@@ -306,6 +306,50 @@ def verify_fixture(peer, root, password):
         assert client.complete
 
 
+def confirm_fixture_file_dialogs(parent, root, port):
+    """Simulate user file-opening consent on a disposable CI account only.
+
+    Never alter policy, trust a TLS warning, enter a password or enable redirection.
+    """
+    if os.environ.get("GITHUB_ACTIONS")!="true" or not 1024<=port<=65535:
+        raise RuntimeError("RDP file consent is restricted to the loopback CI fixture")
+    script=r"""$ErrorActionPreference='Stop'
+Add-Type -AssemblyName UIAutomationClient
+$children=@(Get-CimInstance Win32_Process -Filter ("ParentProcessId="+$env:RUSTREMOTE_NLA_PARENT+" AND Name='mstsc.exe'"))
+$intro=0;$connection=0;$deadline=[DateTime]::UtcNow.AddSeconds(12)
+while([DateTime]::UtcNow -lt $deadline){
+foreach($process in $children){
+$condition=[Windows.Automation.PropertyCondition]::new([Windows.Automation.AutomationElement]::ProcessIdProperty,[int]$process.ProcessId)
+$windows=[Windows.Automation.AutomationElement]::RootElement.FindAll([Windows.Automation.TreeScope]::Children,$condition)
+foreach($window in $windows){
+$controls=@($window.FindAll([Windows.Automation.TreeScope]::Descendants,[Windows.Automation.Condition]::TrueCondition))
+if(@($controls|Where-Object{$_.Current.IsPassword}).Count){continue}
+$boxes=@($controls|Where-Object{$_.Current.ControlType -eq [Windows.Automation.ControlType]::CheckBox})
+$allow=@($boxes|Where-Object{$_.Current.Name -ceq 'I understand and allow RDP files to open on this device for my account'})
+$ok=@($controls|Where-Object{$_.Current.ControlType -eq [Windows.Automation.ControlType]::Button -and $_.Current.Name -ceq 'OK'})
+if($intro -eq 0 -and $allow.Count -eq 1 -and $ok.Count -eq 1){
+$toggle=$allow[0].GetCurrentPattern([Windows.Automation.TogglePattern]::Pattern)
+if($toggle.Current.ToggleState -eq [Windows.Automation.ToggleState]::Off){$toggle.Toggle()}
+if($toggle.Current.ToggleState -ne [Windows.Automation.ToggleState]::On){throw 'Fixture opening consent not selected'}
+if($ok[0].Current.IsEnabled){$ok[0].GetCurrentPattern([Windows.Automation.InvokePattern]::Pattern).Invoke();$intro++;continue}
+}
+$labels=@($controls|Where-Object{$_.Current.ControlType -eq [Windows.Automation.ControlType]::Text}|ForEach-Object{$_.Current.Name})
+$connect=@($controls|Where-Object{$_.Current.ControlType -eq [Windows.Automation.ControlType]::Button -and $_.Current.Name -ceq 'Connect' -and $_.Current.IsEnabled})
+if($connection -eq 0 -and $labels -ccontains 'Caution: Unknown remote connection' -and $labels -ccontains 'Unknown publisher' -and $labels -ccontains $env:RUSTREMOTE_NLA_TARGET -and $connect.Count -eq 1){
+foreach($box in $boxes){
+if($box.GetCurrentPattern([Windows.Automation.TogglePattern]::Pattern).Current.ToggleState -ne [Windows.Automation.ToggleState]::Off){throw 'Fixture unexpectedly requests local resources'}
+}
+$connect[0].GetCurrentPattern([Windows.Automation.InvokePattern]::Pattern).Invoke();$connection++
+}
+}}
+if($connection -eq 1){break}
+Start-Sleep -Milliseconds 200
+}
+@{intro_confirmed=$intro;loopback_file_confirmed=$connection}|ConvertTo-Json -Compress
+"""
+    return json.loads(powershell(script,root,extra={"RUSTREMOTE_NLA_PARENT":str(parent),"RUSTREMOTE_NLA_TARGET":f"127.0.0.1:{port}"}))
+
+
 def native_window_flags(parent, root):
     script=r"""$ErrorActionPreference='Stop'
 Add-Type -AssemblyName UIAutomationClient
@@ -425,6 +469,7 @@ def main():
                         try:
                             stdout,stderr=process.communicate(json.dumps(dict(profile=profile,secret=password,state=str(root/"rdp-nla-state.json"))),timeout=5)
                         except subprocess.TimeoutExpired:
+                            peer.state["file_consents"]=confirm_fixture_file_dialogs(process.pid,root,peer.port)
                             try:peer.state["native_ui"]=native_window_flags(process.pid,root)
                             except Exception as error:peer.state["ui_probe_error"]=type(error).__name__
                             stdout,stderr=process.communicate(timeout=35)
