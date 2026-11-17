@@ -315,8 +315,9 @@ def confirm_fixture_file_dialogs(parent, root, port):
         raise RuntimeError("RDP file consent is restricted to the loopback CI fixture")
     script=r"""$ErrorActionPreference='Stop'
 Add-Type -AssemblyName UIAutomationClient
+function Label($control){return (($control.Current.Name -replace '&','' -replace '\s+',' ').Trim())}
 $children=@(Get-CimInstance Win32_Process -Filter ("ParentProcessId="+$env:RUSTREMOTE_NLA_PARENT+" AND Name='mstsc.exe'"))
-$intro=0;$connection=0;$deadline=[DateTime]::UtcNow.AddSeconds(12)
+$intro=0;$connection=0;$candidate=@{};$deadline=[DateTime]::UtcNow.AddSeconds(12)
 while([DateTime]::UtcNow -lt $deadline){
 foreach($process in $children){
 $condition=[Windows.Automation.PropertyCondition]::new([Windows.Automation.AutomationElement]::ProcessIdProperty,[int]$process.ProcessId)
@@ -325,10 +326,12 @@ foreach($window in $windows){
 $controls=@($window.FindAll([Windows.Automation.TreeScope]::Descendants,[Windows.Automation.Condition]::TrueCondition))
 if(@($controls|Where-Object{$_.Current.IsPassword}).Count){continue}
 $boxes=@($controls|Where-Object{$_.Current.ControlType -eq [Windows.Automation.ControlType]::CheckBox})
-$allow=@($boxes|Where-Object{$_.Current.Name -ceq 'I understand and allow RDP files to open on this device for my account'})
-$ok=@($controls|Where-Object{$_.Current.ControlType -eq [Windows.Automation.ControlType]::Button -and $_.Current.Name -ceq 'OK'})
-if($intro -eq 0 -and $allow.Count -eq 1 -and $ok.Count -eq 1){
-$toggle=$allow[0].GetCurrentPattern([Windows.Automation.TogglePattern]::Pattern)
+$introLabels=@($controls|Where-Object{(Label $_) -cmatch '^I understand and allow (RDP|\.rdp) files to open on this device for my account$'})
+$introTitle=@($controls|Where-Object{(Label $_) -ceq 'Opening Remote Desktop Connection'})
+$ok=@($controls|Where-Object{$_.Current.ControlType -eq [Windows.Automation.ControlType]::Button -and (Label $_) -ceq 'OK'})
+$candidate=@{checkboxes=$boxes.Count;intro_labels=$introLabels.Count;intro_titles=$introTitle.Count;ok_buttons=$ok.Count}
+if($intro -eq 0 -and $boxes.Count -eq 1 -and $introLabels.Count -ge 1 -and $introTitle.Count -eq 1 -and $ok.Count -eq 1){
+$toggle=$boxes[0].GetCurrentPattern([Windows.Automation.TogglePattern]::Pattern)
 if($toggle.Current.ToggleState -eq [Windows.Automation.ToggleState]::Off){$toggle.Toggle()}
 if($toggle.Current.ToggleState -ne [Windows.Automation.ToggleState]::On){throw 'Fixture opening consent not selected'}
 if($ok[0].Current.IsEnabled){$ok[0].GetCurrentPattern([Windows.Automation.InvokePattern]::Pattern).Invoke();$intro++;continue}
@@ -345,7 +348,7 @@ $connect[0].GetCurrentPattern([Windows.Automation.InvokePattern]::Pattern).Invok
 if($connection -eq 1){break}
 Start-Sleep -Milliseconds 200
 }
-@{intro_confirmed=$intro;loopback_file_confirmed=$connection}|ConvertTo-Json -Compress
+@{intro_confirmed=$intro;loopback_file_confirmed=$connection;intro_candidate=$candidate}|ConvertTo-Json -Compress
 """
     return json.loads(powershell(script,root,extra={"RUSTREMOTE_NLA_PARENT":str(parent),"RUSTREMOTE_NLA_TARGET":f"127.0.0.1:{port}"}))
 
