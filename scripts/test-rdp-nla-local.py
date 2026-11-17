@@ -350,16 +350,15 @@ $toggle=$boxes[0].GetCurrentPattern([Windows.Automation.TogglePattern]::Pattern)
 if($toggle.Current.ToggleState -eq [Windows.Automation.ToggleState]::Off){$toggle.Toggle()}
 if($toggle.Current.ToggleState -ne [Windows.Automation.ToggleState]::On){throw 'Fixture opening consent not selected'}
 # Only this already identified, non-credential dialog may expose label metadata.
-# DirectUI buttons can expose a legacy default action instead of InvokePattern.
+# Record only this verified introduction, never a credential dialog.
 $debug=Join-Path $env:RUSTREMOTE_NLA_ROOT 'rdp-intro-accessibility.json'
 if(-not (Test-Path -LiteralPath $debug)){
 @($controls|Select-Object -First 128|ForEach-Object{
-@{type=$_.Current.ControlType.ProgrammaticName;name=(Label $_);id=$_.Current.AutomationId;enabled=$_.Current.IsEnabled;invoke=$_.GetCurrentPropertyValue([Windows.Automation.AutomationElement]::IsInvokePatternAvailableProperty);legacy=$_.GetCurrentPropertyValue([Windows.Automation.AutomationElement]::IsLegacyIAccessiblePatternAvailableProperty)}
+@{type=$_.Current.ControlType.ProgrammaticName;name=(Label $_);id=$_.Current.AutomationId;enabled=$_.Current.IsEnabled;invoke=$_.GetCurrentPropertyValue([Windows.Automation.AutomationElement]::IsInvokePatternAvailableProperty)}
 })|ConvertTo-Json -Depth 3|Set-Content -LiteralPath $debug -Encoding utf8
 }
 if($ok.Count -eq 1 -and $ok[0].Current.IsEnabled){
 if($ok[0].GetCurrentPropertyValue([Windows.Automation.AutomationElement]::IsInvokePatternAvailableProperty)){$ok[0].GetCurrentPattern([Windows.Automation.InvokePattern]::Pattern).Invoke()}
-elseif($ok[0].GetCurrentPropertyValue([Windows.Automation.AutomationElement]::IsLegacyIAccessiblePatternAvailableProperty)){$ok[0].GetCurrentPattern([Windows.Automation.LegacyIAccessiblePattern]::Pattern).DoDefaultAction()}
 else{throw 'Verified introduction button has no supported action'}
 $intro++;continue
 }
