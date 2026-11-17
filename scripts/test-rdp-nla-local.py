@@ -4,6 +4,7 @@ Only --native on ephemeral GitHub Windows CI may temporarily trust this fixture'
 All credentials are generated in memory; only a private fake NT hash is written.
 """
 import argparse
+import contextlib
 import datetime
 import ipaddress
 import json
@@ -76,7 +77,34 @@ def negotiation(usage, password=None):
                         password=password, usage=usage, options=spnego.NegotiateOptions.use_ntlm)
 
 
-def certificate(root):
+@contextlib.contextmanager
+def crl_endpoint(root):
+    from http.server import BaseHTTPRequestHandler, HTTPServer
+    class Handler(BaseHTTPRequestHandler):
+        def setup(self):
+            super().setup();self.connection.settimeout(3)
+        def log_message(self,*args):pass
+        def do_GET(self):
+            if self.path!="/ca.crl" or self.server.crl_requests>=32:
+                self.send_error(404);return
+            data=(root/"ca.crl").read_bytes()
+            if len(data)>131072:raise ValueError("CRL fixture exceeds budget")
+            self.server.crl_requests+=1
+            self.send_response(200);self.send_header("Content-Type","application/pkix-crl")
+            self.send_header("Content-Length",str(len(data)));self.end_headers();self.wfile.write(data)
+    server=HTTPServer(("127.0.0.1",0),Handler);server.crl_requests=0
+    worker=threading.Thread(target=lambda:server.serve_forever(poll_interval=.1),daemon=True)
+    try:
+        worker.start()
+        yield server
+    finally:
+        if worker.is_alive():server.shutdown()
+        server.server_close()
+        if worker.ident is not None:worker.join(timeout=5)
+        if worker.is_alive():raise RuntimeError("CRL fixture did not stop")
+
+
+def certificate(root, crl_url):
     now = datetime.datetime.now(datetime.timezone.utc)
     key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
     subject = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "RustRemote loopback lab " + secrets.token_hex(8))])
@@ -93,7 +121,7 @@ def certificate(root):
             .add_extension(x509.ExtendedKeyUsage([ExtendedKeyUsageOID.SERVER_AUTH]),critical=False)
             .add_extension(x509.SubjectAlternativeName([x509.IPAddress(ipaddress.ip_address("127.0.0.1"))]),critical=False)
             .add_extension(x509.CRLDistributionPoints([x509.DistributionPoint(
-                full_name=[x509.UniformResourceIdentifier((root/"ca.crl").resolve().as_uri())],
+                full_name=[x509.UniformResourceIdentifier(crl_url)],
                 relative_name=None,reasons=None,crl_issuer=None)]),critical=False)
             .sign(key,hashes.SHA256()))
     crl=(x509.CertificateRevocationListBuilder().issuer_name(subject)
@@ -633,17 +661,18 @@ def main():
     if not args.verify_fixture and not (sys.platform=="win32" and os.environ.get("GITHUB_ACTIONS")=="true"):
         parser.error("Native certificate changes are restricted to an ephemeral GitHub Windows runner")
     trusted=False;peer=None
-    with tempfile.TemporaryDirectory(prefix="RustRemote NLA ") as folder:
+    with tempfile.TemporaryDirectory(prefix="RustRemote NLA ") as folder, contextlib.ExitStack() as resources:
         root=Path(folder)
         CURRENT_STAGE="secure-folder"
         if sys.platform=="win32":secure_folder(root)
+        crl=resources.enter_context(crl_endpoint(root))
         password=secrets.token_urlsafe(24)+"é"
         user_file=root/"ntlm-cache"
         user_file.write_text(f"{DOMAIN}\\{USER}:0:{'0'*32}:{ntowfv1(password).hex()}:[U]:LCT-0\n",encoding="utf-8")
         previous=os.environ.get("NTLM_USER_FILE");os.environ["NTLM_USER_FILE"]=str(user_file)
         try:
             CURRENT_STAGE="certificate-generation"
-            context,thumb=certificate(root)
+            context,thumb=certificate(root,f"http://127.0.0.1:{crl.server_port}/ca.crl")
             chain_report=None
             if args.native:
                 CURRENT_STAGE="trust-add"
@@ -685,6 +714,7 @@ def main():
                 except Exception as error:peer.state["event_probe_error"]=type(error).__name__
                 if result.returncode:raise RuntimeError("Native RDP lab client did not complete")
             peer.close()
+            peer.state["crl_requests"]=crl.crl_requests
             CURRENT_STAGE="credential-verification"
             if not all(peer.state.get(key) for key in ("negotiation","credssp_complete","account_match","password_match")):
                 raise RuntimeError("Native RDP profile credential was not authenticated")
@@ -692,7 +722,9 @@ def main():
                         real_windows_account=False,desktop_session=False,**peer.state)
         except Exception:
             FAILURE_STAGE=CURRENT_STAGE
-            if peer: print(json.dumps({"stage":"CredSSP", "events":peer.state}))
+            if peer:
+                peer.state["crl_requests"]=crl.crl_requests
+                print(json.dumps({"stage":"CredSSP", "events":peer.state}))
             raise
         finally:
             try:
