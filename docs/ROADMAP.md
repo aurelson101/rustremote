@@ -593,3 +593,5 @@ initial. Le run 44889538009 confirme la correction du dialogue, puis reproduit
 le reset de `mstsc` à l’échange de clé publique CredSSP v6 observé sur Server 2022.
 TLS 1.2, la révocation X509 et NTLM réussissent sur les deux plateformes.
 MSI, bureau et presse-papiers restent à qualifier.
+
+Le laboratoire Linux a confirmé NLA et l’affichage du bureau. CLIPRDR valide quatre cas de copie client vers serveur et le texte serveur vers client. La copie dans l’autre sens et l’intégrité du texte Unicode restent à corriger sur les trajets en échec. WIN-05 reste partiel avec le reset CredSSP de mstsc. Publication du MSI après validation de ces parcours sur Windows.

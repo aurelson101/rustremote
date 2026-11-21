@@ -288,8 +288,9 @@ def inside(base):
             assert request(source, {'op':'set','data':{'text/plain;charset=utf-8':value,'text/plain':value}}).get('ok')
             time.sleep(.5)
             result = request(destination, {'op':'get','mimes':['text/plain;charset=utf-8','text/plain']})
-            assert result.get('text') == value, (label, result)
-            report['text_'+label] = True
+            report['text_'+label] = result.get('text') == value
+            if not report['text_'+label]:
+                report['text_error_'+label] = result
         report['file_cases'] = []
         for label, source, destination, home in [('client_to_server',client_probe,server_probe,client['HOME']),
                                                ('server_to_client',server_probe,client_probe,server['HOME'])]:
@@ -324,6 +325,7 @@ def inside(base):
                         actual={str(p.relative_to(remote)):p.read_bytes() for p in remote.rglob('*') if p.is_file()}
                         assert actual==expected
                 report['file_cases'].append(label+':'+case)
+        assert report['text_client_to_server'] and report['text_server_to_client'], 'Texte CLIPRDR non préservé dans les deux sens'
         report['success'] = True
     except Exception as error:
         report['error'] = str(error)
