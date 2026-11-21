@@ -423,7 +423,7 @@ if($id -gt 65535){throw 'Invalid fixture task-dialog button ID'}
 if(-not [IntroCapture]::PostMessageW([IntPtr]$window.Current.NativeWindowHandle,1126,[UIntPtr]$id,[IntPtr]::Zero)){throw 'Fixture task-dialog action not queued'}
 }
 $children=@(Get-CimInstance Win32_Process -Filter ("ParentProcessId="+$env:RUSTREMOTE_NLA_PARENT+" AND Name='mstsc.exe'"))
-$intro=0;$connection=0;$candidate=@{};$connectionCandidate=@{};$deadline=[DateTime]::UtcNow.AddSeconds(12)
+$intro=0;$connection=0;$introToggleRequested=$false;$candidate=@{};$connectionCandidate=@{};$deadline=[DateTime]::UtcNow.AddSeconds(12)
 while([DateTime]::UtcNow -lt $deadline){
 foreach($process in $children){
 $condition=[Windows.Automation.PropertyCondition]::new([Windows.Automation.AutomationElement]::ProcessIdProperty,[int]$process.ProcessId)
@@ -451,8 +451,15 @@ if($drawn){$bitmap.Save($capture,[Drawing.Imaging.ImageFormat]::Png)}
 }
 }
 $toggle=$boxes[0].GetCurrentPattern([Windows.Automation.TogglePattern]::Pattern)
-if($toggle.Current.ToggleState -eq [Windows.Automation.ToggleState]::Off){$toggle.Toggle()}
-if($toggle.Current.ToggleState -ne [Windows.Automation.ToggleState]::On){throw 'Fixture opening consent not selected'}
+$state=$toggle.Current.ToggleState
+$candidate.toggle_state=$state.ToString()
+if($state -eq [Windows.Automation.ToggleState]::Off -and -not $introToggleRequested){
+$toggle.Toggle()
+$introToggleRequested=$true
+}
+# UI Automation may return before the control has applied Toggle(). Re-enumerate
+# the verified dialog on the next poll without risking a second toggle.
+if($state -ne [Windows.Automation.ToggleState]::On){continue}
 # Only this already identified, non-credential dialog may expose label metadata.
 # Record only this verified introduction, never a credential dialog.
 $debug=Join-Path $env:RUSTREMOTE_NLA_ROOT 'rdp-intro-accessibility.json'
@@ -463,8 +470,9 @@ if(-not (Test-Path -LiteralPath $debug)){
 }
 if($ok.Count -eq 1 -and $ok[0].Current.IsEnabled){
 ClickVerifiedTaskButton $window $ok[0]
-$intro++;continue
+$intro++
 }
+continue
 }
 $labels=@($controls|Where-Object{-not $_.Current.IsPassword}|ForEach-Object{Label $_})
 $connect=@($controls|Where-Object{(Label $_) -ceq 'Connect' -and $_.Current.IsEnabled})
