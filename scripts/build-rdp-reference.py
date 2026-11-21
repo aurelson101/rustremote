@@ -2,6 +2,7 @@
 """Build a pinned IronRDP example as a disposable CI peer."""
 import hashlib
 import io
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -32,9 +33,10 @@ def main(root):
         archive.extractall(root, filter="data")
     source = root / f"IronRDP-{REVISION}"
     example = source / "crates/ironrdp/examples/server.rs"
+    replace(example, "let bind_addr = args", "let bind_addr: SocketAddr = args")
     replace(example, 'let pass = args.opt_value_from_str("--pass")?.unwrap_or_else(|| "pass".to_owned());', """let mut pass = String::new();
         use std::io::Read as _;
-        std::io::stdin().take(129).read_to_string(&mut pass)?;
+        io::stdin().take(129).read_to_string(&mut pass)?;
         anyhow::ensure!(!pass.is_empty() && pass.len() <= 128, "Invalid fixture password");
         anyhow::ensure!(bind_addr.ip() == std::net::Ipv4Addr::LOCALHOST && bind_addr.port() == 0
                         && hybrid && cert.is_some() && key.is_some() && user == "rr-lab", "Invalid fixture arguments");""")
@@ -47,6 +49,7 @@ def main(root):
         ["cargo", "build", "--locked", "--target-dir", str(root / "target"), "-p", "ironrdp",
          "--example", "server", "--features", "cliprdr,connector,rdpsnd,server"],
         cwd=source, check=True, timeout=720,
+        env=dict(os.environ, CARGO_PROFILE_DEV_OPT_LEVEL="0", CARGO_PROFILE_DEV_DEBUG="0"),
     )
 
 
