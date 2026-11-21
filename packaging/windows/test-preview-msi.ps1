@@ -53,7 +53,7 @@ try {
     $exe = Join-Path $installed 'rustremote-windows-probe.exe'
     if (-not (Test-Path (Join-Path $menu 'RustRemote.lnk'))) { throw 'Start menu shortcut was not installed' }
     if (-not (Test-Path $desktop)) { throw 'DESKTOPSHORTCUT=1 did not create the desktop shortcut' }
-    if (-not ((Get-MachinePath).Split(';') -contains $installed)) { throw 'ADDTOPATH=1 did not extend the system PATH' }
+    if (-not ((Get-MachinePath).Split(';') | Where-Object { $_.TrimEnd('\') -eq $installed })) { throw 'ADDTOPATH=1 did not extend the system PATH' }
     $rdp = Join-Path $installed 'wfreerdp.exe'
     $rdpProcess = Invoke-Bounded $rdp '/version'
     if ($rdpProcess.ExitCode -ne 0) { throw "Installed FreeRDP exited with $($rdpProcess.ExitCode)" }
