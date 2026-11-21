@@ -603,3 +603,6 @@ Le laboratoire CLIPRDR conserve la version FreeRDP dans son rapport et accepte `
 Le run 44893353352 confirme la négociation HYBRID_EX et l’autorisation anticipée dans le contrôle SSPI. mstsc négocie le même mode et réinitialise toujours la connexion pendant la preuve de clé publique. WIN-05 reste partiel. La prochaine comparaison doit utiliser un serveur RDP de référence dans un laboratoire isolé pour distinguer le comportement propre au simulateur de celui du lanceur Windows.
 
 Le run 44894110535 construit et vérifie le MSI Windows Preview x64 0.1.0 sur Server 2022 (installation, démarrage et désinstallation). L’artefact CI et son SHA-256 sont disponibles. SSH réussit avec mot de passe ou clé chiffrée et refuse les cas négatifs testés. RDP échoue toujours après NTLM. Publication en release et qualification RDP Windows restent ouvertes.
+
+Le prototype Windows propose désormais un client FreeRDP à côté de mstsc. Il utilise les options du profil et son mot de passe enregistré. La CI 44895936220 construit le MSI et vérifie le lancement de l’exécutable FreeRDP livré. Une connexion RDP complète de ce client et le presse-papiers restent à qualifier.
+Le MSI avec client FreeRDP a passé l’installation, le chargement du client et la désinstallation sur Server 2022. La connexion réelle depuis le profil FreeRDP doit être testée avant qualification.
