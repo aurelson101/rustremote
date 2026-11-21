@@ -18,7 +18,7 @@
         <Shortcut Id="AppShortcut" Name="RustRemote" Target="[INSTALLFOLDER]rustremote-windows-probe.exe"
                   WorkingDirectory="INSTALLFOLDER" />
         <RemoveFolder Id="RemoveStartMenuDir" On="uninstall" />
-        <RegistryValue Root="HKLM" Key="Software\RustRemote\WindowsPreview" Name="Shortcut" Type="integer" Value="1" KeyPath="yes" />
+        <RegistryValue Root="HKCU" Key="Software\RustRemote\WindowsPreview" Name="Shortcut" Type="integer" Value="1" KeyPath="yes" />
       </Component>
     </DirectoryRef>
     <Feature Id="Preview" Title="RustRemote Windows Preview" Level="1">
