@@ -292,6 +292,7 @@ def inside(base):
             if not report['text_'+label]:
                 report['text_error_'+label] = result
         report['file_cases'] = []
+        report['file_errors'] = {}
         for label, source, destination, home in [('client_to_server',client_probe,server_probe,client['HOME']),
                                                ('server_to_client',server_probe,client_probe,server['HOME'])]:
             fixtures = Path(home)/'fixtures';fixtures.mkdir()
@@ -303,28 +304,32 @@ def inside(base):
             cases = [('one_file',['un.txt']),('multiple_files',['un.txt','deux.txt']),
                      ('one_folder',['dossier-un']),('multiple_folders',['dossier-un','dossier-deux'])]
             for case, names in cases:
-                paths=[fixtures/name for name in names]
-                uris='\r\n'.join(path.as_uri() for path in paths)+'\r\n'
-                request(source, {'op':'set','data':{'text/uri-list':uris,
-                         'x-special/gnome-copied-files':'copy\n'+'\n'.join(path.as_uri() for path in paths)}})
-                time.sleep(.5)
-                received=request(destination, {'op':'get','mimes':['text/uri-list']})
-                assert 'text' in received, (label,case,received)
-                urls=[line for line in received['text'].splitlines() if line and not line.startswith('#')]
-                assert len(urls)==len(paths), (label,case,urls)
-                for source_path, url in zip(paths,urls):
-                    parsed=urlparse(url);assert parsed.scheme=='file' and parsed.netloc in ('','localhost')
-                    remote=Path(unquote(parsed.path))
-                    assert remote!=source_path, 'URI du chemin source réutilisée : faux positif de copie'
-                    mountpoints=[Path(line.split()[4].replace('\\040',' ')) for line in Path('/proc/self/mountinfo').read_text().splitlines() if ' - fuse' in line]
-                    assert any(remote.is_relative_to(m) for m in mountpoints), 'Destination hors du montage CLIPRDR FUSE'
-                    if source_path.is_file():
-                        assert remote.read_bytes()==source_path.read_bytes()
-                    else:
-                        expected={str(p.relative_to(source_path)):p.read_bytes() for p in source_path.rglob('*') if p.is_file()}
-                        actual={str(p.relative_to(remote)):p.read_bytes() for p in remote.rglob('*') if p.is_file()}
-                        assert actual==expected
-                report['file_cases'].append(label+':'+case)
+                try:
+                    paths=[fixtures/name for name in names]
+                    uris='\r\n'.join(path.as_uri() for path in paths)+'\r\n'
+                    request(source, {'op':'set','data':{'text/uri-list':uris,
+                             'x-special/gnome-copied-files':'copy\n'+'\n'.join(path.as_uri() for path in paths)}})
+                    time.sleep(.5)
+                    received=request(destination, {'op':'get','mimes':['text/uri-list']})
+                    assert 'text' in received, (label,case,received)
+                    urls=[line for line in received['text'].splitlines() if line and not line.startswith('#')]
+                    assert len(urls)==len(paths), (label,case,urls)
+                    for source_path, url in zip(paths,urls):
+                        parsed=urlparse(url);assert parsed.scheme=='file' and parsed.netloc in ('','localhost')
+                        remote=Path(unquote(parsed.path))
+                        assert remote!=source_path, 'URI du chemin source réutilisée : faux positif de copie'
+                        mountpoints=[Path(line.split()[4].replace('\\040',' ')) for line in Path('/proc/self/mountinfo').read_text().splitlines() if ' - fuse' in line]
+                        assert any(remote.is_relative_to(m) for m in mountpoints), 'Destination hors du montage CLIPRDR FUSE'
+                        if source_path.is_file():
+                            assert remote.read_bytes()==source_path.read_bytes()
+                        else:
+                            expected={str(p.relative_to(source_path)):p.read_bytes() for p in source_path.rglob('*') if p.is_file()}
+                            actual={str(p.relative_to(remote)):p.read_bytes() for p in remote.rglob('*') if p.is_file()}
+                            assert actual==expected
+                    report['file_cases'].append(label+':'+case)
+                except AssertionError as error:
+                    report['file_errors'][f'{label}:{case}'] = str(error) or 'Contenu différent'
+        assert not report['file_errors'], 'Transferts CLIPRDR incomplets'
         assert report['text_client_to_server'] and report['text_server_to_client'], 'Texte CLIPRDR non préservé dans les deux sens'
         report['success'] = True
     except Exception as error:
