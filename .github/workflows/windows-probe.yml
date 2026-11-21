@@ -169,6 +169,21 @@ jobs:
         run: |
           cp experiments/windows-probe/README.md dist/windows-probe/README.md
           cp LICENSE NOTICE dist/windows-probe/
+      - name: Stage Windows preview payload
+        if: matrix.runner == 'windows-2022'
+        run: |
+          python scripts/stage-windows-msi.py "$(cygpath -m /ucrt64)" experiments/windows-probe/target/debug/rustremote-windows-probe.exe dist/msi-stage
+      - name: Build and verify Windows preview MSI
+        if: matrix.runner == 'windows-2022'
+        shell: pwsh
+        run: ./packaging/windows/test-preview-msi.ps1
+      - name: Upload tested Windows preview MSI
+        if: matrix.runner == 'windows-2022'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: windows-preview-msi-x64
+          path: dist/msi-output/
+          if-no-files-found: error
       - name: Enforce native RDP qualification result
         if: always() && (steps.rdp_nla.outcome == 'failure' || steps.sspi_control.outcome == 'failure')
         run: |

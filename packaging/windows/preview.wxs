@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+  <Product Id="*" Name="RustRemote Windows Preview" Language="1033" Version="0.1.0"
+           Manufacturer="RustRemote" UpgradeCode="C838A8A2-D88C-4FF6-8C25-ED160C6D9B31">
+    <Package InstallerVersion="500" Compressed="yes" InstallScope="perMachine" Platform="x64" />
+    <MajorUpgrade DowngradeErrorMessage="A newer RustRemote Windows Preview is installed." />
+    <MediaTemplate EmbedCab="yes" />
+    <Directory Id="TARGETDIR" Name="SourceDir">
+      <Directory Id="ProgramFiles64Folder">
+        <Directory Id="INSTALLFOLDER" Name="RustRemote Windows Preview" />
+      </Directory>
+    </Directory>
+    <Feature Id="Preview" Title="RustRemote Windows Preview" Level="1">
+      <ComponentGroupRef Id="PreviewFiles" />
+    </Feature>
+  </Product>
+</Wix>
