@@ -185,10 +185,27 @@ jobs:
           name: windows-preview-msi-x64
           path: dist/msi-output/
           if-no-files-found: error
-      - name: Enforce native RDP qualification result
-        if: always() && (steps.rdp_nla.outcome == 'failure' || steps.sspi_control.outcome == 'failure')
+      - name: Build isolated IronRDP reference peer
+        if: matrix.runner == 'windows-2022'
+        run: python scripts/build-rdp-reference.py dist/rdp-reference
+      - name: RustRemote mstsc profile against IronRDP
+        id: mstsc_reference
+        if: matrix.runner == 'windows-2022'
+        continue-on-error: true
         run: |
-          echo 'Native RDP authentication failed; see rdp-nla.json. Other protocol checks were allowed to run.'
+          set -o pipefail
+          python scripts/test-rdp-nla-local.py --fetch-deps --native dist/msi-stage/rustremote-windows-probe.exe --reference dist/rdp-reference/target/debug/examples/server.exe | tee dist/windows-probe/mstsc-reference.json
+      - name: RustRemote FreeRDP profile against IronRDP
+        id: freerdp_reference
+        if: matrix.runner == 'windows-2022'
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          python scripts/test-rdp-nla-local.py --fetch-deps --native dist/msi-stage/rustremote-windows-probe.exe --reference dist/rdp-reference/target/debug/examples/server.exe --freerdp | tee dist/windows-probe/freerdp-reference.json
+      - name: Enforce native RDP qualification result
+        if: always() && (steps.rdp_nla.outcome == 'failure' || steps.sspi_control.outcome == 'failure' || steps.mstsc_reference.outcome == 'failure' || steps.freerdp_reference.outcome == 'failure')
+        run: |
+          echo 'Native RDP qualification failed; see rdp-nla.json and the reference reports.'
           exit 1
       - if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02

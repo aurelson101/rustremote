@@ -10,6 +10,7 @@ import ipaddress
 import json
 import logging
 import os
+import queue
 from pathlib import Path
 import secrets
 import socket
@@ -365,6 +366,56 @@ class Peer:
         if self.worker.is_alive():raise RuntimeError("RDP fixture did not stop")
 
 
+class ReferencePeer:
+    """Observe only the pinned peer's readiness and post-negotiation markers."""
+    def __init__(self, binary, root, password):
+        self.state = {"phase": "reference-start", "desktop_activated": False}
+        self.ready = queue.Queue(maxsize=1)
+        state_path = root / "rdp-nla-state.json"
+        material = str(root / "server.pem")
+        self.process = subprocess.Popen(
+            [str(binary.resolve(strict=True)), "--bind-addr", "127.0.0.1:0", "--sec", "hybrid",
+             "--cert", material, "--key", material, "--user", USER],
+            stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+            env=dict(os.environ, IRONRDP_LOG="off"),
+        )
+
+        def observe():
+            try:
+                with self.process.stdout as output:
+                    for line in iter(lambda: output.readline(256), b""):
+                        parts = line.strip().split()
+                        if len(parts) == 2 and parts[0] == b"RR_REFERENCE_READY" and parts[1].isdigit():
+                            self.ready.put_nowait(int(parts[1]))
+                        elif parts == [b"RR_REFERENCE_ACTIVATED"]:
+                            temporary = state_path.with_suffix(".tmp")
+                            temporary.write_text('{"done":true}', encoding="utf-8")
+                            self.state.update(phase="desktop-activated", desktop_activated=True)
+                            temporary.replace(state_path)
+            except Exception as error:
+                self.state["observer_error"] = type(error).__name__
+
+        self.worker = threading.Thread(target=observe, daemon=True)
+        try:
+            self.worker.start()
+            with self.process.stdin as input_stream:
+                input_stream.write(password.encode("utf-8"))
+            self.port = self.ready.get(timeout=10)
+            if not 1024 <= self.port <= 65535:
+                raise ValueError("Invalid reference peer port")
+            self.state["phase"] = "reference-ready"
+        except BaseException:
+            self.close()
+            raise
+
+    def close(self):
+        if self.process.poll() is None:
+            self.process.kill()
+        self.process.wait(timeout=5)
+        if self.worker.ident is not None:
+            self.worker.join(timeout=5)
+
+
 class LoopbackClientTLS(ssl.SSLContext):
     def wrap_bio(self, incoming, outgoing, server_side=False, server_hostname=None, session=None):
         # pyspnego's BIO adapter omits server_hostname. Supply the fixture's
@@ -677,7 +728,12 @@ def main():
     global CURRENT_STAGE, FAILURE_STAGE
     parser=argparse.ArgumentParser();mode=parser.add_mutually_exclusive_group(required=True)
     mode.add_argument("--verify-fixture",action="store_true");mode.add_argument("--verify-sspi-fixture",action="store_true");mode.add_argument("--native",type=Path)
-    parser.add_argument("--fetch-deps",action="store_true");args=parser.parse_args()
+    parser.add_argument("--fetch-deps",action="store_true")
+    parser.add_argument("--reference", type=Path)
+    parser.add_argument("--freerdp", action="store_true")
+    args=parser.parse_args()
+    if (args.reference and not args.native) or (args.freerdp and not args.reference):
+        parser.error("The reference peer requires the native actor; FreeRDP requires the reference peer")
     if not args.verify_fixture and not (sys.platform=="win32" and os.environ.get("GITHUB_ACTIONS")=="true"):
         parser.error("Native certificate changes are restricted to an ephemeral GitHub Windows runner")
     trusted=False;peer=None
@@ -694,7 +750,7 @@ def main():
             CURRENT_STAGE="certificate-generation"
             context,thumb=certificate(root,f"http://127.0.0.1:{crl.server_port}/ca.crl")
             chain_report=None
-            if args.native:
+            if args.native and not args.freerdp:
                 CURRENT_STAGE="trust-add"
                 trusted=True
                 try:trust(root,thumb,True)
@@ -704,24 +760,28 @@ def main():
                 try:chain_report=inspect_windows_chain(root)
                 except Exception as error:chain_report={"error_class":type(error).__name__}
             CURRENT_STAGE="peer-start"
-            peer=Peer(context,root,password)
+            peer=ReferencePeer(args.reference, root, password) if args.reference else Peer(context,root,password)
             if chain_report is not None:peer.state["windows_chain"]=chain_report
             if args.verify_fixture or args.verify_sspi_fixture:verify_fixture(peer,root,password,native_sspi=args.verify_sspi_fixture)
             else:
                 profile=dict(name="CredSSP loopback lab",host="127.0.0.1",port=peer.port,username=USER,favorite=False,
                     options=dict(protocol="Rdp",domain=DOMAIN,width=1280,height=720,fullscreen=False,clipboard=False,clipboard_files=False))
+                if args.freerdp:
+                    leaf = x509.load_der_x509_certificate((root / "server.cer").read_bytes())
+                    profile["options"]["settings"] = {"certificate_sha256": leaf.fingerprint(hashes.SHA256()).hex()}
                 CURRENT_STAGE="native-client"
                 started=datetime.datetime.now(datetime.timezone.utc).isoformat()
-                command=[str(args.native.resolve(strict=True)),"--self-test-rdp-nla"]
+                command=[str(args.native.resolve(strict=True)),"--self-test-rdp-nla-freerdp" if args.freerdp else "--self-test-rdp-nla"]
                 with subprocess.Popen(command,stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,encoding="utf-8") as process:
                     try:
                         try:
                             stdout,stderr=process.communicate(json.dumps(dict(profile=profile,secret=password,state=str(root/"rdp-nla-state.json"))),timeout=5)
                         except subprocess.TimeoutExpired:
-                            peer.state["file_consents"]=confirm_fixture_file_dialogs(process.pid,root,peer.port)
-                            if "error_type" in peer.state["file_consents"]:raise RuntimeError("Native fixture consent action failed")
-                            try:peer.state["native_ui"]=native_window_flags(process.pid,root)
-                            except Exception as error:peer.state["ui_probe_error"]=type(error).__name__
+                            if not args.freerdp:
+                                peer.state["file_consents"]=confirm_fixture_file_dialogs(process.pid,root,peer.port)
+                                if "error_type" in peer.state["file_consents"]:raise RuntimeError("Native fixture consent action failed")
+                                try:peer.state["native_ui"]=native_window_flags(process.pid,root)
+                                except Exception as error:peer.state["ui_probe_error"]=type(error).__name__
                             stdout,stderr=process.communicate(timeout=35)
                     except subprocess.TimeoutExpired:
                         # Popen.__exit__ waits indefinitely: reap our hung actor before
@@ -736,10 +796,11 @@ def main():
             peer.close()
             peer.state["crl_requests"]=crl.crl_requests
             CURRENT_STAGE="credential-verification"
-            if not all(peer.state.get(key) for key in ("negotiation","credssp_complete","account_match","password_match")):
+            required = ("desktop_activated",) if args.reference else ("negotiation","credssp_complete","account_match","password_match")
+            if not all(peer.state.get(key) for key in required):
                 raise RuntimeError("Native RDP profile credential was not authenticated")
-            report=dict(result="PASS",target="127.0.0.1",client="native_sspi" if args.verify_sspi_fixture else "pyspnego" if args.verify_fixture else "mstsc",
-                        real_windows_account=False,desktop_session=False,**peer.state)
+            report=dict(result="PASS",target="127.0.0.1",client="freerdp" if args.freerdp else "native_sspi" if args.verify_sspi_fixture else "pyspnego" if args.verify_fixture else "mstsc",
+                        real_windows_account=False,desktop_session=bool(args.reference),**peer.state)
         except Exception:
             FAILURE_STAGE=CURRENT_STAGE
             if peer:

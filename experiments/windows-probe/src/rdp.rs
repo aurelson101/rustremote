@@ -569,7 +569,7 @@ mod tests {
 
 /// Ephemeral native-client lab: only a fixed fake account and literal loopback peer.
 #[cfg(windows)]
-pub fn nla_lab() -> Result<String, String> {
+pub fn nla_lab(use_freerdp: bool) -> Result<String, String> {
     use std::{
         io::Read,
         path::PathBuf,
@@ -604,7 +604,7 @@ pub fn nla_lab() -> Result<String, String> {
         || input.profile.port < 1024
         || input.profile.username != "rr-lab"
         || input.profile.credential_ref.is_some()
-        || !matches!(&input.profile.options,ProtocolOptions::Rdp{domain,clipboard:false,clipboard_files:false,settings,..} if domain=="RRTEST"&&!settings.microphone&&!settings.printers)
+        || !matches!(&input.profile.options,ProtocolOptions::Rdp{domain,clipboard:false,clipboard_files:false,settings,..} if domain=="RRTEST"&&!settings.microphone&&!settings.printers&&settings.certificate_sha256.is_some()==use_freerdp)
     {
         return Err("Only the fixed fake loopback RDP laboratory is allowed".into());
     }
@@ -643,7 +643,13 @@ pub fn nla_lab() -> Result<String, String> {
     let (stop, receiver) = std::sync::mpsc::channel();
     let worker = std::thread::Builder::new()
         .name("rdp-nla-fixture".into())
-        .spawn(move || launch(profile, receiver))
+        .spawn(move || {
+            if use_freerdp {
+                launch_freerdp(profile, receiver)
+            } else {
+                launch(profile, receiver)
+            }
+        })
         .map_err(|_| "Cannot start RDP lab client")?;
     let deadline = Instant::now() + Duration::from_secs(25);
     #[derive(serde::Deserialize)]

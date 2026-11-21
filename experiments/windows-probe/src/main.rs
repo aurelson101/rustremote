@@ -119,9 +119,14 @@ fn main() -> std::process::ExitCode {
             }
         };
     }
-    if args.iter().any(|a| a == "--self-test-rdp-nla") {
+    if args.iter().any(|a| {
+        matches!(
+            a.as_str(),
+            "--self-test-rdp-nla" | "--self-test-rdp-nla-freerdp"
+        )
+    }) {
         #[cfg(windows)]
-        let result = rdp::nla_lab();
+        let result = rdp::nla_lab(args.iter().any(|a| a == "--self-test-rdp-nla-freerdp"));
         #[cfg(not(windows))]
         let result: Result<String, String> = Err("Native RDP NLA lab requires Windows".into());
         return match result {
