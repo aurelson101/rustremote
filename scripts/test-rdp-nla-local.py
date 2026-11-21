@@ -50,6 +50,7 @@ logging.getLogger("spnego").addHandler(logging.NullHandler())
 logging.getLogger("spnego").propagate = False
 os.umask(0o077)
 USER, DOMAIN = "rr-lab", "RRTEST"
+HYBRID, HYBRID_EX = 2, 8
 CURRENT_STAGE="initialization"
 FAILURE_STAGE=None
 
@@ -302,8 +303,12 @@ class Peer:
                     if end<0:raise ValueError()
                     offset=end+2
                 negotiation_request=request[offset:offset+8]
-                if request[5]!=0xe0 or len(negotiation_request)!=8 or negotiation_request[:1]!=b"\x01" or negotiation_request[2:4]!=b"\x08\0" or not int.from_bytes(negotiation_request[4:],"little") & 2:raise ValueError()
-                stream.sendall(bytes.fromhex("030000130ed000000000000200080002000000"))
+                if request[5]!=0xe0 or len(negotiation_request)!=8 or negotiation_request[:1]!=b"\x01" or negotiation_request[2:4]!=b"\x08\0":raise ValueError()
+                offered=int.from_bytes(negotiation_request[4:],"little")
+                selected=HYBRID_EX if offered & HYBRID_EX else HYBRID
+                if not offered & selected:raise ValueError("CredSSP required")
+                stream.sendall(bytes.fromhex("030000130ed0000000000002000800")+struct.pack("<I",selected))
+                self.state["rdp_protocol"]=selected
                 self.state["negotiation"]=True
                 authentication=negotiation("accept")
                 context=spnego.server(protocol="credssp",credssp_negotiate_context=authentication,
@@ -342,6 +347,10 @@ class Peer:
                         self.state.update(credssp_complete=True,
                             account_match=credential.domain_name.upper()==DOMAIN and credential.username==USER,
                             password_match=secrets.compare_digest(credential.password.encode(),self.password.encode()))
+                        if selected==HYBRID_EX:
+                            allowed=self.state["account_match"] and self.state["password_match"]
+                            stream.sendall(context.wrap(struct.pack("<I",0 if allowed else 5)).data)
+                            self.state["early_authorization_sent"]=True
                         break
         except Exception as error:
             self.state["error_class"]=type(error).__name__
@@ -374,7 +383,8 @@ def verify_fixture(peer, root, password, native_sspi=False):
                          credssp_tls_context=CredSSPTLSContext(context),credssp_min_protocol=5)
     with socket.create_connection(("127.0.0.1",peer.port),timeout=10) as stream:
         stream.settimeout(10)
-        stream.sendall(bytes.fromhex("030000130ee000000000000100080003000000"));assert receive(stream,19)[-4:]==b"\x02\0\0\0"
+        stream.sendall(bytes.fromhex("030000130ee00000000000010008000b000000"))
+        assert receive(stream,19)[-4:]==struct.pack("<I",HYBRID_EX)
         tls_handshake(stream,client)
         token=client.step()
         for _ in range(64):
@@ -382,6 +392,8 @@ def verify_fixture(peer, root, password, native_sspi=False):
             if client.complete:break
             header=receive(stream,5);token=client.step(header+receive(stream,int.from_bytes(header[3:],"big")))
         assert client.complete
+        header=receive(stream,5)
+        assert client.unwrap(header+receive(stream,int.from_bytes(header[3:],"big"))).data==b"\0"*4
 
 
 def confirm_fixture_file_dialogs(parent, root, port):
