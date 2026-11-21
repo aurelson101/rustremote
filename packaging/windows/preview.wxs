@@ -1,10 +1,23 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Silent options (msiexec /i RustRemote.msi /qn ...):
+    INSTALLFOLDER="C:\Tools\RustRemote"  custom install directory
+    DESKTOPSHORTCUT=1                    add a public desktop shortcut
+    ADDTOPATH=1                          append the install folder to the system PATH
+  Silent uninstall (msiexec /x RustRemote.msi /qn):
+    REMOVEUSERDATA=1                     also delete the uninstalling user's profiles, vault
+                                         credentials and application data (irreversible;
+                                         never done on upgrade)
+-->
 <Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
-  <Product Id="*" Name="RustRemote Windows Preview" Language="1033" Version="0.1.0"
+  <Product Id="*" Name="RustRemote Windows Preview" Language="1033" Version="$(var.Version)"
            Manufacturer="RustRemote" UpgradeCode="C838A8A2-D88C-4FF6-8C25-ED160C6D9B31">
     <Package InstallerVersion="500" Compressed="yes" InstallScope="perMachine" Platform="x64" />
     <MajorUpgrade DowngradeErrorMessage="A newer RustRemote Windows Preview is installed." />
     <MediaTemplate EmbedCab="yes" />
+    <Property Id="DESKTOPSHORTCUT" Secure="yes" />
+    <Property Id="ADDTOPATH" Secure="yes" />
+    <Property Id="REMOVEUSERDATA" Secure="yes" />
     <Directory Id="TARGETDIR" Name="SourceDir">
       <Directory Id="ProgramFiles64Folder">
         <Directory Id="INSTALLFOLDER" Name="RustRemote Windows Preview" />
@@ -12,18 +25,48 @@
       <Directory Id="ProgramMenuFolder">
         <Directory Id="StartMenuDir" Name="RustRemote Windows Preview" />
       </Directory>
+      <Directory Id="DesktopFolder" />
     </Directory>
     <DirectoryRef Id="StartMenuDir">
       <Component Id="StartMenuShortcut" Guid="6F0E3B52-4C1D-4E8A-9B7A-2D5C8E1F3A90" Win64="yes">
         <Shortcut Id="AppShortcut" Name="RustRemote" Target="[INSTALLFOLDER]rustremote-windows-probe.exe"
                   WorkingDirectory="INSTALLFOLDER" />
         <RemoveFolder Id="RemoveStartMenuDir" On="uninstall" />
-        <RegistryValue Root="HKCU" Key="Software\RustRemote\WindowsPreview" Name="Shortcut" Type="integer" Value="1" KeyPath="yes" />
+        <RegistryKey Root="HKCU" Key="Software\RustRemote" ForceDeleteOnUninstall="yes">
+          <RegistryValue Name="StartMenu" Type="integer" Value="1" KeyPath="yes" />
+        </RegistryKey>
       </Component>
     </DirectoryRef>
+    <DirectoryRef Id="DesktopFolder">
+      <Component Id="DesktopShortcut" Guid="B2A41C7E-83D5-4F60-A1E9-5C7D0F2B6E48" Win64="yes">
+        <Condition>DESKTOPSHORTCUT = "1"</Condition>
+        <Shortcut Id="DesktopAppShortcut" Name="RustRemote" Target="[INSTALLFOLDER]rustremote-windows-probe.exe"
+                  WorkingDirectory="INSTALLFOLDER" />
+        <RegistryKey Root="HKCU" Key="Software\RustRemote" ForceDeleteOnUninstall="yes">
+          <RegistryValue Name="Desktop" Type="integer" Value="1" KeyPath="yes" />
+        </RegistryKey>
+      </Component>
+    </DirectoryRef>
+    <DirectoryRef Id="INSTALLFOLDER">
+      <Component Id="PathEntry" Guid="0D93E6A8-1B27-4C5F-8E34-7A6F9C1D2B05" Win64="yes">
+        <Condition>ADDTOPATH = "1"</Condition>
+        <Environment Id="AppPath" Name="PATH" Value="[INSTALLFOLDER]" Part="last" Action="set" System="yes" />
+        <RegistryKey Root="HKCU" Key="Software\RustRemote" ForceDeleteOnUninstall="yes">
+          <RegistryValue Name="Path" Type="integer" Value="1" KeyPath="yes" />
+        </RegistryKey>
+      </Component>
+    </DirectoryRef>
+    <CustomAction Id="PurgeUserData" Directory="INSTALLFOLDER"
+                  ExeCommand="&quot;[INSTALLFOLDER]rustremote-windows-probe.exe&quot; --purge-user-data"
+                  Execute="deferred" Impersonate="yes" Return="ignore" />
+    <InstallExecuteSequence>
+      <Custom Action="PurgeUserData" Before="RemoveFiles">REMOVE="ALL" AND NOT UPGRADINGPRODUCTCODE AND REMOVEUSERDATA = "1"</Custom>
+    </InstallExecuteSequence>
     <Feature Id="Preview" Title="RustRemote Windows Preview" Level="1">
       <ComponentGroupRef Id="PreviewFiles" />
       <ComponentRef Id="StartMenuShortcut" />
+      <ComponentRef Id="DesktopShortcut" />
+      <ComponentRef Id="PathEntry" />
     </Feature>
   </Product>
 </Wix>

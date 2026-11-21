@@ -61,6 +61,28 @@ fn main() -> std::process::ExitCode {
         return win_ssh::askpass();
     }
     let args: Vec<String> = std::env::args().collect();
+    #[cfg(windows)]
+    if args.iter().any(|a| a == "--purge-user-data") {
+        // Invoked by the MSI uninstaller (REMOVEUSERDATA=1) as the uninstalling user.
+        let result = win_credentials::purge_all().and_then(|count| {
+            let directory = win_storage::directory()?;
+            if directory.exists() {
+                std::fs::remove_dir_all(&directory)
+                    .map_err(|_| "Cannot remove the user data directory".to_string())?;
+            }
+            Ok(count)
+        });
+        return match result {
+            Ok(count) => {
+                println!("USER_DATA_PURGED: {count} credential(s), profile directory removed");
+                std::process::ExitCode::SUCCESS
+            }
+            Err(error) => {
+                eprintln!("{error}");
+                std::process::ExitCode::FAILURE
+            }
+        };
+    }
     if args.iter().any(|a| a == "--self-test") {
         return match probe() {
             Ok(report) => {

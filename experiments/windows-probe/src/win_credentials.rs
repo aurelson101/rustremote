@@ -109,6 +109,29 @@ pub fn read(profile: &SessionProfile) -> Result<Option<Zeroizing<String>>, Strin
     Ok(Some(Zeroizing::new(std::mem::take(&mut envelope.secret))))
 }
 
+/// Uninstall helper: deletes only this application's generic credentials for the current user.
+pub fn purge_all() -> Result<usize, String> {
+    let filter = crate::win_storage::wide("com.rustremote.credentials:*")?;
+    let mut count = 0u32;
+    let mut list: *mut *mut CREDENTIALW = null_mut();
+    if unsafe { CredEnumerateW(filter.as_ptr(), 0, &mut count, &mut list) } == 0 {
+        return if std::io::Error::last_os_error().raw_os_error() == Some(ERROR_NOT_FOUND as i32) {
+            Ok(0)
+        } else {
+            Err("Windows could not list saved credentials".into())
+        };
+    }
+    let mut deleted = 0;
+    for index in 0..count as usize {
+        let credential = unsafe { &**list.add(index) };
+        if unsafe { CredDeleteW(credential.TargetName, CRED_TYPE_GENERIC, 0) } != 0 {
+            deleted += 1;
+        }
+    }
+    unsafe { CredFree(list.cast()) };
+    Ok(deleted)
+}
+
 pub fn remove(reference: &str) -> Result<(), String> {
     let target = target(reference)?;
     if unsafe { CredDeleteW(target.as_ptr(), CRED_TYPE_GENERIC, 0) } == 0
