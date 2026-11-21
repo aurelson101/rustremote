@@ -10,9 +10,9 @@ $version = '0.1.1'
 
 function New-Msi($ver, $name) {
     $msi = Join-Path $output $name
-    & "$wix/heat.exe" dir $stage -nologo -cg PreviewFiles -dr INSTALLFOLDER -srd -scom -sreg -ag -var var.Stage -out dist/preview-files.wxs
-    & "$wix/candle.exe" -nologo -arch x64 "-dStage=$stage" "-dVersion=$ver" -out dist/ packaging/windows/preview.wxs dist/preview-files.wxs
-    & "$wix/light.exe" -nologo -out $msi dist/preview.wixobj dist/preview-files.wixobj
+    & "$wix/heat.exe" dir $stage -nologo -cg PreviewFiles -dr INSTALLFOLDER -srd -scom -sreg -ag -var var.Stage -out dist/preview-files.wxs | Out-Host
+    & "$wix/candle.exe" -nologo -arch x64 "-dStage=$stage" "-dVersion=$ver" -out dist/ packaging/windows/preview.wxs dist/preview-files.wxs | Out-Host
+    & "$wix/light.exe" -nologo -out $msi dist/preview.wixobj dist/preview-files.wixobj | Out-Host
     $symbols = [IO.Path]::ChangeExtension($msi, '.wixpdb')
     if (Test-Path $symbols) { Move-Item -Force $symbols dist/ }
     return $msi

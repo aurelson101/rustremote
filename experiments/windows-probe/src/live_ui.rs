@@ -310,6 +310,7 @@ pub fn attach(
         ];
         let deadline = std::time::Instant::now() + Duration::from_secs(20);
         let mut phase = 0;
+        let mut capture_attempts = 0;
         let mut before_size = None;
         gtk::glib::timeout_add_local(Duration::from_millis(100), move || {
             let (Some(target), Some(window)) = (target.upgrade(), window.upgrade()) else {
@@ -418,6 +419,12 @@ pub fn attach(
                                 std::path::Path::new("dist/windows-probe/terminal-live.png"),
                             )
                         {
+                            // A snapshot taken before the first frame is rendered is empty on
+                            // slow runners: retry on the next tick before failing.
+                            capture_attempts += 1;
+                            if capture_attempts < 30 && std::time::Instant::now() < deadline {
+                                return gtk::glib::ControlFlow::Continue;
+                            }
                             eprintln!("{error}");
                             if let Some(session) = sessions.borrow().as_ref() {
                                 session.close();
