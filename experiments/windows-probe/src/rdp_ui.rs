@@ -150,7 +150,7 @@ pub fn options(
 }
 
 pub fn open(parent: &gtk::ApplicationWindow, profile: SessionProfile) -> Result<(), String> {
-    crate::rdp::configuration(&profile)?;
+    profile.freerdp_arguments()?;
     if !cfg!(windows) {
         return Err("mstsc requires Windows".into());
     }
@@ -177,7 +177,11 @@ pub fn open(parent: &gtk::ApplicationWindow, profile: SessionProfile) -> Result<
     ));
     status.set_wrap(true);
     body.append(&status);
-    let start = gtk::Button::with_label("Launch Windows Remote Desktop");
+    let engine = gtk::CheckButton::with_label("Use FreeRDP for this connection");
+    #[cfg(windows)]
+    engine.set_sensitive(crate::rdp::freerdp_binary().is_some());
+    body.append(&engine);
+    let start = gtk::Button::with_label("Connect");
     body.append(&start);
     let window = gtk::ApplicationWindow::builder()
         .application(&app)
@@ -196,8 +200,14 @@ pub fn open(parent: &gtk::ApplicationWindow, profile: SessionProfile) -> Result<
             return;
         }
         button.set_sensitive(false);
+        let use_freerdp = engine.is_active();
+        engine.set_sensitive(false);
         if let Some(status) = weak.upgrade() {
-            status.set_text("Opening Windows Remote Desktop. Check its security dialogs and destination; authentication and connection are not yet confirmed.");
+            status.set_text(if use_freerdp {
+                "Opening FreeRDP with the saved profile password. Server authentication is required."
+            } else {
+                "Opening Windows Remote Desktop. Check its security dialogs and destination."
+            });
         }
         let Some(receiver) = rx.borrow_mut().take() else {
             return;
@@ -208,18 +218,22 @@ pub fn open(parent: &gtk::ApplicationWindow, profile: SessionProfile) -> Result<
             move || {
                 #[cfg(windows)]
                 {
-                    crate::rdp::launch(profile, receiver)
+                    if use_freerdp {
+                        crate::rdp::launch_freerdp(profile, receiver)
+                    } else {
+                        crate::rdp::launch(profile, receiver)
+                    }
                 }
                 #[cfg(not(windows))]
                 {
-                    let _ = (profile, receiver);
+                    let _ = (profile, receiver, use_freerdp);
                     Err("mstsc requires Windows".into())
                 }
             },
             move |result| {
                 if let Some(status) = weak.upgrade() {
                     status.set_text(match &result {
-                        Ok(()) => "Controller closed",
+                        Ok(()) => "RDP client closed",
                         Err(error) => error,
                     });
                 }

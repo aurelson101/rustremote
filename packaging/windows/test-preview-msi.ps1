@@ -22,6 +22,9 @@ $env:Path = "$env:SystemRoot\System32;$env:SystemRoot"
 try {
     Invoke-Installer "/i `"$msi`" /qn /norestart /l*v `"$output/install.log`""
     $exe = Join-Path $installed 'rustremote-windows-probe.exe'
+    $rdp = Join-Path $installed 'wfreerdp.exe'
+    $rdpProcess = Start-Process $rdp -ArgumentList '/version' -Wait -PassThru
+    if ($rdpProcess.ExitCode -ne 0) { throw "Installed FreeRDP exited with $($rdpProcess.ExitCode)" }
     $process = Start-Process $exe -ArgumentList '--smoke-ui' -Wait -PassThru
     if ($process.ExitCode -ne 0) { throw "Installed application exited with $($process.ExitCode)" }
 } finally {

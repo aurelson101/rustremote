@@ -93,6 +93,7 @@ jobs:
             mingw-w64-ucrt-x86_64-python-sspilib
             mingw-w64-ucrt-x86_64-openssl
             mingw-w64-ucrt-x86_64-libssh2
+            mingw-w64-ucrt-x86_64-freerdp
       - name: Native operating system and architecture
         shell: pwsh
         run: |

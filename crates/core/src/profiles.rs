@@ -177,6 +177,97 @@ pub enum SessionKind {
 }
 
 impl SessionProfile {
+    /// Build client arguments without accessing the network, filesystem or vault.
+    pub fn freerdp_arguments(&self) -> Result<Vec<String>, String> {
+        self.validate()?;
+        if self.simulation {
+            return Err("Profil de simulation : toute connexion réseau est interdite.".into());
+        }
+        let ProtocolOptions::Rdp {
+            domain,
+            width,
+            height,
+            fullscreen,
+            clipboard,
+            clipboard_files,
+            settings,
+        } = &self.options
+        else {
+            return Err("Choose an RDP profile".into());
+        };
+        let host = if self.host.contains(':') {
+            format!("[{}]", self.host)
+        } else {
+            self.host.clone()
+        };
+        let mut args = vec![
+            format!("/v:{host}:{}", self.port),
+            format!("/u:{}", self.username),
+            "/sec:nla".into(),
+            settings
+                .certificate_sha256
+                .as_ref()
+                .map(|pin| format!("/cert:fingerprint:sha256:{pin}"))
+                .unwrap_or_else(|| "/cert:deny".into()),
+            "/from-stdin:force".into(),
+            format!("/size:{width}x{height}"),
+            if settings.size_mode == 1 {
+                "+dynamic-resolution".into()
+            } else {
+                "-dynamic-resolution".into()
+            },
+            format!("/audio-mode:{}", settings.audio_mode),
+            "-drives".into(),
+        ];
+        if !domain.is_empty() {
+            args.push(format!("/d:{domain}"));
+        }
+        args.push(
+            if *clipboard {
+                if *clipboard_files {
+                    "/clipboard:direction-to:all,files-to:all"
+                } else {
+                    "/clipboard:direction-to:all,files-to:off"
+                }
+            } else {
+                "-clipboard"
+            }
+            .into(),
+        );
+        if settings.size_mode == 2 {
+            args.push("/smart-sizing".into());
+        }
+        if settings.multi_monitor {
+            args.push("/multimon".into());
+            if !settings.monitors.is_empty() {
+                args.push(format!(
+                    "/monitors:{}",
+                    settings
+                        .monitors
+                        .iter()
+                        .map(u16::to_string)
+                        .collect::<Vec<_>>()
+                        .join(",")
+                ));
+            }
+        }
+        if *fullscreen || settings.multi_monitor {
+            args.push("/f".into());
+        }
+        if settings.audio_mode == 0 {
+            args.push("/sound".into());
+        }
+        if settings.microphone {
+            args.push("/microphone".into());
+        }
+        if settings.printers {
+            args.push("/printer".into());
+        }
+        Ok(args)
+    }
+}
+
+impl SessionProfile {
     /// Validate a portable model before opening its file references on this OS.
     pub fn validate_native_paths(&self) -> Result<(), String> {
         if let ProtocolOptions::Ssh {

@@ -10,7 +10,10 @@ prefix, executable, output = map(Path, sys.argv[1:])
 output.mkdir(parents=True, exist_ok=False)
 runtime = prefix / "bin"
 libraries = {path.name.lower(): path for path in runtime.glob("*.dll")}
-pending = [executable]
+client = runtime / "wfreerdp.exe"
+if not client.is_file():
+    raise FileNotFoundError("Windows FreeRDP client missing from the UCRT build environment")
+pending = [executable, client]
 copied = set()
 while pending:
     source = pending.pop()

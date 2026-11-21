@@ -98,6 +98,73 @@ pub fn launch(profile: SessionProfile, stop: std::sync::mpsc::Receiver<()>) -> R
     Ok(())
 }
 #[cfg(windows)]
+pub fn freerdp_binary() -> Option<std::path::PathBuf> {
+    let path = std::env::current_exe().ok()?.parent()?.join("wfreerdp.exe");
+    path.is_file().then_some(path)
+}
+
+#[cfg(windows)]
+pub fn launch_freerdp(
+    profile: SessionProfile,
+    stop: std::sync::mpsc::Receiver<()>,
+) -> Result<(), String> {
+    use std::{
+        io::Write,
+        process::{Command, Stdio},
+        time::Duration,
+    };
+    let args = profile.freerdp_arguments()?;
+    let binary = freerdp_binary().ok_or("FreeRDP is missing from the RustRemote installation")?;
+    let secret = crate::win_credentials::read(&profile)?
+        .ok_or("Save the RDP password in the profile before launching FreeRDP")?;
+    if secret.is_empty() || secret.len() > 2048 || secret.contains(['\0', '\r', '\n']) {
+        return Err("Invalid RDP password for the stdin channel".into());
+    }
+    if !matches!(stop.try_recv(), Err(std::sync::mpsc::TryRecvError::Empty)) {
+        return Ok(());
+    }
+    let mut child = Command::new(&binary)
+        .current_dir(binary.parent().ok_or("FreeRDP directory unavailable")?)
+        .args(args)
+        .env_remove("SSLKEYLOGFILE")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()
+        .map_err(|_| "Cannot start FreeRDP")?;
+    let sent = child.stdin.take().is_some_and(|mut pipe| {
+        pipe.write_all(secret.as_bytes())
+            .and_then(|()| pipe.write_all(b"\n"))
+            .is_ok()
+    });
+    drop(secret);
+    if !sent {
+        let _ = child.kill();
+        let _ = child.wait();
+        return Err("Cannot send the profile password to FreeRDP".into());
+    }
+    loop {
+        match child.try_wait() {
+            Ok(Some(status)) if status.success() => return Ok(()),
+            Ok(Some(status)) => return Err(format!("FreeRDP exited with {status}")),
+            Ok(None) => {}
+            Err(_) => break,
+        }
+        if !matches!(
+            stop.recv_timeout(Duration::from_millis(200)),
+            Err(std::sync::mpsc::RecvTimeoutError::Timeout)
+        ) {
+            let _ = child.kill();
+            let _ = child.wait();
+            return Ok(());
+        }
+    }
+    let _ = child.kill();
+    let _ = child.wait();
+    Err("Cannot monitor FreeRDP".into())
+}
+
+#[cfg(windows)]
 fn client() -> Result<std::path::PathBuf, String> {
     let mut directory = [0u16; 32768];
     let length = unsafe {
