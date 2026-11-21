@@ -177,9 +177,15 @@ pub fn open(parent: &gtk::ApplicationWindow, profile: SessionProfile) -> Result<
     ));
     status.set_wrap(true);
     body.append(&status);
-    let engine = gtk::CheckButton::with_label("Use FreeRDP for this connection");
+    let engine = gtk::CheckButton::with_label(
+        "Use FreeRDP (recommended; unchecked = mstsc, which currently fails CredSSP on tested peers)",
+    );
     #[cfg(windows)]
-    engine.set_sensitive(crate::rdp::freerdp_binary().is_some());
+    {
+        let available = crate::rdp::freerdp_binary().is_some();
+        engine.set_sensitive(available);
+        engine.set_active(available);
+    }
     body.append(&engine);
     let start = gtk::Button::with_label("Connect");
     body.append(&start);
