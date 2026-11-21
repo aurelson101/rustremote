@@ -79,7 +79,13 @@ pub fn launch(profile: SessionProfile, stop: std::sync::mpsc::Receiver<()>) -> R
         stop.recv_timeout(Duration::from_millis(250)),
         Err(std::sync::mpsc::RecvTimeoutError::Timeout)
     ) {
-        let _ = child.try_wait();
+        if let Some(status) = child
+            .try_wait()
+            .map_err(|_| "Cannot inspect owned mstsc process")?
+            && !status.success()
+        {
+            return Err(format!("Windows Remote Desktop exited with {status}"));
+        }
     }
     if child
         .try_wait()
