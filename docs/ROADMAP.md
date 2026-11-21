@@ -599,3 +599,5 @@ Le laboratoire Linux a confirmé NLA et l’affichage du bureau. CLIPRDR valide 
 CLIPRDR est désormais testé sur les huit parcours de fichiers et dossiers sans arrêt au premier échec de contenu. Les quatre transferts FreeRDP 3.32.2 vers GNOME passent et les quatre inverses échouent. Le run Windows 44891011783 confirme le même arrêt CredSSP après NTLM. La qualification Windows reste ouverte.
 
 Le laboratoire CLIPRDR conserve la version FreeRDP dans son rapport et accepte `--client` pour comparer un client de test dans le namespace privé. La pile locale Ubuntu 26.04 fournit FreeRDP 3.32.2 et GNOME Remote Desktop 50.2. Les défauts de texte et de transferts inverses y ont été reproduits. La qualification exige de vérifier les deux directions avec une pile corrigée.
+
+Le run 44893353352 confirme la négociation HYBRID_EX et l’autorisation anticipée dans le contrôle SSPI. mstsc négocie le même mode et réinitialise toujours la connexion pendant la preuve de clé publique. WIN-05 reste partiel. La prochaine comparaison doit utiliser un serveur RDP de référence dans un laboratoire isolé pour distinguer le comportement propre au simulateur de celui du lanceur Windows.
