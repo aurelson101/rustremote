@@ -1578,3 +1578,55 @@ aucun rejouage Win11ARM de cette série. Prochaine tâche : compter/localiser le
 échanges CredSSP et la validation serveur au point du reset, sans contourner
 certificat/NLA, puis qualifier bureau/clipboard. Contrôle positif pyspnego local
 réussi ; il ne prouve pas l’interopérabilité mstsc ni une session Windows réelle.
+
+## Reprise CredSSP — 2026-11-17
+Départ propre e6c97b9. Lecture ciblée des docs. Aucune entrée mémoire externe
+CredSSP trouvée. Aucun serveur réel contacté, aucun secret ni compte système créé.
+scripts/test-rdp-nla-local.py : compteurs TLS/records/réponses, étape/version
+CredSSP, état NTLM/MIC, SpnegoError type+NTSTATUS seulement (CredSSP peut emballer
+l’erreur en TSRequest au lieu de la propager immédiatement). Tout token et
+message brut reste exclu. Dernière preuve mstsc : NTLM complete true, stage
+Public key exchange, version6, MIC absent, puis ConnectionResetError.
+Événements RDP lus pour PID mstsc exact+heure de lancement seulement. Champs
+numériques filtrés EventData/UserData ; normalisation « Error Code » nécessaire.
+Code226=2147500037 (E_FAIL), pas une cause plus précise. Aucune erreur de mot de
+passe démontrée ; aucun formatter domaine/username modifié arbitrairement.
+
+Contrôle ajouté --verify-sspi-fixture : Windows NTLM SSPI sortant, credentials
+fictifs explicites, serveur NTLM pur, TLS+CredSSP framing Python. Pas de KDC, de
+nouveau compte, ni de CA ajoutée dans ce mode. PASS Server2022 dès4659730/
+run44039147485 puis7b9a47c/44042855654, avec égalité compte/password délégués.
+Ce n’est PAS le CredSSP natif complet de mstsc, qui reste en échec. Workflow
+continue ce contrôle et NLA pour les autres tests, garde finale rouge si l’un
+échoue. Fichier modifié aussi : .github/workflows/windows-probe.yml.
+
+Défaut réel du certificat fixture : X509Chain Windows révocation Online signalait
+RevocationStatusUnknown (run44040846572). CRL signée locale ajoutée ; file://
+ne suffisait pas (OfflineRevocation run44041953990). Endpoint HTTP127.0.0.1:
+port éphémère, chemin unique /ca.crl, 32 succès max, timeout3s, worker unique,
+arrêt viaExitStack avant nettoyage temp. Clé privée /server.pem refusée404.
+run44042855654/7b9a47c : CRL récupérée1fois, X509Chain user+machine valid true,
+statuses vides ; aucun ajout LocalMachine ni NoCheck. Reset mstsc persiste.
+Lecture X509 diagnostique, aucune politique modifiée. Annulation précoce du run
+44040758952 avant buildutile pour corriger sortieJSON (OidCollection.Add renvoie
+un index, masqué par[void]) ; remplacé par44040846572.
+
+Contrôle TLS Python : SSLContext client strict, override wrap_bio pour fournir
+127.0.0.1 omis par pyspnego, vérification IP SAN activée. Test positif PASS,
+test mauvais nom avec CA correcte rejeté SSLCertVerificationError. OpenSSL
+verify -crl_check PASS sur CRL signée, récupération HTTP==DER et refus clé privée
+PASS, endpoint arrêté. Python -Werror py_compile et diffcheck PASS. fmt/check/
+clippy -Dwarnings workspace PASS, cargo test workspace63 PASS/2ignored (journal
+/tmp/rustremote-credssp-workspace-tests.log). Application Rust inchangée.
+README, README prototype, SECURITY et ROADMAP décrivent ces preuves/limites.
+Win11ARM source7b9a47c lancé run44044779746 ; résultat final à ajouter. Aucun
+MSI/release/tag ni qualification bureau/clipboard. Prochaine piste : moteur
+CredSSP mstsc au pubKey exchange, validation SSL du nom/politiques de délégation
+en lecture seule, sans bypass cryptographique ni réécriture de profils fonctionnels.
+
+## Reprise Windows 11 ARM — 2026-11-21
+
+- Le run 44044779746 a validé le contrôle NTLM SSPI, la chaîne X509 et les tests SSH, SFTP et GTK. Le test mstsc a échoué avant TCP sur la lecture immédiate du consentement. Le rapport est dans `dist/windows-probe-validation/44044779746/windows-11-arm`.
+- Le commit `81aa374` demande le changement de la case une fois, puis vérifie son état et le bouton OK lors des lectures suivantes du dialogue identifié. Le délai de 12 secondes et les contrôles du dialogue restent en place. Nouveau run Windows 11 ARM 44889538009.
+- `py_compile -Werror`, contrôle CredSSP Python sur boucle locale et `git diff --check` réussis. Formatage, compilation, Clippy et tests du workspace passent, avec 63 tests réussis et 2 ignorés.
+- Le run 44889538009 confirme le passage des deux dialogues sous Windows 11 ARM (prototype x64 émulé). TLS 1.2, X509 avec révocation et NTLM réussissent. `mstsc` réinitialise la connexion à l’échange de clé publique CredSSP v6, avec `E_FAIL`, comme sur Server 2022. Le contrôle NTLM SSPI délègue le compte fictif. Rapports dans `dist/windows-probe-validation/44889538009/windows-11-arm`. Reprendre au niveau de l’interopérabilité du moteur CredSSP de `mstsc` avec le simulateur, avec les deux plateformes désormais comparables.

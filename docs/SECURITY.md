@@ -201,3 +201,11 @@ profil généré : PID mstsc enfant possédé, destination affichée 127.0.0.1 e
 port éphémère exact dans le modèle/fichier privé généré,
 toutes les redirections décochées. Aucun clic sur une alerte de certificat ou
 sur une saisie d’identifiants ; aucune automatisation sur le poste personnel.
+
+Le certificat du simulateur publie une CRL signée sur un endpoint HTTP borné,
+lié seulement à 127.0.0.1 et ne servant que /ca.crl. Les fichiers privés ne sont
+pas exposés. Les diagnostics X509 gardent la révocation Online ; aucun NoCheck,
+aucune modification de stratégie. Le contrôle Python vérifie aussi l’identité IP
+du certificat. Le contrôle SSPI utilise uniquement NTLM avec les identifiants
+fictifs explicites, sans compte Windows créé ni authentification Kerberos/réseau
+externe. La confiance temporaire CurrentUser du seul test mstsc reste nettoyée.

@@ -580,3 +580,16 @@ toujours FAIL/non qualifiée, garde finale CI rouge. SSH/SFTP CLI+GUI, coffre,
 ConPTY et GUI profils PASS dans ce même run. Prochaine tâche : localiser la
 réinitialisation CredSSP (échanges/politique certificat/auth), sans affaiblir TLS,
 puis seulement bureau/clipboard, Win11 et MSI. Aucun MSI ou tag publié.
+
+WIN-05 — source7b9a47c/run44042855654 Server2022 : NTLM du profil aboutit,
+CredSSP6 s’arrête après la réponse de preuve de clé publique (reset, E_FAIL).
+Contrôle natif NTLM SSPI dans framing Python PASS, compte/password fictifs
+délégués ; ce contrôle n’est pas le moteur CredSSP complet de mstsc.
+Défaut de certificat du labo corrigé : CRL signée viaHTTP127.0.0.1, chaîne et
+révocation Windows PASS dans les deux contextes sans contournement. SSH/SFTP,
+coffre, ConPTY et GUI réussissent. Sur Windows 11 ARM, le run 44044779746 a
+validé SSPI et X509. Le test mstsc s’est arrêté avant TCP sur le consentement
+initial. Le run 44889538009 confirme la correction du dialogue, puis reproduit
+le reset de `mstsc` à l’échange de clé publique CredSSP v6 observé sur Server 2022.
+TLS 1.2, la révocation X509 et NTLM réussissent sur les deux plateformes.
+MSI, bureau et presse-papiers restent à qualifier.

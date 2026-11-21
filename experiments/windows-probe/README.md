@@ -226,11 +226,16 @@ native window text. A loopback listener guards against unexpected connection
 attempts. Even that test qualifies file loading, not an RDP session.
 
 The subsequent native TLS/CredSSP loopback test now passes file confirmations
-and reaches RDP/TLS negotiation on Server 2022, but resets during CredSSP:
-[run44034020953](https://github.com/aurelson101/rustremote/actions/runs/44034020953),
-source `824886b`. A stored profile password must **not** be advertised
+and reaches TLS 1.2, NTLM completion and CredSSP v6 public-key exchange on
+Server 2022, then resets:
+[run44042855654](https://github.com/aurelson101/rustremote/actions/runs/44042855654),
+source `7b9a47c`. A stored profile password must **not** be advertised
 as working native automatic authentication yet. Diagnostics inspect only owned
 client windows and publish fixed flags/categories, never field values.
+On Windows 11 ARM64 with x64 emulation, the runner now waits for the consent
+checkbox to update before confirming the dialog. The new run reaches the same
+CredSSP public-key exchange reset and the SSPI control succeeds.
+[Windows 11 ARM64 run](https://github.com/aurelson101/rustremote/actions/runs/44889538009)
 Only the verified non-credential introduction may produce a capture and static
 accessibility labels; credential windows are never captured.
 The Python peer authenticates its generated fake account successfully in the
@@ -243,5 +248,18 @@ resource checkbox off. TLS warnings and credential prompts are never accepted.
 The production launcher leaves these decisions to the user. Microsoft's
 [RDP-file warning reference](https://learn.microsoft.com/en-us/windows-server/remote/remote-desktop-services/remotepc/understanding-security-warnings)
 describes these preconnection dialogs introduced in April 2026.
-The workflow continues other protocol checks after this failure and fails a
-final RDP gate, so a green job cannot conceal failed native authentication.
+The fixture now publishes its signed CRL over a bounded HTTP endpoint listening
+only on `127.0.0.1`. It serves `/ca.crl` only; private-key paths are refused.
+Windows chain validation with online revocation succeeds in both diagnostic
+contexts. No certificate or revocation check is disabled.
+
+`--verify-sspi-fixture` passes on Server 2022 using Windows' native **NTLM SSPI**
+with fake explicit credentials, inside Python TLS/CredSSP framing. This is an
+interoperability control, not a test of Windows' full CredSSP engine or a desktop.
+It installs no CA and creates no Windows account. The local Python control
+verifies the IP SAN as well as the fixture CA; a wrong TLS identity is rejected.
+
+The workflow continues other protocol checks after these controls and fails a
+final gate if mstsc authentication or the SSPI control fails. A green job cannot
+conceal failed native authentication. Reports contain counters, fixed stages
+and numeric errors for the exact owned mstsc PIDs, never authentication tokens.

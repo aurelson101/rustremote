@@ -166,9 +166,10 @@ The Windows prototype also has an experimental mstsc adapter and an RDP options
 dialog (display, domain, audio, printers and monitors). Profile passwords are
 read from Credential Manager and passed as current-user DPAPI ciphertext in a
 private temporary launch file; Windows policies may still request a prompt.
-Automatic authentication is **not yet qualified**. The Server 2022 loopback
-test now passes native file confirmations and reaches RDP/TLS negotiation,
-then resets during CredSSP authentication. DPAPI readback and `mstsc /edit`
+Automatic authentication remains unqualified. The Server 2022 and Windows 11
+ARM64 (x64 emulation) loopback tests pass file confirmations, TLS 1.2 and NTLM,
+then resets at the CredSSP public-key exchange. Windows certificate-chain and
+revocation checks pass in the lab. DPAPI readback and `mstsc /edit`
 tests validate storage and file loading only. Native desktop sessions and
 clipboard qualification remain pending. Confirm Windows dialogs for the expected
 destination; file-opening permission is separate from server authentication.
