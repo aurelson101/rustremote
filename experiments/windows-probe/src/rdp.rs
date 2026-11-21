@@ -117,8 +117,11 @@ pub fn launch_freerdp(
     let binary = freerdp_binary().ok_or("FreeRDP is missing from the RustRemote installation")?;
     let secret = crate::win_credentials::read(&profile)?
         .ok_or("Save the RDP password in the profile before launching FreeRDP")?;
-    if secret.is_empty() || secret.len() > 2048 || secret.contains(['\0', '\r', '\n']) {
-        return Err("Invalid RDP password for the stdin channel".into());
+    // FreeRDP's forced stdin reader uses a fixed 512-byte buffer.
+    if secret.is_empty() || secret.len() > 511 || secret.contains(['\0', '\r', '\n']) {
+        return Err(
+            "FreeRDP requires a password of 1–511 UTF-8 bytes without NUL or line breaks".into(),
+        );
     }
     if !matches!(stop.try_recv(), Err(std::sync::mpsc::TryRecvError::Empty)) {
         return Ok(());

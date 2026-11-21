@@ -373,11 +373,13 @@ class ReferencePeer:
         self.ready = queue.Queue(maxsize=1)
         state_path = root / "rdp-nla-state.json"
         material = str(root / "server.pem")
+        environment = dict(os.environ, IRONRDP_LOG="off")
+        environment.pop("SSLKEYLOGFILE", None)
         self.process = subprocess.Popen(
             [str(binary.resolve(strict=True)), "--bind-addr", "127.0.0.1:0", "--sec", "hybrid",
              "--cert", material, "--key", material, "--user", USER],
             stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
-            env=dict(os.environ, IRONRDP_LOG="off"),
+            env=environment,
         )
 
         def observe():
@@ -809,7 +811,7 @@ def main():
             raise
         finally:
             try:
-                if peer and peer.worker.is_alive():peer.close()
+                if peer:peer.close()
             finally:
                 try:
                     if trusted:
