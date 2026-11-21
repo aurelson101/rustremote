@@ -27,11 +27,13 @@ function Invoke-Installer($arguments) {
 }
 
 $installed = Join-Path $env:ProgramFiles 'RustRemote Windows Preview'
+$shortcut = Join-Path $env:ProgramData 'Microsoft\Windows\Start Menu\Programs\RustRemote Windows Preview\RustRemote.lnk'
 if (Test-Path $installed) { throw 'Preview installation path already exists' }
 $env:Path = "$env:SystemRoot\System32;$env:SystemRoot"
 try {
     Invoke-Installer "/i `"$msi`" /qn /norestart /l*v `"$output/install.log`""
     $exe = Join-Path $installed 'rustremote-windows-probe.exe'
+    if (-not (Test-Path $shortcut)) { throw 'Start menu shortcut was not installed' }
     $rdp = Join-Path $installed 'wfreerdp.exe'
     $rdpProcess = Invoke-Bounded $rdp '/version'
     if ($rdpProcess.ExitCode -ne 0) { throw "Installed FreeRDP exited with $($rdpProcess.ExitCode)" }
@@ -43,5 +45,6 @@ try {
     }
 }
 if (Test-Path $installed) { throw 'Uninstall left the application directory' }
+if (Test-Path $shortcut) { throw 'Uninstall left the Start menu shortcut' }
 $hash = (Get-FileHash -Algorithm SHA256 $msi).Hash.ToLowerInvariant()
 "$hash  $([IO.Path]::GetFileName($msi))" | Set-Content -Encoding ascii "$msi.sha256"

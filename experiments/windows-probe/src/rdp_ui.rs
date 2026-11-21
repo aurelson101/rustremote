@@ -177,14 +177,15 @@ pub fn open(parent: &gtk::ApplicationWindow, profile: SessionProfile) -> Result<
     ));
     status.set_wrap(true);
     body.append(&status);
-    let engine = gtk::CheckButton::with_label(
-        "Use FreeRDP (recommended; unchecked = mstsc, which currently fails CredSSP on tested peers)",
-    );
+    // FreeRDP is the supported Windows client: mstsc fails CredSSP against every tested peer.
+    // The choice is only shown when the bundled client is missing (mstsc fallback).
+    let engine = gtk::CheckButton::with_label("Use FreeRDP");
     #[cfg(windows)]
     {
         let available = crate::rdp::freerdp_binary().is_some();
         engine.set_sensitive(available);
         engine.set_active(available);
+        engine.set_visible(!available);
     }
     body.append(&engine);
     let start = gtk::Button::with_label("Connect");
