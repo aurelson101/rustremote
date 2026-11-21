@@ -597,3 +597,5 @@ MSI, bureau et presse-papiers restent à qualifier.
 Le laboratoire Linux a confirmé NLA et l’affichage du bureau. CLIPRDR valide quatre cas de copie client vers serveur et le texte serveur vers client. La copie dans l’autre sens et l’intégrité du texte Unicode restent à corriger sur les trajets en échec. WIN-05 reste partiel avec le reset CredSSP de mstsc. Publication du MSI après validation de ces parcours sur Windows.
 
 CLIPRDR est désormais testé sur les huit parcours de fichiers et dossiers sans arrêt au premier échec de contenu. Les quatre transferts FreeRDP 3.32.2 vers GNOME passent et les quatre inverses échouent. Le run Windows 44891011783 confirme le même arrêt CredSSP après NTLM. La qualification Windows reste ouverte.
+
+Le laboratoire CLIPRDR conserve la version FreeRDP dans son rapport et accepte `--client` pour comparer un client de test dans le namespace privé. La pile locale Ubuntu 26.04 fournit FreeRDP 3.32.2 et GNOME Remote Desktop 50.2. Les défauts de texte et de transferts inverses y ont été reproduits. La qualification exige de vérifier les deux directions avec une pile corrigée.

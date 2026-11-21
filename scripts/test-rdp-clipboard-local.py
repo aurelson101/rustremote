@@ -3,6 +3,7 @@
 Nécessite GNOME Shell/Remote Desktop, PipeWire, GTK4/PyGObject, FreeRDP, Xvfb,
 xauth et FUSE. Ni sudo, ni service système, ni connexion hors loopback.
 """
+import argparse
 import json
 import os
 import pty
@@ -247,8 +248,12 @@ def inside(base):
         number = int(os.read(reader,32).strip()); os.close(reader)
         run(['xauth','-f',str(authority)], client, input=f'add :{number} . {cookie}\n'.encode())
         client.update(DISPLAY=f':{number}', XAUTHORITY=str(authority), GDK_BACKEND='x11')
+        freerdp = os.environ.get('RUSTREMOTE_CLIPRDR_CLIENT', 'xfreerdp3')
+        report['freerdp_version'] = run([freerdp, '/version'], client).decode().strip()
+        if 'FreeRDP version 3.' not in report['freerdp_version']:
+            raise RuntimeError('Le laboratoire requiert un client FreeRDP 3')
         pin = run(['openssl','x509','-in',str(certificate),'-noout','-fingerprint','-sha256'], server).decode().split('=')[1].strip().replace(':','').lower()
-        rdp = spawn(['xfreerdp3','/v:127.0.0.1:3391','/u:'+user,'/from-stdin:force',
+        rdp = spawn([freerdp,'/v:127.0.0.1:3391','/u:'+user,'/from-stdin:force',
                      '/sec:nla','/auth-pkg-list:none,ntlm','/cert:fingerprint:sha256:'+pin,
                      '/clipboard:direction-to:all,files-to:all','-drives','/audio-mode:2',
                      '/size:1280x800','/t:RustRemote-CLIPRDR-Lab','/log-level:WARN'], client, 'client', stdin=subprocess.PIPE)
@@ -307,8 +312,8 @@ def inside(base):
                 try:
                     paths=[fixtures/name for name in names]
                     uris='\r\n'.join(path.as_uri() for path in paths)+'\r\n'
-                    request(source, {'op':'set','data':{'text/uri-list':uris,
-                             'x-special/gnome-copied-files':'copy\n'+'\n'.join(path.as_uri() for path in paths)}})
+                    assert request(source, {'op':'set','data':{'text/uri-list':uris,
+                             'x-special/gnome-copied-files':'copy\n'+'\n'.join(path.as_uri() for path in paths)}}).get('ok')
                     time.sleep(.5)
                     received=request(destination, {'op':'get','mimes':['text/uri-list']})
                     assert 'text' in received, (label,case,received)
@@ -353,9 +358,17 @@ if __name__ == '__main__':
     elif '--inside' in sys.argv:
         inside(Path(sys.argv[-1]))
     else:
+        parser = argparse.ArgumentParser(description=__doc__)
+        parser.add_argument('--client', type=Path, help='Client FreeRDP 3 à comparer dans le laboratoire isolé')
+        args = parser.parse_args()
         with tempfile.TemporaryDirectory(prefix='rustremote-cliprdr-') as directory:
             base=Path(directory)
             env={'PATH':os.environ['PATH'],'LANG':'C.UTF-8','RUSTREMOTE_RDP_NS':'1'}
+            if args.client:
+                executable = args.client.resolve()
+                if not executable.is_file() or not os.access(executable, os.X_OK):
+                    parser.error('--client doit désigner un exécutable FreeRDP 3')
+                env['RUSTREMOTE_CLIPRDR_CLIENT'] = str(executable)
             log=ROOT/'dist/rdp-clipboard-local.log'
             log.parent.mkdir(exist_ok=True)
             with log.open('wb') as output:
