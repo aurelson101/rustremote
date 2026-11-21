@@ -11,8 +11,18 @@ $msi = Join-Path $output 'RustRemote-Windows-Preview-0.1.0-x64.msi'
 $symbols = [IO.Path]::ChangeExtension($msi, '.wixpdb')
 if (Test-Path $symbols) { Move-Item $symbols dist/ }
 
+function Invoke-Bounded($path, $arguments, $seconds = 120) {
+    $process = Start-Process $path -ArgumentList $arguments -PassThru
+    if (-not $process.WaitForExit($seconds * 1000)) {
+        Stop-Process -Id $process.Id -Force
+        throw "$([IO.Path]::GetFileName($path)) did not finish within $seconds seconds"
+    }
+    $process.WaitForExit()
+    return $process
+}
+
 function Invoke-Installer($arguments) {
-    $process = Start-Process "$env:SystemRoot/System32/msiexec.exe" -ArgumentList $arguments -Wait -PassThru
+    $process = Invoke-Bounded "$env:SystemRoot/System32/msiexec.exe" $arguments 300
     if ($process.ExitCode -ne 0) { throw "Windows Installer exited with $($process.ExitCode)" }
 }
 
@@ -23,9 +33,9 @@ try {
     Invoke-Installer "/i `"$msi`" /qn /norestart /l*v `"$output/install.log`""
     $exe = Join-Path $installed 'rustremote-windows-probe.exe'
     $rdp = Join-Path $installed 'wfreerdp.exe'
-    $rdpProcess = Start-Process $rdp -ArgumentList '/version' -Wait -PassThru
+    $rdpProcess = Invoke-Bounded $rdp '/version'
     if ($rdpProcess.ExitCode -ne 0) { throw "Installed FreeRDP exited with $($rdpProcess.ExitCode)" }
-    $process = Start-Process $exe -ArgumentList '--smoke-ui' -Wait -PassThru
+    $process = Invoke-Bounded $exe '--smoke-ui'
     if ($process.ExitCode -ne 0) { throw "Installed application exited with $($process.ExitCode)" }
 } finally {
     if (Test-Path $installed) {
