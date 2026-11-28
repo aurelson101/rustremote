@@ -201,6 +201,7 @@ impl SessionProfile {
     /// `sleep` keeps the tunnel only until the viewer connects; OpenSSH then
     /// stays up exactly as long as that forwarded connection. With `-f` and
     /// ExitOnForwardFailure, the parent exits 0 only once the port is bound.
+    #[cfg(any(target_os = "macos", test))]
     pub fn screen_sharing(&self, local_port: u16) -> Result<(Vec<String>, String), String> {
         self.validate()?;
         if self.simulation {
