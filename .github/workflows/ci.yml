@@ -35,6 +35,8 @@ jobs:
         env:
           G_DEBUG: fatal-warnings
           GDK_BACKEND: x11
+          GSK_RENDERER: cairo
+          GTK_A11Y: none
         run: >-
           xvfb-run -a cargo test --locked --bin rustremote --
           --ignored disabling_input_delivers_focus_out_and_preserves_other_input
