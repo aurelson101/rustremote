@@ -156,6 +156,11 @@ ZIP `RustRemote-0.9.3-preview-macos-arm64.zip` (ditto) : app, LICENSE, NOTICE,
 ZIP extrait : signature valide et démarrage sans `/opt/homebrew`. Tag
 `macos-v0.9.3-preview`, pré-version GitHub. Non notarié : Gatekeeper demande
 « Ouvrir quand même » (documenté).
+Release retéléchargée depuis GitHub : SHA-256 OK. CI 9c9723a verte.
+`~/Applications/RustRemote.app` remplacé par la 0.9.3 issue du ZIP publié
+(demande utilisateur). Signature vérifiée, LaunchServices réenregistré, fenêtre
+ouverte (capture), dialogue de profils non touché. Ancienne 0.9.2 conservée
+temporairement dans le scratchpad de session, pas dans le dépôt.
 
 | Date | Agent | Tâches | Fichiers | Vérification |
 |---|---|---|---|---|
