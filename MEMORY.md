@@ -140,6 +140,10 @@ occupé refusé (255), bannière RFB via tunnel, tunnel vivant au-delà de
 main qu’une fois le port lié (5/5), sans sondage ni course. Partage d’écran
 contre un vrai Mac distant non testé.
 Contrôles : fmt, Clippy, 57+1 tests, rejeu `--macos-gui-lab` success true.
+CI d4cab2c : échec Linux (Clippy, `screen_sharing` mort hors macOS), corrigé par
+`cfg(any(target_os = "macos", test))`. CI e809ce5 verte (Linux, macOS, sonde
+Windows). `cargo audit` : 5 alertes de maintenance, aucune vulnérabilité.
+Paquet autonome non publié : aucune nouvelle release, `~/Applications` non remplacé.
 
 | Date | Agent | Tâches | Fichiers | Vérification |
 |---|---|---|---|---|
