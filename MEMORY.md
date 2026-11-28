@@ -77,6 +77,20 @@ Référence de publication macOS Apple Silicon : `macos-v0.9.2-preview`.
 Le README indique les dépendances Homebrew, la signature ad hoc et le périmètre
 validé. Le ZIP contient le paquet, la licence et les notices, avec SHA-256 séparé.
 
+Session Claude Code du 2026-11-28 (vérification multiplateforme). Sur macOS :
+fmt, Clippy `-D warnings` et `cargo test --locked` réussis (54+1 tests, 2 ignorés).
+Constat : le crate principal n’a aucun `cfg(windows)` et dépend de VTE sans
+condition, donc il ne compile pas sous Windows ; seule `experiments/windows-probe`
+le fait. Aucune CI Linux/macOS n’existait : les blocs `cfg(target_os = "linux")`
+n’étaient jamais lintés depuis macOS. Ajout de `.github/workflows/ci.yml`
+(push/PR) : Linux Ubuntu 24.04 avec fmt/Clippy/tests et test GTK de focus sous
+Xvfb avec `G_DEBUG=fatal-warnings`, macOS 15 avec Homebrew, puis tests et
+auto-test ConPTY de la sonde Windows. Actions épinglées par les mêmes SHA que
+`windows-probe.yml`. YAML validé localement et filtre du test GTK vérifié.
+**Workflow pas encore exécuté sur GitHub** (push non autorisé à ce stade) ;
+aucun résultat Linux/Windows nouveau. Pas de cible croisée locale (Rust Homebrew
+sans rustup).
+
 | Date | Agent | Tâches | Fichiers | Vérification |
 |---|---|---|---|---|
 | 2026-11-07 | Préparation | Création du pack documentaire | README, instructions agents, docs, prompts, assets | Présence des fichiers et archive ZIP validées ; Rust non compilé |
