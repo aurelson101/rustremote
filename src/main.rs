@@ -6,6 +6,8 @@ mod discovery;
 mod external;
 mod i18n;
 mod icons;
+#[cfg(target_os = "macos")]
+mod macos_bundle;
 mod preferences;
 mod profiles;
 mod session_tree;
@@ -27,6 +29,8 @@ mod macos_gui_lab;
 use gtk::prelude::*;
 
 fn main() -> gtk::glib::ExitCode {
+    #[cfg(target_os = "macos")]
+    macos_bundle::configure();
     #[cfg(all(target_os = "macos", feature = "macos-gui-lab"))]
     match std::env::args().nth(1).as_deref() {
         Some("--macos-gui-lab") => return macos_gui_lab::run(),

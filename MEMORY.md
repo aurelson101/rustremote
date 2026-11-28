@@ -107,6 +107,40 @@ présence des trois déclencheurs sur le VTE réel. Rejeu
 Fmt, Clippy (avec et sans `macos-gui-lab`) et 55 tests réussis. L’appui physique
 sur Cmd+C/V n’a pas été injecté (contrôle structurel seulement).
 
+Paquet macOS autonome (même session). `build-macos-app.py` embarque par défaut
+59 dylibs non système dans `Contents/Frameworks`, réécrites en
+`@executable_path`, signées ad hoc. Il ajoute les chargeurs gdk-pixbuf, le
+modèle `loaders.cache.in`, `gschemas.compiled` et le thème hicolor.
+`--homebrew-runtime` garde l’ancien mode. Défauts trouvés et corrigés :
+copie nommée d’après le nom réel au lieu de la référence (libxcb absente),
+garde contre une même bibliothèque copiée sous deux noms.
+`LSMinimumSystemVersion` est calculé (27.2) : les bouteilles Homebrew visent macOS
+27, donc le paquet ne cible pas les macOS antérieurs. `src/macos_bundle.rs` ne
+s’active que dans un tel paquet et pointe XDG_DATA_DIRS, GSETTINGS_SCHEMA_DIR,
+GIO_MODULE_DIR et GTK_PATH vers le paquet. Le cache des chargeurs va dans
+`~/Library/Caches/com.rustremote.Preview`.
+Preuve : sous `sandbox-exec` refusant toute lecture de `/opt/homebrew`, `--version`
+réussit et l’interface démo tourne, avec 0 mapping `/opt/homebrew` (vmmap). Le
+binaire cargo témoin échoue (dyld), ce qui valide le test. 88 Mio. Captures OK.
+Défaut macOS préexistant : sans thème Adwaita (absent même avec Homebrew),
+Port Forward, Tunnels et les icônes `utilities-terminal` s’affichaient en
+icône manquante. Ajout de `forward.svg`/`tunnel.svg` et de `icons::themed()`,
+qui associe les noms du thème aux SVG embarqués, avec test de présence dans le
+gresource. Corrigé aussi : avertissement GTK ≥ 4.20 sur prefer-dark-theme, avec
+`gtk-interface-color-scheme` cherché à l’exécution et repli sur GTK 4.8.
+Apple/VNC sur client macOS : le chemin générique cherchait xtigervncviewer et
+xterm, donc échec systématique. Désormais `ssh -f` avec BatchMode,
+StrictHostKeyChecking=yes, ExitOnForwardFailure et `-L 127.0.0.1:port`, puis
+`open vnc://compte@127.0.0.1:port` (Partage d’écran). Tunnel SSH vers le même
+Mac toujours obligatoire, mot de passe macOS demandé par Partage d’écran.
+Labo local sshd 127.0.0.1:22622 (clés jetables, `~/.ssh` intact) et faux RFB,
+avec les arguments réels du code : hôte inconnu refusé sans invite (255), port
+occupé refusé (255), bannière RFB via tunnel, tunnel vivant au-delà de
+`sleep 20` tant que le client reste connecté, puis sortie 0. `ssh -f` ne rend la
+main qu’une fois le port lié (5/5), sans sondage ni course. Partage d’écran
+contre un vrai Mac distant non testé.
+Contrôles : fmt, Clippy, 57+1 tests, rejeu `--macos-gui-lab` success true.
+
 | Date | Agent | Tâches | Fichiers | Vérification |
 |---|---|---|---|---|
 | 2026-11-07 | Préparation | Création du pack documentaire | README, instructions agents, docs, prompts, assets | Présence des fichiers et archive ZIP validées ; Rust non compilé |

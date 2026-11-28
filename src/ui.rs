@@ -146,7 +146,7 @@ fn terminal() -> gtk::ScrolledWindow {
 fn open_demo(tabs: &gtk::Notebook, status: &Label, title: &str) {
     let page = terminal();
     let tab_header = Box::new(Orientation::Horizontal, 8);
-    tab_header.append(&gtk::Image::from_icon_name("utilities-terminal"));
+    tab_header.append(&crate::icons::themed("utilities-terminal"));
     tab_header.append(&Label::new(Some(title)));
     let close = gtk::Button::from_icon_name("window-close-symbolic");
     close.set_tooltip_text(Some("Fermer l’onglet"));
@@ -167,6 +167,20 @@ fn open_demo(tabs: &gtk::Notebook, status: &Label, title: &str) {
     status.set_text("Hors ligne · aperçu de démonstration");
 }
 
+/// GTK ≥ 4.20 deprecates (and warns about) prefer-dark-theme in favour of
+/// gtk-interface-color-scheme; older runtimes such as the Debian 12 AppImage
+/// baseline (GTK 4.8) only have the former.
+fn prefer_dark(settings: &gtk::Settings) {
+    let scheme = settings
+        .find_property("gtk-interface-color-scheme")
+        .and_then(|spec| gtk::glib::EnumClass::with_type(spec.value_type()))
+        .and_then(|class| class.to_value_by_nick("dark"));
+    match scheme {
+        Some(value) => settings.set_property_from_value("gtk-interface-color-scheme", &value),
+        None => settings.set_gtk_application_prefer_dark_theme(true),
+    }
+}
+
 pub fn build(app: &Application, offline: bool, demo: bool, enforced_offline: bool) {
     if let Some(window) = app.active_window() {
         crate::i18n::present(&window);
@@ -175,7 +189,7 @@ pub fn build(app: &Application, offline: bool, demo: bool, enforced_offline: boo
     gtk::gio::resources_register_include!("rustremote.gresource")
         .expect("Ressources graphiques intégrées");
     if let Some(settings) = gtk::Settings::default() {
-        settings.set_gtk_application_prefer_dark_theme(true);
+        prefer_dark(&settings);
     }
     let css = gtk::CssProvider::new();
     css.load_from_data(include_str!("style.css"));
@@ -461,7 +475,8 @@ https://github.com/aurelson101/rustremote/blob/main/PRIVACY.md", env!("CARGO_PKG
             "VNC" => crate::icons::image("vnc"),
             "Apple" => crate::icons::image("macos"),
             "Série" => crate::icons::image("switch"),
-            _ => gtk::Image::from_icon_name(icon),
+            "Tunnels" => crate::icons::image("tunnel"),
+            _ => crate::icons::themed(icon),
         };
         image.set_pixel_size(24);
         image.add_css_class(class);
@@ -552,7 +567,7 @@ https://github.com/aurelson101/rustremote/blob/main/PRIVACY.md", env!("CARGO_PKG
             } else if name.contains("Linux") {
                 crate::icons::image("linux")
             } else {
-                gtk::Image::from_icon_name(icon)
+                crate::icons::themed(icon)
             });
             contents.append(&label(name, "session-label"));
             row.set_child(Some(&contents));

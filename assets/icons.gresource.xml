@@ -3,5 +3,6 @@
 <file alias="linux.svg">icons/linux.svg</file><file alias="ssh.svg">icons/ssh.svg</file><file alias="file.svg">icons/file.svg</file>
 <file alias="switch.svg">icons/switch.svg</file><file alias="vnc.svg">icons/vnc.svg</file>
 <file alias="macos.svg">icons/macos.svg</file>
+<file alias="forward.svg">icons/forward.svg</file><file alias="tunnel.svg">icons/tunnel.svg</file>
 <file alias="rustremote.png">icons/rustremote.png</file>
 </gresource></gresources>

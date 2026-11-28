@@ -194,6 +194,63 @@ impl SessionProfile {
             _ => None,
         })
     }
+    /// macOS client: OpenSSH arguments forwarding `127.0.0.1:local_port` to the
+    /// VNC/Screen Sharing service, and the `vnc://` URL for the system Screen
+    /// Sharing app. A same-Mac SSH tunnel is mandatory (validated), the host key
+    /// must already be trusted and no prompt can appear (BatchMode). The remote
+    /// `sleep` keeps the tunnel only until the viewer connects; OpenSSH then
+    /// stays up exactly as long as that forwarded connection. With `-f` and
+    /// ExitOnForwardFailure, the parent exits 0 only once the port is bound.
+    pub fn screen_sharing(&self, local_port: u16) -> Result<(Vec<String>, String), String> {
+        self.validate()?;
+        if self.simulation {
+            return Err("Profil de simulation : toute connexion réseau est interdite.".into());
+        }
+        let ProtocolOptions::Vnc {
+            tunnel: Some(tunnel),
+            ..
+        } = &self.options
+        else {
+            return Err(
+                "Partage d’écran : tunnel SSH obligatoire (VNC direct non chiffré refusé).".into(),
+            );
+        };
+        let target = if self.platform == Platform::MacOs {
+            "127.0.0.1".to_string()
+        } else if self.host.contains(':') {
+            format!("[{}]", self.host)
+        } else {
+            self.host.clone()
+        };
+        let args = vec![
+            "-f".into(),
+            "-T".into(),
+            "-oBatchMode=yes".into(),
+            "-oStrictHostKeyChecking=yes".into(),
+            "-oForwardAgent=no".into(),
+            "-oForwardX11=no".into(),
+            "-oPermitLocalCommand=no".into(),
+            "-oExitOnForwardFailure=yes".into(),
+            "-oConnectTimeout=15".into(),
+            "-p".into(),
+            tunnel.port.to_string(),
+            "-L".into(),
+            format!("127.0.0.1:{local_port}:{target}:{}", self.port),
+            "-l".into(),
+            tunnel.username.clone(),
+            "--".into(),
+            tunnel.host.clone(),
+            "sleep".into(),
+            "20".into(),
+        ];
+        let user = self.username.replace('@', "%40").replace('\\', "%5C");
+        let url = if user.is_empty() {
+            format!("vnc://127.0.0.1:{local_port}")
+        } else {
+            format!("vnc://{user}@127.0.0.1:{local_port}")
+        };
+        Ok((args, url))
+    }
     pub fn kind(&self) -> SessionKind {
         match self.options {
             ProtocolOptions::Ssh { .. } => SessionKind::Ssh,
@@ -695,6 +752,44 @@ pub(crate) mod tests {
         assert!(p.validate().is_err());
         p.simulation = true;
         assert!(p.command().is_err());
+    }
+    #[test]
+    fn screen_sharing_requires_strict_tunnel_and_targets_loopback() {
+        let mut p = example();
+        p.platform = Platform::MacOs;
+        p.port = 5900;
+        p.username = "marie@corp".into();
+        p.options = ProtocolOptions::Vnc {
+            tunnel: None,
+            view_only: false,
+        };
+        assert!(p.screen_sharing(55000).is_err());
+        p.options = ProtocolOptions::Vnc {
+            tunnel: Some(SshTunnel {
+                host: p.host.clone(),
+                port: 2222,
+                username: "macadmin".into(),
+            }),
+            view_only: false,
+        };
+        let (args, url) = p.screen_sharing(55000).unwrap();
+        assert_eq!(url, "vnc://marie%40corp@127.0.0.1:55000");
+        for required in [
+            "-f",
+            "-oBatchMode=yes",
+            "-oStrictHostKeyChecking=yes",
+            "-oExitOnForwardFailure=yes",
+            "-oForwardAgent=no",
+            "127.0.0.1:55000:127.0.0.1:5900",
+        ] {
+            assert!(args.iter().any(|a| a == required), "{required} missing");
+        }
+        let separator = args.iter().position(|a| a == "--").unwrap();
+        assert_eq!(args[separator + 1], p.host);
+        assert_eq!(&args[separator + 2..], ["sleep", "20"]);
+        assert!(!args.iter().any(|a| a.contains("StrictHostKeyChecking=no")));
+        p.simulation = true;
+        assert!(p.screen_sharing(55000).is_err());
     }
     #[test]
     fn serialization_and_options() {

@@ -236,6 +236,44 @@ impl Drop for Inner {
     }
 }
 
+/// macOS: SSH tunnel (strict host key, agent/key only), then the system
+/// Screen Sharing app on the forwarded loopback port. Blocking: run on a worker.
+/// The macOS account password is asked by Screen Sharing, never by RustRemote.
+#[cfg(target_os = "macos")]
+pub fn screen_sharing(profile: &SessionProfile) -> Result<(), String> {
+    let port = std::net::TcpListener::bind(("127.0.0.1", 0))
+        .and_then(|listener| listener.local_addr())
+        .map(|address| address.port())
+        .map_err(|_| "Port local indisponible")?;
+    let (args, url) = profile.screen_sharing(port)?;
+    // `ssh -f` returns only once the forward is bound (or failed): no polling.
+    // The backgrounded tunnel ends by itself with the viewer connection, or
+    // after the remote `sleep` if nothing connects.
+    let status = crate::ssh_route::command()
+        .args(&args)
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .status()
+        .map_err(|_| "OpenSSH (/usr/bin/ssh) introuvable")?;
+    if !status.success() {
+        return Err(format!(
+            "Tunnel SSH refusé (code {}). Requis : clé SSH via l’agent et empreinte \
+             d’hôte déjà approuvée — ouvrez d’abord une session SSH vers ce Mac.",
+            status.code().unwrap_or(-1)
+        ));
+    }
+    let opened = Command::new("/usr/bin/open")
+        .arg(&url)
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status();
+    if !opened.is_ok_and(|status| status.success()) {
+        return Err("Partage d’écran macOS impossible à ouvrir.".into());
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -113,7 +113,11 @@ Blank Apple SSH gateway fields use the Mac host and account entered in that edit
 2. Click **Apple**, enter the Mac host, account name and port **5900**. Keep the SSH
    tunnel enabled and enter the **same Mac host**, its SSH port and SSH user in the
    gateway fields below. SSH uses your agent/configuration and checks the host key.
-3. Install **TigerVNC 1.14+ with DH support** on Linux. Enter your macOS account and
+3. **From a Mac**, RustRemote opens macOS **Screen Sharing** on a loopback port
+   forwarded by the SSH tunnel. The tunnel never prompts: use a key or the SSH
+   agent, and approve the Mac's host key first (for example by opening an SSH
+   session to it once). Screen Sharing asks for the macOS account itself.
+   **From Linux**, install **TigerVNC 1.14+ with DH support**. Enter your macOS account and
    password in its authentication window. RustRemote does not pass them in command
    arguments or export them. Direct Apple ARD is refused because type 30 alone
    does not authenticate the server or encrypt the entire desktop.
@@ -133,19 +137,20 @@ in separate local labs; a complete real-Mac end-to-end test remains pending.
 The preview provides SSH/SFTP and RDP via FreeRDP SDL. It was tested on macOS
 27.2.1 with Apple Silicon. VNC and serial are available in simulation.
 
-1. Install the runtime dependencies with Homebrew. FreeRDP is required for RDP.
-
-   ```bash
-   brew install vte3 openssl@4 freerdp
-   ```
+1. Bundles built from the current source embed GTK, VTE and their libraries;
+   Homebrew is then needed only for RDP (`brew install freerdp`). They require
+   the macOS version they were built on or later (`LSMinimumSystemVersion`,
+   currently 27.2). The published 0.9.2 preview ZIP predates this and still
+   needs `brew install vte3 openssl@4 freerdp`.
 
 2. Download `RustRemote-0.9.2-preview-macos-arm64.zip` and its SHA-256 file from
    the [macOS preview release](https://github.com/aurelson101/rustremote/releases/tag/macos-v0.9.2-preview).
    Run `shasum -a 256 -c RustRemote-0.9.2-preview-macos-arm64.zip.sha256` beside the ZIP,
    then extract it and open `RustRemote.app`.
-3. The app is ad hoc signed. For a local build from the tagged source, install
-   Rust and pkg-config with `brew install rust pkgconf`, then run
+3. The app is ad hoc signed. For a local build, install the build dependencies
+   with `brew install rust pkgconf gtk4 vte3 openssl@4`, then run
    `python3 scripts/build-macos-app.py` and open `dist/RustRemote.app`.
+   `--homebrew-runtime` builds the older bundle that links to Homebrew instead.
 
 Application shortcuts use **Cmd** on macOS (Cmd+B sessions, Cmd+=/−/0 zoom,
 Cmd+W close tab, Cmd+F find), so Ctrl keys reach the remote shell, for example

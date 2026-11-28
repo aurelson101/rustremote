@@ -1597,6 +1597,19 @@ impl Controller {
                     });
                     return;
                 }
+                #[cfg(target_os = "macos")]
+                if matches!(profile.options,ProtocolOptions::Vnc{..}){
+                    drop(secret); // Screen Sharing asks for the macOS account itself.
+                    b.set_sensitive(false);let b=b.clone();let w=w.clone();let e=e.clone();let c=c.clone();let name=profile.name.clone();
+                    io(move||crate::external::screen_sharing(&profile),move|result|{
+                        b.set_sensitive(true);
+                        match result {
+                            Ok(())=>{c.0.status.set_text(&format!("{name} · Partage d’écran ouvert via tunnel SSH vérifié"));w.close();}
+                            Err(message)=>e.set_text(&message),
+                        }
+                    });
+                    return;
+                }
                 let controller=c;
             let (binary,args)=match profile.command() {Ok(v)=>v,Err(e)=>{controller.information("Connexion refusée",&e);return;}};
             if !std::path::Path::new(binary).is_file() { controller.information("Client manquant","Installez openssh-client (SSH), freerdp3-x11 (RDP), tigervnc-viewer (VNC) ou picocom (série). Aucun téléchargement automatique.");return; }

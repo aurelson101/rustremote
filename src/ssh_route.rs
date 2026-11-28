@@ -56,7 +56,7 @@ impl Drop for Proxy {
         let _ = self.0.wait();
     }
 }
-fn command() -> Command {
+pub(crate) fn command() -> Command {
     let mut command = Command::new("/usr/bin/ssh");
     for name in [
         "LD_LIBRARY_PATH",

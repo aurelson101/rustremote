@@ -10,7 +10,11 @@ temporaire. RDP réel validé en boucle locale via FreeRDP SDL de Homebrew, avec
 NLA, contrôle du certificat et déconnexion. Windows réel et redirections RDP
 restent à qualifier. Verrou corrigé pour RUSTSEC-2026-0544.
 Les fichiers SSH locaux des profils importés doivent être choisis dans l’éditeur.
-VNC et série disponibles en simulation. Le paquet dépend de Homebrew.
+VNC et série disponibles en simulation. Depuis le 2026-11-28 (non publié),
+le paquet construit embarque GTK/VTE ; démarrage vérifié sans `/opt/homebrew`.
+Il exige macOS ≥ 27.2. Seul FreeRDP vient encore de Homebrew. Apple/VNC ouvre
+Partage d’écran via tunnel SSH strict (labo local validé, vrai Mac non testé).
+Le ZIP 0.9.2 publié dépend encore de Homebrew.
 Logo intégré à la barre de titre et au paquet macOS. Reconstruction locale avec
 `python3 scripts/build-macos-app.py`.
 Distribution GitHub via le tag [macos-v0.9.2-preview](https://github.com/aurelson101/rustremote/releases/tag/macos-v0.9.2-preview).
