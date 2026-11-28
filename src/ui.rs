@@ -81,14 +81,20 @@ fn display_actions(
     let c = controller.clone();
     tabs.connect_notify_local(Some("page"), move |_, _| c.sync_view_actions());
     controller.sync_view_actions();
+    // <Primary> = Ctrl on Linux/Windows and Cmd on macOS, leaving Ctrl to the
+    // remote terminal there (tmux prefix, readline zoom keys).
+    #[cfg(target_os = "macos")]
+    let close_tab = &["<Primary>w", "<Primary><Shift>w"][..];
+    #[cfg(not(target_os = "macos"))]
+    let close_tab = &["<Primary><Shift>w"][..];
     for (name, keys) in [
         ("app.fullscreen", &["F11"][..]),
-        ("app.view-sessions", &["<Control>b"][..]),
-        ("app.view-sftp", &["<Control><Shift>b"][..]),
-        ("app.zoom-in", &["<Control>plus", "<Control>equal"][..]),
-        ("app.zoom-out", &["<Control>minus"][..]),
-        ("app.zoom-reset", &["<Control>0"][..]),
-        ("app.close-tab", &["<Control><Shift>w"][..]),
+        ("app.view-sessions", &["<Primary>b"][..]),
+        ("app.view-sftp", &["<Primary><Shift>b"][..]),
+        ("app.zoom-in", &["<Primary>plus", "<Primary>equal"][..]),
+        ("app.zoom-out", &["<Primary>minus"][..]),
+        ("app.zoom-reset", &["<Primary>0"][..]),
+        ("app.close-tab", close_tab),
     ] {
         app.set_accels_for_action(name, keys);
     }

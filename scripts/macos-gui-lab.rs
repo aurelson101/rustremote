@@ -106,6 +106,31 @@ fn saw_reply(terminal: Option<&vte::Terminal>) -> bool {
     String::from_utf8_lossy(stream.steal_as_bytes().as_ref()).contains("RÉPONSE_DISTANTE — été")
 }
 
+fn check_clipboard_shortcuts(terminal: &vte::Terminal) {
+    let controllers = terminal.observe_controllers();
+    let mut triggers = Vec::new();
+    for item in (0..controllers.n_items()).filter_map(|i| controllers.item(i)) {
+        if let Ok(shortcuts) = item.downcast::<gtk::ShortcutController>() {
+            for shortcut in (0..shortcuts.n_items()).filter_map(|i| shortcuts.item(i)) {
+                if let Some(trigger) = shortcut
+                    .downcast::<gtk::Shortcut>()
+                    .ok()
+                    .and_then(|s| s.trigger())
+                {
+                    triggers.push(trigger.to_str().to_string());
+                }
+            }
+        }
+    }
+    for expected in ["<Meta>c", "<Meta>v", "<Meta>a"] {
+        assert!(
+            triggers.iter().any(|t| t == expected),
+            "missing {expected} in {triggers:?}"
+        );
+    }
+    println!("Cmd+C/V/A terminal shortcuts attached");
+}
+
 fn check_keychain(reference: &str, secret: &str) {
     use crate::credentials::{read, remove, write};
     assert!(read(reference).expect("keychain preflight").is_none());
@@ -184,6 +209,7 @@ pub fn run() -> gtk::glib::ExitCode {
             });
             match step {
                 0 if first.can_dispatch() => {
+                    check_clipboard_shortcuts(&terminals[0]);
                     first.send_command("echo RUSTREMOTE_UTF8").unwrap();
                     step = 1;
                 }

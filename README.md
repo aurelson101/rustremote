@@ -147,6 +147,11 @@ The preview provides SSH/SFTP and RDP via FreeRDP SDL. It was tested on macOS
    Rust and pkg-config with `brew install rust pkgconf`, then run
    `python3 scripts/build-macos-app.py` and open `dist/RustRemote.app`.
 
+Application shortcuts use **Cmd** on macOS (Cmd+B sessions, Cmd+=/−/0 zoom,
+Cmd+W close tab, Cmd+F find), so Ctrl keys reach the remote shell, for example
+the tmux prefix. In the terminal, Cmd+C, Cmd+V and Cmd+A copy, paste with the
+usual confirmation, and select all.
+
 Validation covers graphical SSH and SFTP in loopback, a temporary Apple Keychain
 entry, and an RDP session against IronRDP with NLA and a SHA-256 certificate
 fingerprint. RDP against Windows and redirection of devices remain to be tested.

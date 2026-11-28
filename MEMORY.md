@@ -90,6 +90,22 @@ auto-test ConPTY de la sonde Windows. Actions épinglées par les mêmes SHA que
 **Workflow pas encore exécuté sur GitHub** (push non autorisé à ce stade) ;
 aucun résultat Linux/Windows nouveau. Pas de cible croisée locale (Rust Homebrew
 sans rustup).
+Résultat CI GitHub : run 46124625437, macOS, Windows et Linux réussis, sauf le
+test GTK de focus, interrompu par SIGTRAP (`G_DEBUG=fatal-warnings`) faute de bus
+a11y sur le runner. Correctif CI `GTK_A11Y=none` + `GSK_RENDERER=cairo` : run
+46125037027 entièrement vert, test de focus compris (1 réussi).
+
+Ergonomie macOS (même session) : les raccourcis applicatifs passent de
+`<Control>` à `<Primary>`. Sous Linux, c’est identique (Ctrl) ; sous macOS, c’est
+Cmd, donc Ctrl+B (préfixe tmux), Ctrl+-/0 ne sont plus volés au shell distant.
+Cmd+W ferme l’onglet sur macOS. Terminal : contrôleur macOS Cmd+C/V/A vers les
+actions vérifiées `terminal.copy/paste/select-all`, avec la touche toujours
+consommée pour ne pas fuir Meta+lettre vers le shell. Le labo GUI vérifie la
+présence des trois déclencheurs sur le VTE réel. Rejeu
+`test-ssh-sftp-local.py --gui target/debug/rustremote --macos-gui-lab`
+(paramiko dans un venv temporaire hors dépôt) : success true, services arrêtés.
+Fmt, Clippy (avec et sans `macos-gui-lab`) et 55 tests réussis. L’appui physique
+sur Cmd+C/V n’a pas été injecté (contrôle structurel seulement).
 
 | Date | Agent | Tâches | Fichiers | Vérification |
 |---|---|---|---|---|

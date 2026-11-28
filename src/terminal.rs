@@ -396,6 +396,8 @@ fn open_internal(
     }
     terminal.insert_action_group("terminal", Some(&actions));
     page.insert_action_group("terminal", Some(&actions));
+    #[cfg(target_os = "macos")]
+    terminal.add_controller(macos_clipboard_shortcuts());
     let context_click = gtk::GestureClick::new();
     context_click.set_button(3);
     context_click.set_propagation_phase(gtk::PropagationPhase::Capture);
@@ -694,6 +696,30 @@ fn configure(terminal: &vte::Terminal, preferences: &crate::preferences::Prefere
         &[],
     );
 }
+/// Cmd+C/V/A on macOS, routed through the checked `terminal.*` actions.
+/// Shortcuts are always claimed so a disabled action never leaks the key to
+/// VTE, which would otherwise send it to the remote shell as Meta+letter.
+#[cfg(target_os = "macos")]
+fn macos_clipboard_shortcuts() -> gtk::ShortcutController {
+    let controller = gtk::ShortcutController::new();
+    controller.set_propagation_phase(gtk::PropagationPhase::Capture);
+    for (trigger, action) in [
+        ("<Meta>c", "terminal.copy"),
+        ("<Meta>v", "terminal.paste"),
+        ("<Meta>a", "terminal.select-all"),
+    ] {
+        let callback = gtk::CallbackAction::new(move |widget, _| {
+            let _ = widget.activate_action(action, None);
+            gtk::glib::Propagation::Stop
+        });
+        controller.add_shortcut(gtk::Shortcut::new(
+            gtk::ShortcutTrigger::parse_string(trigger),
+            Some(callback),
+        ));
+    }
+    controller
+}
+
 fn copy_selected(terminal: &vte::Terminal, status: &gtk::Label) {
     if let Some(text) = terminal.text_selected(vte::Format::Text) {
         if text.len() > 65536 {
