@@ -9,7 +9,7 @@ serial connections.
 **Preview software. English is the default; French is available in Settings
 (restart required).** Developed independently, without proprietary MobaXterm code.
 
-[macOS Apple Silicon preview](https://github.com/aurelson101/rustremote/releases/tag/macos-v0.9.2-preview) ·
+[macOS Apple Silicon preview](https://github.com/aurelson101/rustremote/releases/tag/macos-v0.9.3-preview) ·
 [Linux AppImage v0.9.2](https://github.com/aurelson101/rustremote/releases/tag/v0.9.2) ·
 [Windows MSI preview](https://github.com/aurelson101/rustremote/releases/tag/windows-v0.1.1-preview) ·
 [Validation](docs/VALIDATION-0.9.2.md) · [Roadmap](docs/ROADMAP.md) ·
@@ -134,19 +134,19 @@ in separate local labs; a complete real-Mac end-to-end test remains pending.
 
 ## macOS Apple Silicon preview
 
-The preview provides SSH/SFTP and RDP via FreeRDP SDL. It was tested on macOS
-27.2.1 with Apple Silicon. VNC and serial are available in simulation.
+The 0.9.3 preview provides SSH/SFTP, RDP via FreeRDP SDL and Apple Screen Sharing
+over an SSH tunnel. It was tested on macOS 27.2.1 with Apple Silicon. Serial is
+available in simulation.
 
-1. Bundles built from the current source embed GTK, VTE and their libraries;
-   Homebrew is then needed only for RDP (`brew install freerdp`). They require
-   the macOS version they were built on or later (`LSMinimumSystemVersion`,
-   currently 27.2). The published 0.9.2 preview ZIP predates this and still
-   needs `brew install vte3 openssl@4 freerdp`.
-
-2. Download `RustRemote-0.9.2-preview-macos-arm64.zip` and its SHA-256 file from
-   the [macOS preview release](https://github.com/aurelson101/rustremote/releases/tag/macos-v0.9.2-preview).
-   Run `shasum -a 256 -c RustRemote-0.9.2-preview-macos-arm64.zip.sha256` beside the ZIP,
-   then extract it and open `RustRemote.app`.
+1. The app embeds GTK, VTE and their libraries. Homebrew is only needed for RDP
+   (`brew install freerdp`). It requires macOS 27.2 or later
+   (`LSMinimumSystemVersion`), the version its libraries were built for.
+2. Download `RustRemote-0.9.3-preview-macos-arm64.zip` and its SHA-256 file from
+   the [macOS preview release](https://github.com/aurelson101/rustremote/releases/tag/macos-v0.9.3-preview).
+   Run `shasum -a 256 -c RustRemote-0.9.3-preview-macos-arm64.zip.sha256` beside the ZIP,
+   then extract it and open `RustRemote.app`. The app is not notarized: if macOS
+   blocks the first launch, choose **Open Anyway** in System Settings › Privacy &
+   Security. Third-party licences are in `RustRemote.app/Contents/Resources/licenses`.
 3. The app is ad hoc signed. For a local build, install the build dependencies
    with `brew install rust pkgconf gtk4 vte3 openssl@4`, then run
    `python3 scripts/build-macos-app.py` and open `dist/RustRemote.app`.

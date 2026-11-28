@@ -126,7 +126,43 @@ def bundle_runtime(contents, executables, resources):
                  if any(r.startswith(("/opt/", "@rpath/")) for r in macho_links(p)[1])]
     if leftovers:
         raise SystemExit(f"Unbundled references remain: {leftovers}")
+    collect_licenses(resources, copied)
     print(f"Bundled {len(copied)} libraries", file=sys.stderr)
+
+
+LICENSE_MARKERS = ("COPYING", "LICEN", "COPYRIGHT", "NOTICE", "GPL")
+
+
+def collect_licenses(resources, copied):
+    """Copy each bundled Homebrew formula's licence files and write an inventory."""
+    cellar = (HOMEBREW / "Cellar").resolve()
+    formulas = {}
+    for name, source in sorted(copied.items()):
+        relative = source.relative_to(cellar)  # <formula>/<version>/lib/...
+        formulas.setdefault((relative.parts[0], relative.parts[1]), []).append(name)
+    info = json.loads(subprocess.check_output(
+        ["brew", "info", "--json=v1", *sorted({f for f, _ in formulas})], text=True))
+    spdx = {entry["name"]: entry.get("license") or "unknown" for entry in info}
+    root = resources / "licenses"
+    lines = ["RustRemote.app — third-party libraries bundled from Homebrew bottles.",
+             "Each library is dynamically linked and replaceable in Contents/Frameworks.",
+             "Sources: the upstream projects and https://github.com/Homebrew/homebrew-core.", ""]
+    for (formula, version), libraries in sorted(formulas.items()):
+        prefix = cellar / formula / version
+        found = [p for p in sorted(prefix.iterdir())
+                 if p.is_file() and any(m in p.name.upper() for m in LICENSE_MARKERS)]
+        if found:
+            target = root / f"{formula}-{version}"
+            target.mkdir(parents=True)
+            for path in found:
+                shutil.copy2(path, target / path.name)
+        files = ", ".join(p.name for p in found) or "no licence file in bottle; see upstream"
+        lines.append(f"{formula} {version} [{spdx.get(formula, 'unknown')}]: "
+                     f"{', '.join(libraries)} — {files}")
+    root.mkdir(exist_ok=True)
+    (root / "THIRD-PARTY.txt").write_text("\n".join(lines) + "\n")
+    for name in ("LICENSE", "NOTICE"):
+        shutil.copy2(Path(__file__).resolve().parent.parent / name, root / f"RustRemote-{name}")
 if sys.platform != "darwin":
     parser.error("macOS is required to build the application bundle")
 

@@ -145,6 +145,18 @@ CI d4cab2c : échec Linux (Clippy, `screen_sharing` mort hors macOS), corrigé p
 Windows). `cargo audit` : 5 alertes de maintenance, aucune vulnérabilité.
 Paquet autonome non publié : aucune nouvelle release, `~/Applications` non remplacé.
 
+Publication 0.9.3 macOS, autorisée par l’utilisateur le 2026-11-28. Version
+passée à 0.9.3 (Cargo.toml/lock, paquet rustremote seul). Le script copie
+maintenant les fichiers de licence des 46 formules Homebrew embarquées et écrit
+`Contents/Resources/licenses/THIRD-PARTY.txt` (formule, version, SPDX, dylibs) ;
+glib n’était pas détecté au départ (`LGPL-2.1-or-later.txt`), filtre élargi, plus
+aucun manque. Le NOTICE décrit le paquet macOS.
+ZIP `RustRemote-0.9.3-preview-macos-arm64.zip` (ditto) : app, LICENSE, NOTICE,
+36 Mo. SHA-256 1aeffac09996fa9e13fad5fc828f4ff6a323aa3fa96062815a6ddfdee0d47add.
+ZIP extrait : signature valide et démarrage sans `/opt/homebrew`. Tag
+`macos-v0.9.3-preview`, pré-version GitHub. Non notarié : Gatekeeper demande
+« Ouvrir quand même » (documenté).
+
 | Date | Agent | Tâches | Fichiers | Vérification |
 |---|---|---|---|---|
 | 2026-11-07 | Préparation | Création du pack documentaire | README, instructions agents, docs, prompts, assets | Présence des fichiers et archive ZIP validées ; Rust non compilé |

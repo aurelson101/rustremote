@@ -24,6 +24,12 @@ RustRemote et le script de construction permettent de reconstruire et remplacer
 ces bibliothèques conformément à leurs licences. Les sources et droits des composants
 restent disponibles auprès des projets et distributions indiqués dans leurs notices.
 
+Le paquet macOS construit par scripts/build-macos-app.py embarque des bibliothèques
+issues des bouteilles Homebrew (GTK, GLib, VTE, cairo, pango, OpenSSL, etc.) dans
+Contents/Frameworks, liées dynamiquement et remplaçables. Leurs licences et un
+inventaire (Contents/Resources/licenses/THIRD-PARTY.txt) sont inclus dans le paquet ;
+les sources sont disponibles auprès des projets amont et de Homebrew.
+
 Les captures de docs/screenshots montrent uniquement des profils et des données de
 laboratoire locaux. Elles ne présentent aucun accès à une infrastructure utilisateur.
 assets/maquette-rustremote.png est une référence conceptuelle, pas une capture de
