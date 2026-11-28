@@ -1,12 +1,17 @@
 # RustRemote
 
-A native **Rust / GTK4** remote session manager for Linux: tabbed SSH terminals,
-a graphical SFTP browser, saved sessions, and RDP, VNC and serial connections.
+<img src="assets/icons/rustremote.png" width="96" alt="RustRemote app icon">
+
+A native **Rust / GTK4** remote session manager for Linux and macOS with tabbed SSH
+terminals, graphical SFTP, saved sessions, and RDP. Linux also supports VNC and
+serial connections.
 
 **Preview software. English is the default; French is available in Settings
 (restart required).** Developed independently, without proprietary MobaXterm code.
 
-[Download v0.9.2](https://github.com/aurelson101/rustremote/releases/tag/v0.9.2) ·
+[macOS Apple Silicon preview](https://github.com/aurelson101/rustremote/releases/tag/macos-v0.9.2-preview) ·
+[Linux AppImage v0.9.2](https://github.com/aurelson101/rustremote/releases/tag/v0.9.2) ·
+[Windows MSI preview](https://github.com/aurelson101/rustremote/releases/tag/windows-v0.1.1-preview) ·
 [Validation](docs/VALIDATION-0.9.2.md) · [Roadmap](docs/ROADMAP.md) ·
 [Security](docs/SECURITY.md) · [License](LICENSE)
 
@@ -51,8 +56,9 @@ and user-defined names retain their original language.
 - **Organization:** nested folders, drag sessions/folders to another folder or use
   **Move…** in the context menu. Folder moves retain their descendants. Import/export
   uses RustRemote JSON; optional age encryption protects profile metadata.
-- **Credentials:** passwords belong to their SSH/RDP profile and may be saved in the
-  system Secret Service vault. Passwords and private keys are never exported.
+- **Credentials:** passwords belong to their SSH/RDP profile and may be saved in
+  macOS Keychain or Linux Secret Service. Passwords and private keys are never exported.
+  Select local SSH key, `known_hosts`, and OpenSSH configuration files after importing a profile.
 - **RDP:** system FreeRDP 3 client, domain, protected password input, certificate/NLA
   checks, sizing and monitor options, opt-in clipboard/audio/device redirection.
 - **macOS / Apple:** Apple preset and machine icon; TigerVNC DH / Apple ARD
@@ -122,11 +128,35 @@ Linux simulator checks the handshake, account rejection and pixels; **no physica
 Mac or macOS VM has been qualified**. The Apple handshake and SSH tunnel are tested
 in separate local labs; a complete real-Mac end-to-end test remains pending.
 
-## Windows port — experimental terminal
+## macOS Apple Silicon preview
+
+The preview provides SSH/SFTP and RDP via FreeRDP SDL. It was tested on macOS
+27.2.1 with Apple Silicon. VNC and serial are available in simulation.
+
+1. Install the runtime dependencies with Homebrew. FreeRDP is required for RDP.
+
+   ```bash
+   brew install vte3 openssl@4 freerdp
+   ```
+
+2. Download `RustRemote-0.9.2-preview-macos-arm64.zip` and its SHA-256 file from
+   the [macOS preview release](https://github.com/aurelson101/rustremote/releases/tag/macos-v0.9.2-preview).
+   Run `shasum -a 256 -c RustRemote-0.9.2-preview-macos-arm64.zip.sha256` beside the ZIP,
+   then extract it and open `RustRemote.app`.
+3. The app is ad hoc signed. For a local build from the tagged source, install
+   Rust and pkg-config with `brew install rust pkgconf`, then run
+   `python3 scripts/build-macos-app.py` and open `dist/RustRemote.app`.
+
+Validation covers graphical SSH and SFTP in loopback, a temporary Apple Keychain
+entry, and an RDP session against IronRDP with NLA and a SHA-256 certificate
+fingerprint. RDP against Windows and redirection of devices remain to be tested.
+
+## Windows port — experimental preview
 
 Targets: **Windows 11 x64** and **Windows Server 2022 x64 with Desktop Experience**.
-The complete Linux application has not been ported yet; Server Core is outside the
-GUI target. There is no Windows MSI/MSIX or WinGet package to download at this stage.
+The [experimental Windows x64 MSI](https://github.com/aurelson101/rustremote/releases/tag/windows-v0.1.1-preview)
+is available. Full desktop feature parity, MSIX, and WinGet remain in progress.
+The GUI targets Windows Desktop Experience.
 
 The isolated [GTK4/ConPTY prototype](experiments/windows-probe/README.md) provides
 a live local terminal: ANSI/UTF-8 display, Unicode/IME input routing, terminal keys,
@@ -209,7 +239,9 @@ current build system instead of the portable baseline.
 
 For a temporary demo: `cargo run --locked -- --demo`. `--offline` blocks actual
 connections. Leaving demo mode opens personal profiles without importing examples.
-Profiles live in `$XDG_CONFIG_HOME/rustremote` or `~/.config/rustremote`.
+Profiles live in `$XDG_CONFIG_HOME/rustremote` when set to an absolute path.
+The default is `~/Library/Application Support/rustremote` on macOS and
+`~/.config/rustremote` on Linux.
 Keep the `rustremote-askpass` helper beside a manually installed executable.
 
 ## Current limits
@@ -241,7 +273,8 @@ for local storage, network operations, support requests and deletion information
 ## Code signing policy
 
 RustRemote is not currently enrolled in SignPath Foundation and does not claim
-SignPath-signed releases or sponsorship. No Windows artifact is released yet.
+SignPath-signed releases or sponsorship. The Windows preview MSI is unsigned,
+and the macOS preview uses ad hoc signing.
 The project maintainer is [@aurelson101](https://github.com/aurelson101), responsible
 for original-code changes and reviews and designated to approve any future signing
 requests. No signing pipeline is active. A future SignPath workflow must verify

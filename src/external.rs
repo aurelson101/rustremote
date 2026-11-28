@@ -1,13 +1,14 @@
-//! Client graphique RDP externe, secret transmis sur pipe, arrêt par pidfd.
+//! Client graphique RDP externe, secret transmis sur pipe.
 use crate::{credentials::Secret, profiles::SessionProfile};
+#[cfg(target_os = "linux")]
+use std::os::fd::{AsRawFd, FromRawFd, OwnedFd};
+use std::sync::{
+    Arc,
+    atomic::{AtomicBool, AtomicI32, Ordering},
+};
 use std::{
     io::Write,
-    os::fd::{AsRawFd, FromRawFd, OwnedFd},
     process::{Command, Stdio},
-    sync::{
-        Arc,
-        atomic::{AtomicBool, AtomicI32, Ordering},
-    },
 };
 fn verify_freerdp_three(binary: &str) -> Result<(), String> {
     use std::io::{Read, Seek, SeekFrom};
@@ -25,6 +26,9 @@ fn verify_freerdp_three(binary: &str) -> Result<(), String> {
     for key in [
         "LD_LIBRARY_PATH",
         "LD_PRELOAD",
+        "DYLD_INSERT_LIBRARIES",
+        "DYLD_LIBRARY_PATH",
+        "DYLD_FALLBACK_LIBRARY_PATH",
         "GIO_MODULE_DIR",
         "GTK_PATH",
         "GDK_PIXBUF_MODULE_FILE",
@@ -68,18 +72,29 @@ fn verify_freerdp_three(binary: &str) -> Result<(), String> {
 #[derive(Clone)]
 pub struct Client(Arc<Inner>);
 struct Inner {
+    #[cfg(target_os = "linux")]
     pidfd: OwnedFd,
+    #[cfg(target_os = "macos")]
+    child: Arc<std::sync::Mutex<std::process::Child>>,
     alive: Arc<AtomicBool>,
     exit: Arc<AtomicI32>,
 }
 impl Client {
     pub fn spawn(profile: &SessionProfile, password: Secret) -> Result<Self, String> {
         crate::credentials::validate_password(&password)?;
+        if !matches!(
+            profile.options,
+            crate::profiles::ProtocolOptions::Rdp { .. }
+        ) {
+            return Err("Le client externe attend un profil RDP".into());
+        }
         let (binary, args) = profile.command()?;
-        if binary == "/usr/bin/xfreerdp" {
+        if cfg!(target_os = "macos") || binary == "/usr/bin/xfreerdp" {
             verify_freerdp_three(binary)?;
         }
         let mut command = Command::new(binary);
+        #[cfg(target_os = "macos")]
+        command.args(["-sdl-connection-dialog", "+force-console-callbacks"]);
         command
             .args(args)
             .stdin(Stdio::piped())
@@ -88,6 +103,9 @@ impl Client {
         for key in [
             "LD_LIBRARY_PATH",
             "LD_PRELOAD",
+            "DYLD_INSERT_LIBRARIES",
+            "DYLD_LIBRARY_PATH",
+            "DYLD_FALLBACK_LIBRARY_PATH",
             "GDK_PIXBUF_MODULE_FILE",
             "GIO_MODULE_DIR",
             "GTK_PATH",
@@ -101,13 +119,16 @@ impl Client {
         let mut child = command
             .spawn()
             .map_err(|_| "Le client RDP n’a pas pu être lancé")?;
-        let fd = unsafe { libc::syscall(libc::SYS_pidfd_open, child.id(), 0) };
-        if fd < 0 {
-            let _ = child.kill();
-            let _ = child.wait();
-            return Err("Suivi sécurisé du client RDP indisponible".into());
-        }
-        let pidfd = unsafe { OwnedFd::from_raw_fd(fd as i32) };
+        #[cfg(target_os = "linux")]
+        let pidfd = {
+            let fd = unsafe { libc::syscall(libc::SYS_pidfd_open, child.id(), 0) };
+            if fd < 0 {
+                let _ = child.kill();
+                let _ = child.wait();
+                return Err("Suivi sécurisé du client RDP indisponible".into());
+            }
+            unsafe { OwnedFd::from_raw_fd(fd as i32) }
+        };
         let result = child
             .stdin
             .take()
@@ -125,12 +146,26 @@ impl Client {
         let state = alive.clone();
         let exit = Arc::new(AtomicI32::new(-1000));
         let result = exit.clone();
+        #[cfg(target_os = "macos")]
+        let monitored = Arc::new(std::sync::Mutex::new(child));
+        #[cfg(target_os = "macos")]
+        let child = monitored.clone();
         std::thread::spawn(move || {
+            #[cfg(target_os = "linux")]
             let code = child.wait().ok().and_then(|s| s.code()).unwrap_or(-1);
+            #[cfg(target_os = "macos")]
+            let code = wait_for_client(&child);
             result.store(code, Ordering::Release);
             state.store(false, Ordering::Release);
         });
-        Ok(Self(Arc::new(Inner { pidfd, alive, exit })))
+        Ok(Self(Arc::new(Inner {
+            #[cfg(target_os = "linux")]
+            pidfd,
+            #[cfg(target_os = "macos")]
+            child: monitored,
+            alive,
+            exit,
+        })))
     }
     pub fn active(&self) -> bool {
         self.0.alive.load(Ordering::Relaxed)
@@ -140,6 +175,9 @@ impl Client {
         (code != -1000).then_some(code)
     }
     pub fn disconnect(&self) {
+        #[cfg(target_os = "macos")]
+        stop_client(&self.0.child);
+        #[cfg(target_os = "linux")]
         if self.active() {
             unsafe {
                 libc::syscall(
@@ -153,8 +191,37 @@ impl Client {
         }
     }
 }
+
+#[cfg(target_os = "macos")]
+fn wait_for_client(child: &std::sync::Mutex<std::process::Child>) -> i32 {
+    loop {
+        let status = child
+            .lock()
+            .ok()
+            .and_then(|mut child| child.try_wait().ok());
+        match status {
+            Some(Some(status)) => return status.code().unwrap_or(-1),
+            Some(None) => std::thread::sleep(std::time::Duration::from_millis(50)),
+            None => return -1,
+        }
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn stop_client(child: &std::sync::Mutex<std::process::Child>) {
+    // Serializing kill with try_wait keeps the child's PID reserved until reaped.
+    if let Ok(mut child) = child.lock()
+        && matches!(child.try_wait(), Ok(None))
+    {
+        let _ = child.kill();
+    }
+}
+
 impl Drop for Inner {
     fn drop(&mut self) {
+        #[cfg(target_os = "macos")]
+        stop_client(&self.child);
+        #[cfg(target_os = "linux")]
         if self.alive.load(Ordering::Relaxed) {
             unsafe {
                 libc::syscall(

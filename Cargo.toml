@@ -11,6 +11,9 @@ default-run = "rustremote"
 members = ["."]
 resolver = "3"
 
+[features]
+macos-gui-lab = []
+
 [dependencies]
 age = "0.11"
 gtk = { package = "gtk4", version = "=0.10.3", features = ["v4_8"] }

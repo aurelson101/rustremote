@@ -18,7 +18,14 @@ impl Store {
         let base = std::env::var_os("XDG_CONFIG_HOME")
             .map(PathBuf::from)
             .filter(|p| p.is_absolute())
-            .or_else(|| std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".config")))
+            .or_else(|| {
+                let directory = if cfg!(target_os = "macos") {
+                    "Library/Application Support"
+                } else {
+                    ".config"
+                };
+                std::env::var_os("HOME").map(|h| PathBuf::from(h).join(directory))
+            })
             .ok_or("Répertoire de configuration introuvable")?;
         Ok(base.join("rustremote"))
     }

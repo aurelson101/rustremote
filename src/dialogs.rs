@@ -1464,6 +1464,17 @@ impl Controller {
             self.information("Connexion bloquée hors ligne","Le mode --offline interdit toute connexion réelle. Activez la simulation dans le profil pour ouvrir le laboratoire local.");
             return;
         }
+        #[cfg(target_os = "macos")]
+        if matches!(
+            profile.options,
+            ProtocolOptions::Vnc { .. } | ProtocolOptions::Serial { .. }
+        ) {
+            self.information(
+                "Protocole indisponible",
+                "VNC et les ports série sont disponibles en simulation sur macOS.",
+            );
+            return;
+        }
         if let Some(session) = self.0.terminals.borrow().get(&profile.name)
             && session.active()
         {
@@ -1561,6 +1572,15 @@ impl Controller {
                     io(move||crate::external::Client::spawn(&profile,crate::credentials::Secret::new(secret.as_str().to_owned())),move|result|{
                         b.set_sensitive(true);
                         match result {Ok(client)=>{
+                            if !w.is_visible() || c.0.offline.get() {
+                                client.disconnect();
+                                return;
+                            }
+                            if c.0.external.borrow().get(&name).is_some_and(|client| client.active()) {
+                                client.disconnect();
+                                e.set_text("Cette connexion RDP est déjà ouverte");
+                                return;
+                            }
                             c.0.external.borrow_mut().retain(|_,client|client.active());
                             c.0.external.borrow_mut().insert(name.clone(),client.clone());
                             c.0.status.set_text("Client RDP lancé · connexion en cours avec contrôle NLA et certificat");

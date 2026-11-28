@@ -1,8 +1,9 @@
 use crate::profiles::SessionProfile;
 use gtk::prelude::*;
+#[cfg(target_os = "linux")]
+use std::os::fd::{AsRawFd, FromRawFd, OwnedFd};
 use std::{
     cell::{Cell, RefCell},
-    os::fd::{AsRawFd, FromRawFd, OwnedFd},
     rc::Rc,
 };
 use vte::prelude::*;
@@ -15,6 +16,7 @@ struct SessionInner {
     cancelled: Cell<bool>,
     cancel: gtk::gio::Cancellable,
     terminal: gtk::glib::WeakRef<vte::Terminal>,
+    #[cfg(target_os = "linux")]
     pidfd: RefCell<Option<OwnedFd>>,
     sftp_windows: RefCell<Vec<gtk::glib::WeakRef<gtk::Window>>>,
     profile: SessionProfile,
@@ -149,6 +151,7 @@ impl Session {
         {
             window.close();
         }
+        #[cfg(target_os = "linux")]
         if let Some(fd) = self.0.pidfd.borrow_mut().take() {
             // pidfd : aucune possibilité de signaler un PID réutilisé par le système.
             unsafe {
@@ -162,6 +165,8 @@ impl Session {
             }
         }
         if let Some(terminal) = self.0.terminal.upgrade() {
+            #[cfg(target_os = "macos")]
+            hang_up_pty(&terminal);
             terminal.set_input_enabled(false);
         }
     }
@@ -169,6 +174,11 @@ impl Session {
 impl Drop for SessionInner {
     fn drop(&mut self) {
         self.cancel.cancel();
+        #[cfg(target_os = "macos")]
+        if let Some(terminal) = self.terminal.upgrade() {
+            hang_up_pty(&terminal);
+        }
+        #[cfg(target_os = "linux")]
         if let Some(fd) = self.pidfd.get_mut().take() {
             unsafe {
                 libc::syscall(
@@ -180,6 +190,17 @@ impl Drop for SessionInner {
                 );
             }
         }
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn hang_up_pty(terminal: &vte::Terminal) {
+    use std::os::fd::AsRawFd;
+    if let Some(pty) = terminal.pty() {
+        // Darwin TIOCSIG (_IO('t', 95)) targets the PTY's foreground group.
+        // A live reference keeps the master descriptor open throughout the call.
+        const TIOCSIG: libc::c_ulong = 0x2000_745f;
+        unsafe { libc::ioctl(pty.fd().as_raw_fd(), TIOCSIG, libc::SIGHUP) };
     }
 }
 
@@ -222,10 +243,14 @@ fn open_internal(
         profile.options,
         crate::profiles::ProtocolOptions::Ssh { .. }
     ) {
-        let directory = tempfile::Builder::new()
-            .prefix("rr-ssh-control-")
-            .tempdir()
-            .map_err(|_| "Contrôle d’authentification SSH indisponible")?;
+        let mut builder = tempfile::Builder::new();
+        builder.prefix("rr-ssh-control-");
+        let directory = if cfg!(target_os = "macos") {
+            builder.tempdir_in("/tmp")
+        } else {
+            builder.tempdir()
+        }
+        .map_err(|_| "Contrôle d’authentification SSH indisponible")?;
         args.splice(
             0..0,
             [
@@ -304,6 +329,7 @@ fn open_internal(
     ))]);
     let session = Session(Rc::new(SessionInner {
         pid: Cell::new(None),
+        #[cfg(target_os = "linux")]
         pidfd: RefCell::new(None),
         sftp_windows: RefCell::new(Vec::new()),
         profile: profile.clone(),
@@ -522,6 +548,7 @@ fn open_internal(
             child.auth.borrow_mut().take();
             child.credential.borrow_mut().take();
             child.pid.set(None);
+            #[cfg(target_os = "linux")]
             child.pidfd.replace(None);
             child.cancelled.set(true);
             for window in child
@@ -606,12 +633,15 @@ fn open_internal(
                     auth.pid
                         .store(pid.0 as u32, std::sync::atomic::Ordering::Relaxed);
                 }
-                let fd = unsafe { libc::syscall(libc::SYS_pidfd_open, pid.0, 0) };
-                if fd >= 0 {
-                    child
-                        .0
-                        .pidfd
-                        .replace(Some(unsafe { OwnedFd::from_raw_fd(fd as i32) }));
+                #[cfg(target_os = "linux")]
+                {
+                    let fd = unsafe { libc::syscall(libc::SYS_pidfd_open, pid.0, 0) };
+                    if fd >= 0 {
+                        child
+                            .0
+                            .pidfd
+                            .replace(Some(unsafe { OwnedFd::from_raw_fd(fd as i32) }));
+                    }
                 }
                 if child.0.cancelled.get() {
                     child.disconnect();

@@ -93,6 +93,8 @@ Phrase secrète	Passphrase
 Confirmation de la phrase secrète	Confirm passphrase
 Continuer sans chiffrement	Continue without encryption
 Importer des profils RustRemote	Import RustRemote profiles
+JSON RustRemote uniquement (2 Mio max). Aucun secret accepté. Prévisualisation avant import, aucun remplacement ni connexion automatique.	RustRemote JSON only (2 MiB max). Secrets are rejected. Preview before import. Existing profiles are preserved and no connections are opened.
+Après l’import, choisissez les fichiers SSH locaux dans le profil (clé, known_hosts, configuration OpenSSH).	After import, select the local SSH files in the profile (key, known_hosts, OpenSSH configuration).
 Fichier à importer	Import file
 Prévisualiser l’import	Preview import
 Confirmer l’import	Confirm import

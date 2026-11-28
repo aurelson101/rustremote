@@ -16,13 +16,9 @@ fn catalog() -> &'static Vec<(&'static str, &'static str)> {
     })
 }
 pub fn initialize() {
-    let root = std::env::var_os("XDG_CONFIG_HOME")
-        .map(std::path::PathBuf::from)
-        .or_else(|| std::env::var_os("HOME").map(|h| std::path::PathBuf::from(h).join(".config")));
-    let french = root
-        .and_then(|p| {
-            crate::preferences::Preferences::load(&p.join("rustremote/settings.json")).ok()
-        })
+    let french = crate::store::Store::directory()
+        .ok()
+        .and_then(|p| crate::preferences::Preferences::load(&p.join("settings.json")).ok())
         .is_some_and(|p| p.language == "fr");
     // Explicit override also lets the isolated French accessibility labs keep their labels.
     let french = match std::env::var("RUSTREMOTE_LANGUAGE").as_deref() {

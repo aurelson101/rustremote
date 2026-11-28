@@ -14,10 +14,10 @@ pub struct Scope {
 }
 impl Scope {
     pub fn parse(value: &str) -> Result<Self, String> {
-        let (ip, prefix) = value.trim().split_once('/').map_or(
-            (value.trim(), if value.contains(':') { "128" } else { "32" }),
-            |p| p,
-        );
+        let (ip, prefix) = value
+            .trim()
+            .split_once('/')
+            .unwrap_or((value.trim(), if value.contains(':') { "128" } else { "32" }));
         if let Ok(IpAddr::V6(ip)) = ip.parse::<IpAddr>() {
             let prefix = prefix.parse::<u32>().map_err(|_| "Préfixe CIDR invalide")?;
             if !(120..=128).contains(&prefix) {
@@ -217,9 +217,19 @@ fn reverse_name(address: IpAddr, cancel: &AtomicBool, deadline: Instant) -> Opti
     if cancel.load(Ordering::Relaxed) || Instant::now() >= deadline {
         return None;
     }
-    let mut command = Command::new("/usr/bin/getent");
+    #[cfg(target_os = "linux")]
+    let mut command = {
+        let mut command = Command::new("/usr/bin/getent");
+        command.args(["hosts", &address.to_string()]);
+        command
+    };
+    #[cfg(target_os = "macos")]
+    let mut command = {
+        let mut command = Command::new("/usr/bin/dscacheutil");
+        command.args(["-q", "host", "-a", "ip_address", &address.to_string()]);
+        command
+    };
     command
-        .args(["hosts", &address.to_string()])
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::null());
@@ -270,15 +280,51 @@ fn reverse_name(address: IpAddr, cancel: &AtomicBool, deadline: Instant) -> Opti
     if !successful || bytes.len() > 1024 {
         return None;
     }
-    parse_name(address, &bytes)
+    #[cfg(target_os = "linux")]
+    {
+        parse_name(address, &bytes)
+    }
+    #[cfg(target_os = "macos")]
+    {
+        parse_macos_name(address, &bytes)
+    }
 }
+#[cfg(any(target_os = "linux", test))]
 fn parse_name(address: IpAddr, bytes: &[u8]) -> Option<String> {
     let text = std::str::from_utf8(bytes).ok()?;
     let mut fields = text.split_whitespace();
     if fields.next()?.parse::<IpAddr>().ok()? != address {
         return None;
     }
-    let name = fields.next()?;
+    checked_name(fields.next()?)
+}
+#[cfg(target_os = "macos")]
+fn parse_macos_name(address: IpAddr, bytes: &[u8]) -> Option<String> {
+    let text = std::str::from_utf8(bytes).ok()?;
+    let address_prefix = if address.is_ipv4() {
+        "ip_address:"
+    } else {
+        "ipv6_address:"
+    };
+    text.split("\n\n").find_map(|record| {
+        let matches_address = record.lines().any(|line| {
+            line.strip_prefix(address_prefix)
+                .and_then(|value| value.trim().parse::<IpAddr>().ok())
+                == Some(address)
+        });
+        if !matches_address {
+            return None;
+        }
+        checked_name(
+            record
+                .lines()
+                .find_map(|line| line.strip_prefix("name:"))?
+                .trim(),
+        )
+    })
+}
+
+fn checked_name(name: &str) -> Option<String> {
     (name.len() <= 253
         && !name.is_empty()
         && name

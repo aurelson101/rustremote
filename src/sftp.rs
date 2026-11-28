@@ -216,6 +216,7 @@ fn publish(from: &Path, to: &Path) -> Result<(), String> {
     use std::os::unix::ffi::OsStrExt;
     let from = std::ffi::CString::new(from.as_os_str().as_bytes()).map_err(error)?;
     let to = std::ffi::CString::new(to.as_os_str().as_bytes()).map_err(error)?;
+    #[cfg(target_os = "linux")]
     let result = unsafe {
         libc::renameat2(
             libc::AT_FDCWD,
@@ -225,6 +226,8 @@ fn publish(from: &Path, to: &Path) -> Result<(), String> {
             libc::RENAME_NOREPLACE,
         )
     };
+    #[cfg(target_os = "macos")]
+    let result = unsafe { libc::renamex_np(from.as_ptr(), to.as_ptr(), libc::RENAME_EXCL) };
     if result != 0 {
         return Err(
             "Destination existante ou publication atomique impossible ; aucun écrasement".into(),

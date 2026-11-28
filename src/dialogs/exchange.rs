@@ -59,7 +59,7 @@ impl Controller {
         let body = gtk::Box::new(gtk::Orientation::Vertical, 12);
         body.add_css_class("dialog-content");
         let hint = gtk::Label::new(Some(
-            "JSON RustRemote uniquement (2 Mio max). Aucun secret accepté. Prévisualisation avant import, aucun remplacement ni connexion automatique.",
+            "JSON RustRemote uniquement (2 Mio max). Aucun secret accepté. Prévisualisation avant import, aucun remplacement ni connexion automatique.\nAprès l’import, choisissez les fichiers SSH locaux dans le profil (clé, known_hosts, configuration OpenSSH).",
         ));
         hint.set_wrap(true);
         body.append(&hint);

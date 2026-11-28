@@ -2,6 +2,19 @@
 
 **Règle :** le statut `DONE` exige résultat observable + commande de vérification enregistrée dans `MEMORY.md`. Si l'outil est indisponible, marquer `BLOCKED`, jamais `DONE`. Une seule tâche principale ouverte par agent.
 
+**Déploiement local macOS Apple Silicon — DONE (2026-11-28).** Aperçu SSH/SFTP/RDP
+0.9.2 installé dans `~/Applications/RustRemote.app` et fenêtre vérifiée.
+Parcours graphique SSH en boucle locale validé après correction du lancement et de
+la fermeture VTE. Rejeu GTK local automatisé et trousseau validé sur entrée
+temporaire. RDP réel validé en boucle locale via FreeRDP SDL de Homebrew, avec
+NLA, contrôle du certificat et déconnexion. Windows réel et redirections RDP
+restent à qualifier. Verrou corrigé pour RUSTSEC-2026-0544.
+Les fichiers SSH locaux des profils importés doivent être choisis dans l’éditeur.
+VNC et série disponibles en simulation. Le paquet dépend de Homebrew.
+Logo intégré à la barre de titre et au paquet macOS. Reconstruction locale avec
+`python3 scripts/build-macos-app.py`.
+Distribution GitHub via le tag [macos-v0.9.2-preview](https://github.com/aurelson101/rustremote/releases/tag/macos-v0.9.2-preview).
+
 ## Campagne 15 contrôles / 10 améliorations — 2026-11-15
 
 Dix améliorations livrées dans le code (cinq Linux, cinq prototype Windows), avec

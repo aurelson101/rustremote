@@ -180,9 +180,21 @@ pub fn build(app: &Application, offline: bool, demo: bool, enforced_offline: boo
     );
     let root = Box::new(Orientation::Vertical, 0);
     let header = gtk::HeaderBar::new();
-    header.set_title_widget(Some(&Label::new(Some(
+    let title = Box::new(Orientation::Horizontal, 6);
+    let pixbuf = gtk::gdk_pixbuf::Pixbuf::from_resource_at_scale(
+        "/com/rustremote/icons/rustremote.png",
+        24,
+        24,
+        true,
+    )
+    .ok();
+    let logo = gtk::Image::from_pixbuf(pixbuf.as_ref());
+    logo.update_property(&[gtk::accessible::Property::Label("")]);
+    title.append(&logo);
+    title.append(&Label::new(Some(
         "RustRemote — Terminal / SSH / RDP / SFTP",
-    ))));
+    )));
+    header.set_title_widget(Some(&title));
     header.add_css_class("titlebar");
     let tabs = gtk::Notebook::new();
     tabs.set_hexpand(true);

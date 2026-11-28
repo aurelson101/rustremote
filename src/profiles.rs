@@ -1,5 +1,17 @@
 use serde::{Deserialize, Serialize};
 
+#[cfg(target_os = "macos")]
+pub fn freerdp_binary() -> &'static str {
+    const APPLE_SILICON: &str = "/opt/homebrew/bin/sdl-freerdp";
+    const INTEL: &str = "/usr/local/bin/sdl-freerdp";
+    if std::path::Path::new(APPLE_SILICON).is_file() || !std::path::Path::new(INTEL).is_file() {
+        APPLE_SILICON
+    } else {
+        INTEL
+    }
+}
+
+#[cfg(target_os = "linux")]
 pub fn freerdp_binary() -> &'static str {
     if std::path::Path::new("/usr/bin/xfreerdp3").is_file() {
         "/usr/bin/xfreerdp3"
@@ -613,12 +625,34 @@ pub(crate) mod tests {
         }
         let mut profile = example();
         profile.credential_ref = Some("e0a306ec-71ee-44d0-bc89-dcf7f657135a".into());
+        profile.options = ProtocolOptions::Ssh {
+            identity_file: Some("/tmp/imported-key".into()),
+            agent: true,
+            known_hosts_file: Some("/tmp/imported-known-hosts".into()),
+            config_file: Some("/tmp/imported-config".into()),
+        };
+        let mut existing_profile = profile.clone();
+        existing_profile.name = "Existing profile".into();
+        let existing = Workspace {
+            profiles: vec![existing_profile],
+            ..Workspace::default()
+        };
         let data = Workspace {
             profiles: vec![profile],
             ..Workspace::default()
         };
-        let imported = Workspace::default().merge(&data).unwrap();
-        assert!(imported.profiles[0].credential_ref.is_none());
+        let imported = existing.merge(&data).unwrap();
+        assert_eq!(imported.profiles[0], existing.profiles[0]);
+        assert!(imported.profiles[1].credential_ref.is_none());
+        assert!(matches!(
+            imported.profiles[1].options,
+            ProtocolOptions::Ssh {
+                identity_file: None,
+                agent: true,
+                known_hosts_file: None,
+                config_file: None,
+            }
+        ));
         assert!(data.profiles[0].credential_ref.is_some());
     }
     #[test]
@@ -925,6 +959,18 @@ impl Workspace {
             .profiles
             .extend(incoming.profiles.iter().cloned().map(|mut p| {
                 p.credential_ref = None;
+                // Local paths grant trust or access to files on this machine.
+                if let ProtocolOptions::Ssh {
+                    identity_file,
+                    known_hosts_file,
+                    config_file,
+                    ..
+                } = &mut p.options
+                {
+                    *identity_file = None;
+                    *known_hosts_file = None;
+                    *config_file = None;
+                }
                 p
             }));
         result.validate()?;

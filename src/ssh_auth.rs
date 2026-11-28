@@ -4,7 +4,7 @@ use gtk::prelude::*;
 use std::{
     cell::RefCell,
     os::{fd::AsRawFd, unix::net::UnixListener},
-    path::PathBuf,
+    path::{Path, PathBuf},
     rc::Rc,
     sync::{
         Arc,
@@ -13,6 +13,43 @@ use std::{
     },
     time::{Duration, Instant},
 };
+
+#[cfg(target_os = "linux")]
+fn verified_parent(pid: i32, helper: &Path) -> Option<u32> {
+    if std::fs::read_link(format!("/proc/{pid}/exe"))
+        .ok()
+        .as_deref()
+        != Some(helper)
+    {
+        return None;
+    }
+    std::fs::read_to_string(format!("/proc/{pid}/status"))
+        .ok()?
+        .lines()
+        .find_map(|line| line.strip_prefix("PPid:")?.trim().parse().ok())
+}
+
+#[cfg(target_os = "macos")]
+fn verified_parent(pid: i32, helper: &Path) -> Option<u32> {
+    use std::os::unix::ffi::OsStrExt;
+    let mut path = [0u8; libc::PROC_PIDPATHINFO_MAXSIZE as usize];
+    let len = unsafe { libc::proc_pidpath(pid, path.as_mut_ptr().cast(), path.len() as u32) };
+    if len <= 0 || path.get(..len as usize)? != helper.as_os_str().as_bytes() {
+        return None;
+    }
+    let mut info = std::mem::MaybeUninit::<libc::proc_bsdinfo>::uninit();
+    let size = std::mem::size_of::<libc::proc_bsdinfo>() as i32;
+    let read = unsafe {
+        libc::proc_pidinfo(
+            pid,
+            libc::PROC_PIDTBSDINFO,
+            0,
+            info.as_mut_ptr().cast(),
+            size,
+        )
+    };
+    (read == size).then(|| unsafe { info.assume_init() }.pbi_ppid)
+}
 struct Prompt {
     text: String,
     confirm: bool,
@@ -28,10 +65,14 @@ pub struct Bridge {
 }
 impl Bridge {
     pub fn new(parent: &gtk::Window, secret: Arc<Secret>) -> Result<Self, String> {
-        let directory = tempfile::Builder::new()
-            .prefix("rr-auth-")
-            .tempdir()
-            .map_err(|_| "Socket d’authentification indisponible")?;
+        let mut builder = tempfile::Builder::new();
+        builder.prefix("rr-auth-");
+        let directory = if cfg!(target_os = "macos") {
+            builder.tempdir_in("/tmp")
+        } else {
+            builder.tempdir()
+        }
+        .map_err(|_| "Socket d’authentification indisponible")?;
         let path = directory.path().join("auth.sock");
         let listener = UnixListener::bind(&path).map_err(|_| "Création du socket impossible")?;
         listener
@@ -70,10 +111,7 @@ impl Bridge {
                     let Ok((uid, pid)) = wire::peer(&stream) else {
                         continue;
                     };
-                    if uid != unsafe { libc::geteuid() }
-                        || std::fs::read_link(format!("/proc/{pid}/exe")).ok().as_ref()
-                            != Some(&helper)
-                    {
+                    if uid != unsafe { libc::geteuid() } {
                         continue;
                     }
                     let deadline = Instant::now() + Duration::from_secs(2);
@@ -83,16 +121,10 @@ impl Bridge {
                     {
                         std::thread::sleep(Duration::from_millis(10));
                     }
-                    let ppid = std::fs::read_to_string(format!("/proc/{pid}/status"))
-                        .ok()
-                        .and_then(|s| {
-                            s.lines().find_map(|l| {
-                                l.strip_prefix("PPid:")
-                                    .and_then(|v| v.trim().parse::<u32>().ok())
-                            })
-                        });
-                    if ppid != Some(ssh_pid.load(Ordering::Relaxed))
+                    let expected = ssh_pid.load(Ordering::Relaxed);
+                    if expected == 0
                         || cancel.load(Ordering::Relaxed)
+                        || verified_parent(pid, &helper) != Some(expected)
                     {
                         continue;
                     }

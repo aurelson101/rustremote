@@ -20,13 +20,28 @@ mod tools;
 mod transfers;
 mod ui;
 
+#[cfg(all(target_os = "macos", feature = "macos-gui-lab"))]
+#[path = "../scripts/macos-gui-lab.rs"]
+mod macos_gui_lab;
+
 use gtk::prelude::*;
 
 fn main() -> gtk::glib::ExitCode {
+    #[cfg(all(target_os = "macos", feature = "macos-gui-lab"))]
+    match std::env::args().nth(1).as_deref() {
+        Some("--macos-gui-lab") => return macos_gui_lab::run(),
+        Some("--macos-rdp-lab") => return macos_gui_lab::rdp(),
+        _ => {}
+    }
     if std::env::args().any(|arg| arg == "--version") {
         println!(
-            "RustRemote {} — Linux SSH/RDP client",
-            env!("CARGO_PKG_VERSION")
+            "RustRemote {} — {}",
+            env!("CARGO_PKG_VERSION"),
+            if cfg!(target_os = "macos") {
+                "macOS SSH/SFTP/RDP preview"
+            } else {
+                "Linux SSH/RDP client"
+            }
         );
         return gtk::glib::ExitCode::SUCCESS;
     }

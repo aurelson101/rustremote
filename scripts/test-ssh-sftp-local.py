@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """SSH/SFTP réel sur loopback, sans shell ni compte système, fichiers éphémères.
-Prérequis de test : python3-paramiko, openssh-client. Ne teste pas un moteur Rust.
+Prérequis : Paramiko et OpenSSH. Sur macOS, --macos-gui-lab ajoute le rejeu GTK.
 """
 import errno
 import json
@@ -14,8 +14,14 @@ import threading
 import time
 import sys
 import secrets
+import uuid
 
 import paramiko
+
+if "--macos-gui-lab" in sys.argv and (sys.platform != "darwin" or "--gui" not in sys.argv):
+    sys.exit("--macos-gui-lab requires macOS and --gui <binary>")
+if "--macos-keychain-lab" in sys.argv and "--macos-gui-lab" not in sys.argv:
+    sys.exit("--macos-keychain-lab requires --macos-gui-lab")
 
 os.umask(0o077)
 # Ne pas conserver de trames ni de clés : uniquement des compteurs d'événements.
@@ -392,12 +398,25 @@ with tempfile.TemporaryDirectory(prefix="rustremote-ssh-") as directory:
             primary={"name":"SSH intégré — laboratoire","host":"127.0.0.1","port":port,"username":"lab","favorite":False,"folder":"Linux","platform":"Linux","simulation":False,"options":{"protocol":"Ssh","identity_file":str(base/"identity"),"agent":False,"known_hosts_file":str(gui_known),"config_file":"/dev/null"}}
             agent_profile=dict(primary,name="SSH Agent — laboratoire",options=dict(primary["options"],identity_file=None,agent=True))
             (config/"profiles.json").write_text(json.dumps({"version":1,"folders":["Linux"],"profiles":[primary,agent_profile]}))
-            if "--rust-editor-only" in sys.argv:
+            if "--rust-editor-only" in sys.argv or "--macos-gui-lab" in sys.argv:
                 profile_file=base/"rust-editor-profile.json"
                 profile_file.write_text(json.dumps(primary));profile_file.chmod(0o600)
                 env=dict(gui_env,RUSTREMOTE_SFTP_LAB_ROOT=str(data),RUSTREMOTE_SFTP_LAB_PROFILE=str(profile_file))
                 subprocess.run(["cargo","test","--workspace","sftp::tests::remote_editor_preserves_permissions_and_cleans_failed_write","--","--ignored","--exact"],env=env,check=True,timeout=120)
                 summary["application_rust_sftp_editor_permissions_and_failed_write_cleanup"]=True
+                if "--macos-gui-lab" in sys.argv:
+                    before = events["shell_commands"]
+                    auth_before = events.get("password_accepted", 0)
+                    args = [str(image), "--macos-gui-lab", str(profile_file), str(base/"password.secret")]
+                    if "--macos-keychain-lab" in sys.argv:
+                        args.append(str(uuid.uuid4()))
+                    subprocess.run(args, env=gui_env, check=True, timeout=45)
+                    assert events["shell_commands"] >= before + 2
+                    assert events.get("password_accepted", 0) >= auth_before + 1
+                    summary["application_macos_ssh_gui"] = True
+                    summary["application_macos_rdp_simulation"] = True
+                    if "--macos-keychain-lab" in sys.argv:
+                        summary["application_macos_keychain_roundtrip"] = True
             else:
                 gui=subprocess.run(["dbus-run-session","--","python3",str(Path(__file__).with_name("smoke-connected.py")),str(image),str(config.parent)],env=gui_env,timeout=600)
                 assert gui.returncode==0,"Parcours SSH intégré échoué"
@@ -423,5 +442,7 @@ with tempfile.TemporaryDirectory(prefix="rustremote-ssh-") as directory:
         assert not worker.is_alive() and all(not t.is_alive() for t in transports)
         summary["services_stopped"] = True
         summary["events"] = events
-        (Path(__file__).resolve().parent.parent/"dist/ssh-sftp-local-result.json").write_text(json.dumps(summary, indent=2))
+        report = Path(__file__).resolve().parent.parent / "dist/ssh-sftp-local-result.json"
+        report.parent.mkdir(exist_ok=True)
+        report.write_text(json.dumps(summary, indent=2))
         print(json.dumps(summary, ensure_ascii=False))

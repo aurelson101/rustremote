@@ -32,6 +32,51 @@ Créer **RustRemote**, application de bureau Linux centrée sur des sessions SSH
 
 ## 4. Travaux réalisés (faits vérifiés uniquement)
 
+Le 2026-11-28, RustRemote 0.9.2 a été compilé pour Apple Silicon et installé
+dans `~/Applications/RustRemote.app`. Ouverture par `open` et fenêtre 1400×820
+confirmées sous macOS 27.2.1. Le paquet signé ad hoc utilise GTK4/VTE de Homebrew.
+Contrôles réussis : `cargo fmt --all -- --check`, `cargo check --workspace --locked`,
+`cargo clippy --workspace --all-targets --locked -- -D warnings`,
+`cargo test --workspace --locked` (55 réussis, 2 ignorés par défaut),
+`cargo build --release --locked --bins` et `codesign --verify --strict --deep`.
+La fixture `scripts/test-ssh-sftp-local.py --gui <binaire> --rust-editor-only`
+a aussi validé l’édition SFTP en boucle locale et le nettoyage après échec.
+Debug macOS : deux SIGSEGV VTE 0.84.1 reproduits en laboratoire, dans `fdwalk`
+au lancement et dans `set_pty(NULL)` à la déconnexion. Pile principale de 32 Mio
+et déconnexion via `TIOCSIG` sur le PTY. Paquet local reconstruit, signé et ouvert.
+Harnais GTK temporaire sur le code de production : SSH loopback par clé et askpass,
+réponse UTF-8, déconnexion, profil « Serveur IA » hors réseau et douze ouvertures/
+fermetures RDP simulées avec contrôle de l’activation du presse-papiers. Un
+avertissement GDK de rendu lors des cycles rapides.
+`libz-sys` mis à jour de 1.1.32 à 1.1.33. `cargo audit` termine avec cinq alertes
+de maintenance et aucune vulnérabilité signalée. L’import SSH retire les chemins
+locaux de clé, known_hosts et configuration OpenSSH des nouveaux profils. La langue
+est lue depuis le même répertoire de configuration que les autres préférences.
+Format, check, Clippy, 55 tests et rejeu GTK SSH/SFTP loopback/RDP simulé réussis.
+Paquet macOS reconstruit, signature vérifiée et fenêtre ouverte après mise à jour.
+
+Qualification macOS locale du 2026-11-28. Rejeu natif automatisé avec
+`cargo build --locked --bins --features macos-gui-lab`, puis
+`python3 scripts/test-ssh-sftp-local.py --gui target/debug/rustremote --macos-gui-lab`.
+Avec `--macos-keychain-lab`, écriture, lecture et suppression d’une entrée isolée
+vérifiées via le backend RustRemote. Le RDP macOS utilise FreeRDP SDL de Homebrew.
+Lanceur testé avec FreeRDP 3.33.1 et IronRDP (révision
+`814816c0dd61f7dd3a1833240368ffcd057b1acb`) sur 127.0.0.1. Fenêtre RDP ouverte
+avec NLA et empreinte SHA-256, puis arrêt et récupération du client après
+déconnexion. Empreinte incorrecte, certificat auto-signé non approuvé et mot de
+passe incorrect refusés. Windows réel et redirections RDP restent à qualifier.
+
+Logo RustRemote ajouté le 2026-11-28. Source ImageGen intégrée dans
+`assets/icons/rustremote.png` (terminal vert menthe, fond bleu nuit, liseré cuivre).
+La barre de titre GTK et l’icône macOS utilisent la même image.
+`python3 scripts/build-macos-app.py` produit le paquet local signé ad hoc avec
+`RustRemote.icns`. Installation et relance vérifiées, ainsi que la résolution de
+l’icône par macOS. Format, check, Clippy et 55 tests réussis.
+
+Référence de publication macOS Apple Silicon : `macos-v0.9.2-preview`.
+Le README indique les dépendances Homebrew, la signature ad hoc et le périmètre
+validé. Le ZIP contient le paquet, la licence et les notices, avec SHA-256 séparé.
+
 | Date | Agent | Tâches | Fichiers | Vérification |
 |---|---|---|---|---|
 | 2026-11-07 | Préparation | Création du pack documentaire | README, instructions agents, docs, prompts, assets | Présence des fichiers et archive ZIP validées ; Rust non compilé |
